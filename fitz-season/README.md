@@ -85,6 +85,21 @@ back to system fonts offline. The file is split into commented sections:
 setup, content (days, enemies, upgrades and all the writing), audio, world,
 game flow, drawing, and input/main loop.
 
+### The radio
+
+The chatter at the bottom of the screen comes from `RADIO` in `index.html`.
+Each entry is a conversation that plays one line at a time. There are about
+120 conversations, in these pools:
+
+- **General:** always available.
+- **Per threat:** a pool starts on the day that threat first appears.
+- **Situations:** the gale day, the boss and nighttime.
+- **Reactions:** Christmas reaching town, a low hull, the horn, a pasty, a big
+  combo, an ope shield and the early gale. Each has a cooldown.
+
+A conversation won't repeat in a run until its pool runs out. To add jokes,
+append to the right pool, keeping the respect rules above.
+
 Saves use `localStorage` keys prefixed `fitz_`: `best`, `won` and `muted`.
 
 ### Testing and balancing
