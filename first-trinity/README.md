@@ -19,7 +19,9 @@ Requesting a song really changes the music.
 
 ## Play
 
-Open `index.html`. That's it — the whole game is one file with **zero
+🎮 **[hallowedgains.com/games/first-trinity](https://hallowedgains.com/games/first-trinity/)**
+
+Or open `index.html`. That's it — the whole game is one file with **zero
 dependencies, no build step, and no external assets** (all pixel art and music
 are generated in code), so it works from a plain file, any static host, or
 embedded in a website.

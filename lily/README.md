@@ -1,6 +1,6 @@
 # 🎮 Lily's games
 
-Gentle little games for small hands (ages ~4+), all served from this repo.
+Gentle little games for small hands (ages ~4+), all served from this folder.
 Opening the site shows a **game menu** — pick a game, play, and the
 🎮 **All games** button on each game's title screen brings you back.
 
@@ -11,12 +11,13 @@ Opening the site shows a **game menu** — pick a game, play, and the
 
 ## Play it
 
-🎮 **[unicorngame.hallowedgains.com](https://unicorngame.hallowedgains.com)**
+🎮 **[hallowedgains.com/games/lily](https://hallowedgains.com/games/lily/)**
 
-Served straight from this repo by GitHub Pages — every push to `main` goes
-live within a minute or so. You can also open [index.html](index.html)
+Published with the rest of this repo; see the [top-level README](../README.md)
+for how pushes go live. The old unicorngame.hallowedgains.com address still
+works and forwards there. You can also open [index.html](index.html)
 straight from disk — double-click it, no install or internet needed — or run
-any static server in the repo folder (`python3 -m http.server`).
+any static server in this folder (`python3 -m http.server`).
 
 ### Install it as an app
 
@@ -33,7 +34,7 @@ Once installed it opens fullscreen in landscape and plays offline. Progress is
 saved by the browser per game, so it carries over from the website to the
 installed app on the same device.
 
-## How the repo is laid out
+## How the folder is laid out
 
 ```
 index.html            the game menu
@@ -49,7 +50,7 @@ each game's saved progress to say how far along it is.
 
 The service worker (`sw.js`) caches the menu and both games. It fetches pages
 from the network first and falls back to its cache, so a push to `main` is
-still live on the next launch — the cache is only there for when the network
+still live on the next launch after the site deploys — the cache is only there for when the network
 isn't. Bump its `CACHE` name when the icons, manifest or list of pages change;
 it carries a panic switch in its header comment if it ever needs turning off.
 
