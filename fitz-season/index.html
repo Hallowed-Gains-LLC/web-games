@@ -78,11 +78,20 @@
   }
   #hornBtn.ready { animation: pulse 0.9s ease-in-out infinite; color: var(--gold); }
   @keyframes pulse { 50% { transform: scale(1.08); } }
+  /* In the HUD row, after the score, so it can never cover anything. */
   #pauseBtn {
-    position: absolute; right: max(12px, env(safe-area-inset-right)); top: 58px; pointer-events: auto;
-    width: 40px; height: 40px; border-radius: 10px; font-family: 'Bungee', sans-serif;
-    background: rgba(13,20,28,.72); border: 2px solid rgba(255,255,255,.18);
+    pointer-events: auto; width: 38px; height: 32px; border-radius: 10px; font-family: 'Bungee', sans-serif;
+    background: rgba(13,20,28,.72); border: 2px solid rgba(255,255,255,.18); padding: 0;
   }
+  /* Day-one coaching hints, just under the HUD. */
+  #coach {
+    position: fixed; top: calc(max(10px, env(safe-area-inset-top)) + 58px); left: 50%; z-index: 6;
+    transform: translate(-50%, -6px); width: max-content; max-width: min(520px, calc(100vw - 24px));
+    padding: 9px 14px; border-radius: 12px; background: rgba(232, 182, 76, .96); color: #1d2733;
+    font-family: 'Bungee', sans-serif; font-size: 14px; line-height: 1.35; text-align: center;
+    box-shadow: 0 6px 18px rgba(0,0,0,.35); opacity: 0; transition: opacity .3s, transform .3s; pointer-events: none;
+  }
+  #coach.show { opacity: 1; transform: translate(-50%, 0); }
   #radio {
     position: fixed; left: 12px; bottom: max(14px, env(safe-area-inset-bottom)); z-index: 6;
     max-width: min(460px, calc(100vw - 140px)); padding: 8px 12px; border-radius: 12px;
@@ -165,15 +174,16 @@
   <div class="meter"><span class="label">HULL</span><div class="bar"><i id="hullBar"></i></div></div>
   <div class="meter"><span class="label">CHRISTMAS CREEP</span><div class="bar"><i id="creepBar" style="width:0"></i></div></div>
   <div class="meter" id="bossMeter" hidden><span class="label">INFLATABLE</span><div class="bar"><i id="bossBar"></i></div></div>
-  <div class="pill" id="scorePill">0</div>
   <div class="pill" id="dadPill">📻 Dad played the song 0×</div>
+  <div class="pill" id="scorePill">0</div>
+  <button id="pauseBtn" aria-label="Pause">II</button>
 </div>
 
 <div id="controls" hidden>
-  <button id="pauseBtn" aria-label="Pause">II</button>
   <button id="hornBtn" aria-label="Blow the horn">HORN</button>
 </div>
 <div id="radio"></div>
+<div id="coach"></div>
 
 <div id="overlay"><div class="card" id="card"></div></div>
 
@@ -247,17 +257,22 @@ const SHORE_X = 70; // the town on the left; Christmas that gets past here count
 function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, 2);
   const cw = window.innerWidth, ch = window.innerHeight;
-  scale = Math.max(0.4, Math.min(cw / 900, ch / 560));
+  // Landscape fits about 900 x 560 units. Portrait narrows the world so the
+  // boat stays big, and (below) raises the waterline so the action sits in
+  // the middle of the screen instead of under a mile of empty sky.
+  const portrait = ch > cw;
+  scale = Math.max(0.4, Math.min(cw / (portrait ? 700 : 900), ch / 560));
   W = cw / scale;
   H = ch / scale;
   canvas.width = Math.round(cw * dpr);
   canvas.height = Math.round(ch * dpr);
   canvas.style.width = cw + 'px';
   canvas.style.height = ch + 'px';
-  waterY = H - clamp(H * 0.3, 140, 200);
+  waterY = portrait ? Math.round(H * 0.6) : H - clamp(H * 0.3, 140, 200);
+  ship.L = W < 800 ? 250 : 300;
 }
 window.addEventListener('resize', resize);
-resize();
+// (resize() runs once `ship` exists, further down.)
 
 /** Highest point enemies spawn at, kept clear of the HUD. */
 const skyTop = () => Math.max(waterY - 400, 96 / scale);
@@ -290,7 +305,7 @@ const DAYS = [
     intro: 'deckelf', mix: { candy: 0.9, santa: 0.3, jingle: 0.4, reindeer: 0.25, elfski: 0.45, deckelf: 0.4 }, rate: 2.0, len: 37, gale: 0.45 },
   { title: 'Seasonal Beverages', blurb: 'Peppermint everything. Already. On the seventh.',
     intro: 'latte', mix: { ...ALL, latte: 0.45 }, rate: 2.15, len: 38, gale: 0.5 },
-  { title: 'Gale Warning', blurb: "Lake Superior is in a mood. It's not personal. It's November.",
+  { title: 'The Gales of November', blurb: "They came early. They always come early. Lake Superior is in a mood, and it's not personal.",
     intro: 'gale', mix: ALL, rate: 2.3, len: 40, gale: 1 },
   { title: 'The Great Inflatable', blurb: "Somebody's forty-foot lawn Santa is standing in the lake. This is the last stand.",
     intro: 'boss', mix: { candy: 1, jingle: 0.25 }, rate: 0.8, len: 0, gale: 0.6, boss: true },
@@ -306,7 +321,7 @@ const THREATS = {
   elfski: ['Jet-Ski Elves', 'Ride the waves and ram the boat. Very rude.'],
   deckelf: ['Elf on the Deck', 'Lands on your boat and stares. Your cannons get shy. Blow the horn to shoo it.'],
   latte: ['Seasonal Peppermint Beverage', 'Pop one and it splits into three peppermints.'],
-  gale: ['Gale Warning', 'Huge waves, and wind shoving everything toward shore. Ride the swells.'],
+  gale: ['Gale Warning', 'Huge waves, snow, and wind shoving everything toward shore all day. Ride the swells.'],
   boss: ['The Great Inflatable', 'Forty feet of nylon and holiday spirit. Pop it.'],
 };
 
@@ -349,6 +364,7 @@ const DAD_LINES = [
   'If you see a Christmas tree before the tenth, you have my permission to honk.',
   "Played it {n} times. The dog left.",
   'Six-plus minutes of perfect storytelling. They do not make them like that anymore.',
+  'The gales of November came early, kiddo. Christmas does not get to.',
 ];
 
 // Short lines the radio crackles out during play.
@@ -358,6 +374,7 @@ const RADIO_LINES = [
   ['Deckhand', 'one of the elves waved at me'], ['Deckhand', 'is it bad that i kinda like the candy canes'],
   ['Captain', 'yes.'], ['Dad', "that's {n}."], ['Coast Guard', 'S.S. November, please stop honking at the mall'],
   ['Lake Erie', 'can i be the boss next year'], ['Lake Superior', 'no'], ['Mall Santa', 'ho ho h-'], ['Everyone', 'NOT YET.'],
+  ['Weather Radio', 'gale warning: november, arriving early, as usual'], ['Lake Superior', 'the gales of november come early. read a book.'],
 ];
 
 // Picked between days. Each can be taken up to `max` times.
@@ -575,6 +592,9 @@ function freshUpgrades() {
 }
 
 const ship = { x: 320, y: 400, vx: 0, ang: 0, L: 300, flash: 0, fireT: [0, 0, 0], aims: [0, 0, 0] };
+resize();
+/** Room the boss keeps between itself and the boat. */
+const bossGap = () => (W < 800 ? 110 : 150);
 
 // ----- Waves -----
 // The surface is a few rolling sine waves plus "swells": big humps that
@@ -603,7 +623,7 @@ function updateWaves(dt) {
     G.swellT = rand(3.5, 6.5) - g * 2.2;
   }
   for (const s of G.swells) s.x -= s.v * dt;
-  G.swells = G.swells.filter(s => s.x > -400);
+  G.swells = G.swells.filter(s => s.x > -400 && s.x < W + 600);
 }
 
 // ----- Ship -----
@@ -613,7 +633,7 @@ const pointer = { active: false, x: 0 };
 function shipBounds() {
   const min = SHORE_X + ship.L / 2 + 10;
   let max = W - 24 - ship.L / 2;
-  if (G.boss && !G.boss.flying) max = Math.min(max, G.boss.x - 150 - ship.L / 2);
+  if (G.boss && !G.boss.flying) max = Math.min(max, G.boss.x - bossGap() - ship.L / 2);
   return [min, Math.max(min, max)];
 }
 
@@ -676,16 +696,38 @@ function turretSpots() {
 const KINDS = {
   candy: {
     spawn(e) {
-      Object.assign(e, { x: W + 30, y: rand(skyTop() + 40, waterY - 70), vx: -rand(115, 165), r: 13, hp: 1, pts: 10, creep: 5, dmg: 8,
-        rot: rand(0, 6), spin: rand(-5, 5), phase: rand(0, 6) });
+      Object.assign(e, { x: W + 30, y: rand(skyTop() + 40, waterY - 70), vx: -rand(115, 165), vy: 0, r: 13, hp: 1, pts: 10, creep: 5, dmg: 7,
+        rot: rand(0, 6), spin: rand(-5, 5), phase: rand(0, 6),
+        // Some canes spot the boat and dive at a spot on it. Mid-dive they're
+        // too fast for the cannons, and they don't steer, so the answer is
+        // to move: steering is the whole skill from day one.
+        diver: Math.random() < (G.day === 1 ? 0.2 : 0.15), diving: false });
     },
     update(e, dt) {
+      if (e.diving) {
+        e.x += e.vx * dt; e.y += e.vy * dt;
+        e.rot = Math.atan2(e.vy, e.vx) + Math.PI / 2;
+        if (e.y > surf(e.x)) { e.dead = true; splash(e.x, e.y, 8); SFX.splash(); } // missed: plop
+        return;
+      }
       e.x += (e.vx - G.wind) * dt;
       e.y += Math.sin(G.t * 3 + e.phase) * 40 * dt;
       e.y = Math.min(e.y, surf(e.x) - 14);
       e.rot += e.spin * dt;
+      const ahead = e.x - ship.x;
+      if (e.diver && ahead > 90 && ahead < 300 && e.y < ship.y - 90 && G.gust <= 0) {
+        e.diving = true; e.targetable = false;
+        const tx = ship.x + rand(-0.3, 0.3) * ship.L, ty = ship.y - 20, d = Math.hypot(tx - e.x, ty - e.y) || 1, sp = 330;
+        e.vx = (tx - e.x) / d * sp; e.vy = (ty - e.y) / d * sp;
+        floater(e.x, e.y - 18, '!', '#ffd166');
+        Audio.tone(1400, 0.5, { type: 'sine', vol: 0.1, slide: 500 }); // incoming whistle
+      }
     },
     draw(e) {
+      if (e.diving) { // a little motion trail
+        ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x - e.vx * 0.12, e.y - e.vy * 0.12); ctx.stroke();
+      }
       ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.rot); ctx.translate(-6, -4);
       ctx.lineCap = 'round'; ctx.lineWidth = 7;
       ctx.beginPath(); ctx.moveTo(0, 16); ctx.lineTo(0, -2); ctx.arc(6, -2, 6, Math.PI, 0); ctx.lineTo(12, 2);
@@ -837,9 +879,9 @@ function surfSlope(x) { return Math.atan2(surf(x + 10) - surf(x - 10), 20); }
 // Phase 1 lobs presents. Phase 2 turns on the mall music and sends elves.
 // Phase 3 springs a leak and flies around the sky spitting candy canes.
 
-const BOSS_HP = 650;
+const BOSS_HP = 560;
 function spawnBoss() {
-  G.boss = { x: W - 150, y: waterY + 260, hp: BOSS_HP, rise: 0, t: 0, atk: 2, minion: 3, flying: false, hitT: 0, dying: 0, s: 1, said: {} };
+  G.boss = { x: W - bossGap(), y: waterY + 260, hp: BOSS_HP, rise: 0, t: 0, atk: 2, minion: 3, flying: false, hitT: 0, dying: 0, s: 1, said: {} };
   say('Lake Superior', 'there is a SANTA standing in me');
 }
 
@@ -963,7 +1005,7 @@ function confetti(x, y, n) {
 function splash(x, y, n) {
   for (let i = 0; i < n; i++) G.parts.push({ kind: 'spray', x, y, vx: rand(-70, 70), vy: -rand(60, 170), life: 0.7, t: 0, r: rand(1.5, 3.5) });
 }
-function floater(x, y, text, color) { G.floaters.push({ x, y, text, color, t: 0, life: 1.3 }); }
+function floater(x, y, text, color, life = 1.3) { G.floaters.push({ x, y, text, color, t: 0, life }); }
 
 function updateParticles(dt) {
   for (const p of G.parts) {
@@ -979,11 +1021,14 @@ function updateParticles(dt) {
   for (const f of G.floaters) { f.t += dt; f.y -= 30 * dt; }
   G.floaters = G.floaters.filter(f => f.t < f.life);
 
+  const gust = G.gustRamp || 0;
+  for (const c of CLOUDS) c.x -= (c.s + G.wind * 0.5 - gust * 160) * dt;
+
   // Snow once the weather turns.
   const snowRate = Math.max(0, G.gale - 0.25) * 60;
   if (Math.random() < snowRate * dt) G.flakes.push({ x: rand(0, W + 200), y: -10, vy: rand(30, 60), r: rand(1, 2.5), ph: rand(0, 6) });
-  for (const f of G.flakes) { f.y += f.vy * dt; f.x += (-30 - G.wind) * dt + Math.sin(G.t + f.ph) * 10 * dt; }
-  G.flakes = G.flakes.filter(f => f.y < H + 10 && f.x > -20);
+  for (const f of G.flakes) { f.y += f.vy * dt; f.x += (-30 - G.wind + gust * 260) * dt + Math.sin(G.t + f.ph) * 10 * dt; }
+  G.flakes = G.flakes.filter(f => f.y < H + 10 && f.x > -20 && f.x < W + 220);
 }
 
 // ----- Scoring -----
@@ -1027,7 +1072,7 @@ function hurtShip(dmg) {
 // ----- Cannons -----
 // The cannons aim and fire on their own, so their reach is what makes
 // steering matter: park the boat near trouble or it gets past you.
-const CANNON = { rate: 2.4, speed: 640, range: 470, spread: 0.07 };
+const CANNON = { rate: 2.4, speed: 640, range: 370, spread: 0.07 };
 /** Choose what turret i shoots: whatever is closest to reaching shore, roughly. */
 function chooseTarget(i, from) {
   const cands = [];
@@ -1043,7 +1088,7 @@ function chooseTarget(i, from) {
   const b = G.boss;
   if (b && b.rise >= 1 && !b.dying) {
     const c = bossCenter(b);
-    if (Math.hypot(c.x - from.x, c.y - from.y) < CANNON.range + c.r) cands.push([c.x + 260, { x: c.x, y: c.y, vx: 0, vy: 0, boss: true }]);
+    if (Math.hypot(c.x - from.x, c.y - from.y) < CANNON.range + c.r + 60) cands.push([c.x + 260, { x: c.x, y: c.y, vx: 0, vy: 0, boss: true }]);
   }
   if (!cands.length) return null;
   cands.sort((a, b2) => a[0] - b2[0]);
@@ -1142,7 +1187,12 @@ function setupDay(retry) {
     dayT: 0, creep: 0, spawnAcc: 0, enemies: [], pellets: [], pickups: [], rings: [], swells: [],
     gale: d.gale, wind: d.gale >= 1 ? 45 : 0, boss: null, midnight: false, midnightT: 0,
     combo: 0, comboT: 0, iframes: 1, dayStartScore: G.score, radioT: 5,
+    gust: 0, gustRamp: 0, gustAt: G.day >= 2 && G.day <= 7 ? d.len * rand(0.35, 0.7) : 0,
   });
+  stopCoach();
+  if (G.day === 1 && (store.get('coached', '0') !== '1' || params.has('coach'))) {
+    G.coach = { seen: new Set(), current: null, t: 0, moved: 0, gap: 0 };
+  }
   G.hull = retry ? G.maxHull : Math.min(G.maxHull, G.hull + G.maxHull * 0.35);
   G.horn = Math.max(G.horn, 0.3);
   Music.mall = false;
@@ -1167,6 +1217,8 @@ function updatePlay(dt) {
   G.horn = Math.min(1, G.horn + dt * 0.012 * G.up.hornMul);
 
   updateShip(dt);
+  updateCoach(dt);
+  updateEarlyGale(dt);
 
   // Spawning, until midnight.
   if (!G.midnight) {
@@ -1187,6 +1239,7 @@ function updatePlay(dt) {
     if (e.dead) continue;
     KINDS[e.kind].update(e, dt);
     if (e.dead) continue; // e.g. a present that fell in the lake
+    if (G.gustRamp > 0 && !e.attached) e.x += 260 * G.gustRamp * dt; // blown back out to sea
     e.hitT = Math.max(0, e.hitT - dt);
     if (e.dmg > 0 && hitsShip(e.x, e.y, e.r * 0.7)) {
       hurtShip(e.dmg); e.dead = true; confetti(e.x, e.y, 8);
@@ -1216,6 +1269,8 @@ function finishDay() {
   const creepBonus = Math.round((100 - G.creep) * 4);
   G.score += hullBonus + creepBonus;
   G.lastDay = { day: G.day, hullBonus, creepBonus, earned: G.score - G.dayStartScore };
+  if (G.day === 1) store.set('coached', '1');
+  stopCoach();
   bumpDad();
   if (d.boss) { Music.stop(); showMemorial(); return; }
   G.day++;
@@ -1234,6 +1289,71 @@ function bumpDad() {
   if (G.dad === 29 || G.dad === 30) G.dad = 31;
 }
 
+// ----- Day-one coaching -----
+// First-time players get a few hints on November 1, one at a time, each
+// shown when it becomes relevant. Finishing day one turns them off for good.
+const COACH = [
+  { text: 'Drag (or ← →) to steer. Your cannons fire on their own, but only reach the dashed ring.',
+    when: () => G.dayT > 0.6, done: c => c.moved > 160 || c.t > 9, ring: true },
+  { text: "Incoming! That candy cane is diving at you, too fast to shoot. Steer out of the way!",
+    when: () => G.enemies.some(e => e.diving), done: c => c.t > 4 },
+  { text: 'Christmas is headed for the town ← Steer under it and pop it before it reaches shore!',
+    when: () => G.dayT > 7 || G.creep > 0, done: c => c.t > 6 },
+  { text: 'Something tasty is floating out there. Steer over it to grab it.',
+    when: () => G.pickups.some(p => p.floating), done: c => c.t > 6 },
+  { text: 'The horn is ready! Tap HORN (or Space) to blast everything nearby.',
+    when: () => G.horn >= 1, done: c => G.stats.horns > 0 || c.t > 9 },
+];
+
+function updateCoach(dt) {
+  const c = G.coach;
+  if (!c) return;
+  c.moved += Math.abs(ship.vx) * dt;
+  if (c.current) {
+    c.t += dt;
+    if (c.current.done(c)) { c.current = null; G.coachRing = false; $('coach').classList.remove('show'); c.gap = 1.2; }
+    return;
+  }
+  c.gap -= dt;
+  if (c.gap > 0) return;
+  const next = COACH.find(h => !c.seen.has(h) && h.when());
+  if (!next) return;
+  c.seen.add(next); c.current = next; c.t = 0;
+  G.coachRing = !!next.ring;
+  $('coach').textContent = next.text;
+  $('coach').classList.add('show');
+}
+
+function stopCoach() {
+  G.coach = null; G.coachRing = false;
+  $('coach').classList.remove('show');
+}
+
+// ----- The gales of November came early -----
+// Once a day (Nov 2 to 7), a sudden November gale blows in and shoves all
+// the Christmas stuff back out over the lake. November takes care of its own.
+function updateEarlyGale(dt) {
+  if (G.gust > 0) {
+    G.gust -= dt;
+    G.gustRamp = Math.max(0, Math.min(1, G.gust, 5 - G.gust));
+    if (Math.random() < dt * 80) G.flakes.push({ x: rand(-40, W), y: rand(-10, waterY), vy: rand(20, 50), r: rand(1, 2.5), ph: rand(0, 6) });
+    if (G.gust <= 0) G.gustRamp = 0;
+    return;
+  }
+  if (G.gustAt && !G.midnight && G.dayT >= G.gustAt) {
+    G.gustAt = 0; G.gust = 5;
+    floater(W / 2, waterY - 240, 'THE GALES OF NOVEMBER CAME EARLY', '#ffffff', 3.5);
+    for (let i = 0; i < 2; i++) G.swells.push({ x: -100 - i * 260, w: 110, a: 26, v: -170 }); // rolling out to sea
+    Audio.noise(3, { freq: 500, sweep: 1400, q: 0.6, vol: 0.25 });
+    G.radioT = 7; // let this line stay up
+    say(...pick([
+      ['Lake Superior', 'november gales, right on schedule. early, even.'],
+      ['Deckhand', 'the wind is blowing christmas back out to sea!'],
+      ['Dad', 'the gales of november came early! TAKE THAT, MALL.'],
+    ]));
+  }
+}
+
 // ----- UI: cards, HUD, radio -----
 const overlay = $('overlay'), card = $('card');
 
@@ -1243,7 +1363,8 @@ function setState(s) {
   overlay.hidden = playing;
   $('hud').hidden = !playing && s !== 'paused';
   $('controls').hidden = !playing;
-  if (!playing) $('radio').classList.remove('show');
+  if (!playing) { $('radio').classList.remove('show'); $('coach').classList.remove('show'); }
+  else if (G.coach && G.coach.current) $('coach').classList.add('show');
 }
 
 function showCard(html, onClick) {
@@ -1291,11 +1412,14 @@ function showHow(back) {
   showCard(`
     <h2>HOW TO PLAY</h2>
     <ul class="how">
-      <li><b>Steer:</b> drag anywhere, or use ← → / A D. The cannons aim and fire by themselves.</li>
+      <li><b>Steer:</b> drag anywhere, or use ← → / A D. The cannons aim and fire by themselves,
+        but only reach the <b>dashed ring</b>, so park the boat under the trouble.</li>
       <li><b>Pop the Christmas stuff</b> before it reaches the town on the left. Too much gets through and it's Christmas. On November whatever.</li>
-      <li><b>Don't get hit.</b> Your hull is the red bar. Grab floating pasties to patch up.</li>
+      <li><b>Don't get hit.</b> Your hull is the red bar. When a candy cane flashes <b>!</b> and dives at you,
+        it's too fast to shoot: steer out of the way. Grab floating pasties to patch up.</li>
       <li><b>The horn</b> charges as you pop things. Tap HORN (or Space) to blast everything nearby and calm the waves.</li>
       <li>Hold out until <b>midnight</b> each day. After each day, pick an upgrade.</li>
+      <li>When <b>the gales of November come early</b>, the wind blows Christmas back out over the lake. Enjoy it.</li>
       <li>Pause with II, P or Esc.</li>
     </ul>
     <button class="btn" data-act="back">Got it</button>
@@ -1308,7 +1432,7 @@ function showStory() {
     <h2>THE MOST SACRED SEASON</h2>
     <p>Between Halloween and the tenth of November, there's a season. The internet calls it Fitz Season.
        Dads play a six-minute song about a boat. Everyone gets very into the Great Lakes.</p>
-    <p>And every year, Christmas tries to show up early.</p>
+    <p>The gales of November always come early. Lately, so does Christmas.</p>
     <p><b>Not this year.</b> You captain the S.S. November: 729 feet of steel, a hold full of taconite,
        and one very loud horn.</p>
     <button class="btn" data-act="go">Cast off</button>
@@ -1362,7 +1486,8 @@ function showFail(reason) {
   const n = G.day;
   const html = reason === 'creep'
     ? `<h2>🎄 IT'S CHRISTMAS NOW</h2>
-       <p>Too much got through. Every store in Duluth is playing the music. Someone put up a tree.</p>
+       <p>Too much got through. Every store in Duluth is playing the music. Someone put up a tree.
+          Things that come early in November are supposed to be gales, not this.</p>
        <p><b>It is November ${n}.</b></p>
        <p class="muted">📻 Dad: "I'm not mad. I'm just disappointed. And playing the song."</p>
        <button class="btn" data-act="retry">Take back November ${n}</button>`
@@ -1484,6 +1609,7 @@ function draw() {
   if (G.boss) drawBoss(G.boss);
   for (const e of G.enemies) if (!(e.kind === 'deckelf' && e.attached)) drawEnemy(e);
   for (const p of G.pickups) drawPickup(p);
+  if (G.state === 'play' || G.state === 'paused') drawRange();
   drawShip();
   for (const e of G.enemies) if (e.kind === 'deckelf' && e.attached) drawEnemy(e);
   drawWater();
@@ -1505,19 +1631,77 @@ function draw() {
   }
 }
 
-// Clouds are fixed shapes that drift; generated once.
+// Clouds and stars are fixed shapes; generated once.
 const CLOUDS = Array.from({ length: 9 }, () => ({ x: rand(0, 1400), y: rand(0, 0.45), w: rand(120, 260), s: rand(6, 16) }));
+const STARS = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random() * 0.8, r: rand(0.6, 1.6), ph: rand(0, 6) }));
+
+// Each day runs from overcast afternoon to midnight: [time, top, horizon].
+const SKY_KEYS = [
+  [0.00, [104, 124, 146], [184, 194, 200]], // afternoon
+  [0.40, [112, 118, 150], [226, 196, 160]], // getting golden
+  [0.62, [92, 78, 124], [242, 146, 108]],   // sunset
+  [0.80, [46, 46, 86], [140, 92, 120]],     // dusk
+  [1.00, [16, 22, 44], [44, 54, 84]],       // midnight
+];
+const STORM = [[62, 70, 82], [110, 118, 126]];
+
+/** 0 at the start of the day, 1 at midnight. */
+function dayClock() {
+  const d = DAYS[G.day];
+  if (G.state === 'title' || !d) return 0.6;          // the title gets a sunset
+  if (G.state === 'memorial') return 1;
+  if (d.boss) return G.boss ? clamp(0.55 + 0.4 * (1 - G.boss.hp / BOSS_HP), 0, 0.95) : 0.95;
+  return clamp(G.dayT / d.len, 0, 1);
+}
+const nightness = () => clamp((dayClock() - 0.7) / 0.3, 0, 1);
+const mix = (a, b, t) => a.map((v, i) => Math.round(lerp(v, b[i], t)));
+const rgb = (c, a = 1) => `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
+
+function skyColors() {
+  const t = dayClock();
+  let i = 0;
+  while (i < SKY_KEYS.length - 2 && t > SKY_KEYS[i + 1][0]) i++;
+  const [t0, top0, hz0] = SKY_KEYS[i], [t1, top1, hz1] = SKY_KEYS[i + 1];
+  const k = clamp((t - t0) / (t1 - t0), 0, 1);
+  const storm = G.gale * 0.55 * (1 - nightness() * 0.6); // storms gray out the day more than the night
+  return [mix(mix(top0, top1, k), STORM[0], storm), mix(mix(hz0, hz1, k), STORM[1], storm)];
+}
 
 function drawSky() {
-  const g = G.gale;
+  const g = G.gale, t = dayClock(), night = nightness();
+  const [top, horizon] = skyColors();
   const sky = ctx.createLinearGradient(0, 0, 0, waterY);
-  sky.addColorStop(0, `rgb(${lerp(86, 50, g)}, ${lerp(103, 60, g)}, ${lerp(122, 74, g)})`);
-  sky.addColorStop(1, `rgb(${lerp(170, 120, g)}, ${lerp(180, 130, g)}, ${lerp(186, 140, g)})`);
+  sky.addColorStop(0, rgb(top));
+  sky.addColorStop(1, rgb(horizon));
   ctx.fillStyle = sky; ctx.fillRect(-20, -20, W + 40, waterY + 40);
+  // Stars and a moon once it's dark.
+  if (night > 0) {
+    for (const st of STARS) {
+      ctx.fillStyle = `rgba(255, 255, 240, ${night * (0.45 + 0.4 * Math.sin(G.t * 2 + st.ph))})`;
+      ctx.beginPath(); ctx.arc(st.x * W, st.y * waterY, st.r, 0, Math.PI * 2); ctx.fill();
+    }
+    const mx = W * 0.24, my = Math.max(90 / scale, waterY - 330);
+    ctx.fillStyle = `rgba(245, 240, 220, ${night})`;
+    ctx.beginPath(); ctx.arc(mx, my, 16, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = rgb(top, night); // bite out a crescent
+    ctx.beginPath(); ctx.arc(mx + 7, my - 4, 14, 0, Math.PI * 2); ctx.fill();
+  }
+  // The sun sinks toward the horizon and sets just before dusk.
+  if (t < 0.78) {
+    const sx = W * 0.8, sy = lerp(Math.max(90 / scale, waterY - 330), waterY + 20, t / 0.76);
+    const warm = clamp(t / 0.62, 0, 1);
+    const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, 90);
+    const a = (1 - g * 0.65) * (t > 0.7 ? 1 - (t - 0.7) / 0.08 : 1);
+    glow.addColorStop(0, `rgba(255, ${Math.round(lerp(244, 170, warm))}, ${Math.round(lerp(214, 110, warm))}, ${0.95 * a})`);
+    glow.addColorStop(0.25, `rgba(255, ${Math.round(lerp(236, 150, warm))}, ${Math.round(lerp(200, 100, warm))}, ${0.5 * a})`);
+    glow.addColorStop(1, 'rgba(255, 180, 120, 0)');
+    ctx.fillStyle = glow; ctx.fillRect(sx - 90, sy - 90, 180, 180);
+  }
+  const cloud = mix(mix([226, 230, 234], horizon, 0.35), [60, 64, 84], night * 0.7);
   for (const c of CLOUDS) {
-    const x = ((c.x - G.t * (c.s + G.wind * 0.5)) % (W + 400) + W + 400) % (W + 400) - 200;
+    const x = ((c.x % (W + 400)) + W + 400) % (W + 400) - 200;
     const y = 30 + c.y * (waterY - 60);
-    ctx.fillStyle = `rgba(${lerp(220, 120, g)}, ${lerp(225, 128, g)}, ${lerp(230, 138, g)}, .55)`;
+    ctx.fillStyle = rgb(mix(cloud, [120, 128, 138], g * 0.5), 0.55);
     ctx.beginPath();
     ctx.ellipse(x, y, c.w * 0.5, 18, 0, 0, Math.PI * 2);
     ctx.ellipse(x - c.w * 0.2, y - 10, c.w * 0.25, 16, 0, 0, Math.PI * 2);
@@ -1525,7 +1709,7 @@ function drawSky() {
     ctx.fill();
   }
   // Far horizon: the distant Canadian shore.
-  ctx.fillStyle = 'rgba(60, 76, 88, .55)';
+  ctx.fillStyle = rgb(mix([60, 76, 88], [24, 30, 46], nightness()), 0.6);
   ctx.beginPath(); ctx.moveTo(W * 0.35, waterY - 4);
   for (let x = W * 0.35; x <= W + 20; x += 40) ctx.lineTo(x, waterY - 10 - Math.sin(x * 0.013) * 5 - Math.sin(x * 0.041) * 3);
   ctx.lineTo(W + 20, waterY); ctx.lineTo(W * 0.35, waterY); ctx.fill();
@@ -1536,8 +1720,9 @@ function drawSky() {
 function drawShore() {
   const base = waterY + 6;
   ctx.fillStyle = '#3a3f36';
-  ctx.beginPath(); ctx.moveTo(-20, H); ctx.lineTo(-20, base - 40); ctx.lineTo(SHORE_X - 20, base - 34);
-  ctx.quadraticCurveTo(SHORE_X + 12, base - 20, SHORE_X + 18, base + 30); ctx.lineTo(SHORE_X + 18, H); ctx.fill();
+  // Flat cliff top out to x = SHORE_X - 4, then down to the water.
+  ctx.beginPath(); ctx.moveTo(-20, H); ctx.lineTo(-20, base - 40); ctx.lineTo(SHORE_X - 4, base - 34);
+  ctx.quadraticCurveTo(SHORE_X + 14, base - 28, SHORE_X + 18, base + 30); ctx.lineTo(SHORE_X + 18, H); ctx.fill();
   // Pines
   ctx.fillStyle = '#23302a';
   for (let i = 0; i < 5; i++) {
@@ -1546,22 +1731,22 @@ function drawShore() {
   }
   // Houses
   const lit = G.creep / 100;
-  [[6, 22, '#6b5847'], [34, 18, '#7d6b5a'], [52, 24, '#5e5148']].forEach(([x, h, c], i) => {
+  [[0, 22, '#6b5847'], [18, 18, '#7d6b5a'], [35, 24, '#5e5148']].forEach(([x, h, c], i) => {
     const y = base - 36 - h;
-    ctx.fillStyle = c; ctx.fillRect(x, y, 20, h);
-    ctx.fillStyle = '#2f2a28'; ctx.beginPath(); ctx.moveTo(x - 3, y); ctx.lineTo(x + 10, y - 10); ctx.lineTo(x + 23, y); ctx.fill();
-    ctx.fillStyle = '#ffd98a'; ctx.fillRect(x + 6, y + 6, 6, 5);
+    ctx.fillStyle = c; ctx.fillRect(x, y, 16, h);
+    ctx.fillStyle = '#2f2a28'; ctx.beginPath(); ctx.moveTo(x - 3, y); ctx.lineTo(x + 8, y - 9); ctx.lineTo(x + 19, y); ctx.fill();
+    ctx.fillStyle = '#ffd98a'; ctx.fillRect(x + 5, y + 6, 6, 5);
     if (lit > (i + 0.5) / 3.5) { // Christmas lights. Too early. Ugh.
-      for (let k = 0; k < 6; k++) {
+      for (let k = 0; k < 5; k++) {
         ctx.fillStyle = CONFETTI[(k + Math.floor(G.t * 3)) % 4];
-        ctx.beginPath(); ctx.arc(x - 1 + k * 4.4, y - 8 + Math.abs(k - 2.5) * 2.6, 1.6, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x + k * 4, y - 7 + Math.abs(k - 2) * 2.4, 1.6, 0, Math.PI * 2); ctx.fill();
       }
     }
   });
-  // Lighthouse with a sweeping beam.
-  const lx = SHORE_X - 6, ly = base - 40;
+  // Lighthouse with a sweeping beam, brighter after dark.
+  const lx = SHORE_X - 14, ly = base - 34;
   const beam = Math.sin(G.t * 1.4);
-  ctx.fillStyle = `rgba(255, 240, 180, ${0.05 + 0.06 * Math.abs(beam)})`;
+  ctx.fillStyle = `rgba(255, 240, 180, ${0.05 + 0.06 * Math.abs(beam) + nightness() * 0.12})`;
   ctx.beginPath(); ctx.moveTo(lx, ly - 46); ctx.lineTo(lx + 240, ly - 46 - 28 + beam * 24); ctx.lineTo(lx + 240, ly - 46 + 28 + beam * 24); ctx.fill();
   ctx.fillStyle = '#efe9dc'; ctx.beginPath(); ctx.moveTo(lx - 8, ly); ctx.lineTo(lx - 5, ly - 40); ctx.lineTo(lx + 5, ly - 40); ctx.lineTo(lx + 8, ly); ctx.fill();
   ctx.fillStyle = '#b3261e'; ctx.fillRect(lx - 6, ly - 28, 12, 6); ctx.fillRect(lx - 6, ly - 52, 12, 6);
@@ -1569,9 +1754,10 @@ function drawShore() {
 }
 
 function drawWater() {
+  const night = nightness(), [, horizon] = skyColors();
   const grad = ctx.createLinearGradient(0, waterY - 30, 0, H);
-  grad.addColorStop(0, 'rgba(44, 92, 108, .93)');
-  grad.addColorStop(1, 'rgba(10, 30, 40, .98)');
+  grad.addColorStop(0, rgb(mix(mix([44, 92, 108], horizon, 0.18), [16, 34, 52], night * 0.8), 0.93));
+  grad.addColorStop(1, rgb(mix([10, 30, 40], [4, 10, 20], night), 0.98));
   ctx.fillStyle = grad;
   ctx.beginPath(); ctx.moveTo(SHORE_X + 10, H + 20);
   const pts = [];
@@ -1607,12 +1793,13 @@ function drawShip() {
   for (let x = -h + 82; x < h - 70; x += 17) ctx.fillRect(x, -31, 12, 4);
   // Stern engine house and stack.
   ctx.fillStyle = '#efe9dc'; ctx.fillRect(-h + 8, -56, 66, 30);
-  ctx.fillStyle = '#2b3a4a'; for (let x = -h + 14; x < -h + 70; x += 11) ctx.fillRect(x, -50, 7, 6);
+  const win = nightness() > 0.25 ? '#ffd98a' : '#2b3a4a'; // lights on after dark
+  ctx.fillStyle = win; for (let x = -h + 14; x < -h + 70; x += 11) ctx.fillRect(x, -50, 7, 6);
   ctx.fillStyle = '#1b1b1b'; ctx.fillRect(-h + 28, -84, 20, 30);
   ctx.fillStyle = '#e8b64c'; ctx.fillRect(-h + 28, -76, 20, 6);
   // Forward pilothouse, stacked up at the bow like a real laker.
   ctx.fillStyle = '#efe9dc'; ctx.fillRect(h - 58, -52, 46, 26); ctx.fillRect(h - 50, -68, 34, 16);
-  ctx.fillStyle = '#2b3a4a'; ctx.fillRect(h - 48, -64, 30, 6);
+  ctx.fillStyle = win; ctx.fillRect(h - 48, -64, 30, 6);
   for (let x = h - 54; x < h - 16; x += 10) ctx.fillRect(x, -46, 6, 5);
   ctx.strokeStyle = '#efe9dc'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(h - 34, -68); ctx.lineTo(h - 34, -86); ctx.stroke();
   // Cannons on deck.
@@ -1636,6 +1823,17 @@ function drawShip() {
     ctx.strokeStyle = 'rgba(154, 209, 255, .8)'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.ellipse(0, -30, h + 24, 72, 0, 0, Math.PI * 2); ctx.stroke();
   }
+  ctx.restore();
+}
+
+/** The dashed ring showing how far the cannons reach. */
+function drawRange() {
+  const c = shipPoint(0, -40);
+  const pulse = G.coachRing ? 0.35 + 0.25 * Math.sin(G.t * 6) : 0.16;
+  ctx.save();
+  ctx.setLineDash([10, 10]); ctx.lineDashOffset = -G.t * 20;
+  ctx.strokeStyle = `rgba(255, 233, 166, ${pulse})`; ctx.lineWidth = G.coachRing ? 3 : 2;
+  ctx.beginPath(); ctx.arc(c.x, c.y, CANNON.range, Math.PI, 0); ctx.stroke();
   ctx.restore();
 }
 
