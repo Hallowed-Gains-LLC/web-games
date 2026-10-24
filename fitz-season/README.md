@@ -21,8 +21,10 @@ tribute.
 | Pause | P or Esc | II button |
 | Mute | M | On the title or pause card |
 
-- The taconite cannons aim and fire **by themselves**, but they only reach about
-  half a screen. Steering toward trouble is the whole game.
+- The taconite cannons aim and fire **by themselves**, but only reach the
+  **dashed ring** around the boat. Steer under the trouble.
+- Some candy canes flash **!** and **dive** at the boat. Mid-dive they're too
+  fast to shoot, so steer out of the way. This makes steering matter from day one.
 - Christmas that reaches the town on the left fills the **Christmas Creep**
   meter. If it fills up, it's Christmas, on November whatever, and you retry
   that day.
@@ -31,6 +33,12 @@ tribute.
 - Pop decorations to charge the **horn**. Grab floating **pasties** (heal),
   **coffee** (rapid fire) and **ope** bubbles (blocks one hit).
 - After each day, pick one of three upgrades.
+- Once a day from Nov 2 to 7, **the gales of November come early**: a squall
+  blows every decoration back out over the lake for a few seconds.
+- Each day runs from overcast afternoon through sunset to **midnight**, when
+  November holds and whatever's left pops. The windows light up after dark.
+- First-time players get a few coaching hints on November 1. Add `?coach` to the
+  URL to see them again.
 
 ## The days
 
@@ -60,7 +68,9 @@ because relatives objected to a line implying crew error. So:
   targets Christmas creep, dads, and the Great Lakes' personalities.
 - **No song lyrics and no Lightfoot melody.** The soundtrack is an original
   shanty-style jig. The only borrowed tune is "Jingle Bells" (1857, public
-  domain).
+  domain). The one exception is the short, endlessly quoted phrase "the gales
+  of November came early", used as a nod (headlines use it every year). Don't
+  quote anything longer.
 - **Avoid trademarked characters.** The reindeer has a plain brown nose (no
   Rudolph). The elf is an "Elf on the Deck". The latte is unbranded.
 - Dad's song counter skips 29 and 30 on purpose.
@@ -93,6 +103,19 @@ Balance was tuned with bots playing every day at 8× speed:
   some of the time.
 - **Steers toward threats and dodges presents:** wins.
 
-Tuning lives in `CANNON` (rate, range, spread), each day's `rate` and `mix`
-in `DAYS`, and the boss constants (`BOSS_HP`, the attack timers in
-`updateBoss`).
+The bots can't judge how the early days feel, so those were also tuned by
+hand: day 1 should nick an idle player with a few dives, not sink them.
+
+Tuning lives in:
+
+- `CANNON` (rate, range, spread)
+- each day's `rate` and `mix` in `DAYS`
+- the candy cane's dive chance and speed
+- the boss constants (`BOSS_HP`, and the attack timers in `updateBoss`)
+
+### Layout
+
+Landscape fits about 900 × 560 world units. Portrait narrows the world to 700
+units wide, raises the waterline to 60% of the screen, and shortens the boat,
+so the action sits mid-screen. The title still suggests turning the phone
+sideways.
