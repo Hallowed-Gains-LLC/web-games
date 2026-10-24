@@ -30,7 +30,7 @@ tribute.
   that day.
 - If your **hull** runs out, the crew heads back to port, and you retry the day.
   Hull carries over between days, with some overnight repairs.
-- Pop decorations to charge the **horn**. Grab floating **pasties** (heal),
+- Pop decorations to charge the **horn**. Grab floating **hotdish** (heal),
   **coffee** (rapid fire) and **ope** bubbles (blocks one hit).
 - After each day, pick one of three upgrades.
 - Once a day from Nov 2 to 7, **the gales of November come early**: a squall
@@ -100,7 +100,7 @@ Each entry is a conversation that plays one line at a time. There are about
 - **General:** always available.
 - **Per threat:** a pool starts on the day that threat first appears.
 - **Situations:** the gale day, the boss and nighttime.
-- **Reactions:** Christmas reaching town, a low hull, the horn, a pasty, a big
+- **Reactions:** Christmas reaching town, a low hull, the horn, a hotdish, a big
   combo, an ope shield and the early gale. Each has a cooldown.
 
 A conversation won't repeat in a run until its pool runs out. To add jokes,
