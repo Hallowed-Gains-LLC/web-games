@@ -61,16 +61,22 @@ The memes are affectionate, but 29 real people died. The crew's families are
 active: they lobbied to protect the wreck site, and Lightfoot changed a lyric
 because relatives objected to a line implying crew error. So:
 
-- **The real ship, its crew and the wreck are never shown or joked about.**
-  The player's boat is fictional. Nobody dies in the game: losing means heading
-  back to port, or Christmas winning.
-- **No crew names, no jokes about blame, bodies or the sinking.** The comedy
-  targets Christmas creep, dads, and the Great Lakes' personalities.
+- **The real ship and the wreck are never shown, and nobody dies in the
+  game.** The player's boat is fictional. Losing means heading back to port,
+  or Christmas winning.
+- **Veiled, affectionate nods to the sinking are fine, the way the internet's
+  memes do it** ("FML: fifteen miles from Whitefish Bay", "do the math and then
+  stop doing the math").
+- **No crew names, and no jokes about blame or bodies.** Don't make a joke
+  where the punchline is the men themselves; that's why the "drink 29 beers
+  for the men lost" meme is left out. Most of the comedy targets Christmas
+  creep, dads, and the Great Lakes' personalities.
 - **No song lyrics and no Lightfoot melody.** The soundtrack is an original
   shanty-style jig. The only borrowed tune is "Jingle Bells" (1857, public
   domain). The one exception is the short, endlessly quoted phrase "the gales
-  of November came early", used as a nod (headlines use it every year). Don't
-  quote anything longer.
+  of November came early", used as a nod (headlines use it every year). Allude
+  to other famous lines rather than quoting them: the cook is "too rough to
+  cook", not the lyric.
 - **Avoid trademarked characters.** The reindeer has a plain brown nose (no
   Rudolph). The elf is an "Elf on the Deck". The latte is unbranded.
 - Dad's song counter skips 29 and 30 on purpose.
