@@ -1,0 +1,2618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>First Trinity Oktoberfest — A Very Silly Pixel Fest</title>
+<style>
+  html,body{margin:0;padding:0;background:#1b2431;height:100%;overflow:hidden;
+    font-family:monospace;-webkit-user-select:none;user-select:none;touch-action:none;}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+  body.portrait #wrap{align-items:flex-start;padding-top:calc(60px + env(safe-area-inset-top,0px));}
+  canvas{image-rendering:pixelated;image-rendering:crisp-edges;background:#000;}
+  #topBtns{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));
+    right:calc(8px + env(safe-area-inset-right,0px));z-index:5;display:flex;gap:8px;}
+  .btn{background:rgba(20,28,40,.72);color:#f4e9c8;border:2px solid #f4e9c8;
+    border-radius:8px;font:bold 14px monospace;padding:6px 10px;cursor:pointer;}
+  /* touch controls */
+  #pad{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));
+    bottom:calc(14px + env(safe-area-inset-bottom,0px));width:132px;height:132px;z-index:6;display:none;}
+  #pad div{position:absolute;width:33.34%;height:33.34%;box-sizing:border-box;background:rgba(20,28,40,.6);
+    border:2px solid rgba(244,233,200,.8);border-radius:8px;color:#f4e9c8;
+    font:bold 18px monospace;display:flex;align-items:center;justify-content:center;}
+  #padU{left:33.33%;top:0}#padD{left:33.33%;top:66.66%}#padL{left:0;top:33.33%}#padR{left:66.66%;top:33.33%}
+  #pad div.on{background:rgba(232,210,74,.5);border-color:#e8d24a;}
+  #actBtn{position:fixed;right:calc(20px + env(safe-area-inset-right,0px));
+    bottom:calc(26px + env(safe-area-inset-bottom,0px));width:66px;height:66px;z-index:6;display:none;
+    background:rgba(180,40,40,.75);border:3px solid rgba(244,233,200,.9);border-radius:50%;
+    color:#f4e9c8;font:bold 22px monospace;align-items:center;justify-content:center;}
+  #actBtn.on{background:rgba(230,84,60,.95);transform:scale(.94);}
+  /* bigger targets on touch screens */
+  @media (pointer:coarse){
+    .btn{font:bold 17px monospace;padding:12px 14px;border-radius:10px;}
+    #pad{width:186px;height:186px;}
+    #pad div{font:bold 26px monospace;border-radius:10px;}
+    #actBtn{width:94px;height:94px;font:bold 30px monospace;}
+  }
+  /* landscape phones: keep controls from eating the short axis */
+  @media (pointer:coarse) and (max-height:430px){
+    #pad{width:152px;height:152px;}
+    #actBtn{width:82px;height:82px;font:bold 26px monospace;}
+  }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="game" width="480" height="320"></canvas></div>
+<div id="topBtns"><button class="btn" id="cardBtn">&#9776; QUESTS</button><button class="btn" id="musicBtn">&#9834; ON</button></div>
+<div id="pad"><div id="padU">&#9650;</div><div id="padD">&#9660;</div><div id="padL">&#9664;</div><div id="padR">&#9654;</div></div>
+<div id="actBtn" style="display:none">A</div>
+<script>
+'use strict';
+/* =========================================================================
+   FIRST TRINITY OKTOBERFEST — a very silly 2D pixel exploration game
+   One file, no external assets. Drop it into any website.
+   World layout based on the official FOCUS Oktoberfest map.
+   ========================================================================= */
+
+const CVS = document.getElementById('game');
+const CTX = CVS.getContext('2d');
+CTX.imageSmoothingEnabled = false;
+let VW = 480, VH = 320;        // internal resolution (portrait phones use 360 x dynamic)
+const TS = 16;                 // tile size
+const MW = 64, MH = 52;        // map size in tiles
+
+const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+function fitCanvas(){
+  const w = window.innerWidth, h = window.innerHeight;
+  const portrait = isTouch && h > w;
+  let newVW, newVH, s;
+  if (portrait){
+    // Game Boy layout: narrower view (bigger sprites) pinned below the top
+    // buttons, with the space underneath reserved for the touch controls.
+    newVW = w < 600 ? 360 : 480;
+    s = w / newVW;
+    newVH = clamp(Math.round((h - 300) / s), 320, 560);
+  } else {
+    newVW = 480; newVH = 320;
+    s = Math.min(w / newVW, h / newVH);
+    // Desktop snaps to whole-number scales for perfectly square pixels;
+    // on touch screens filling the display matters more than exact pixels.
+    if (!isTouch && s > 1) s = Math.max(1, Math.floor(s));
+  }
+  if (newVW !== VW || newVH !== VH){
+    VW = newVW; VH = newVH;
+    CVS.width = VW; CVS.height = VH;
+    CTX.imageSmoothingEnabled = false;   // canvas resize resets context state
+  }
+  document.body.classList.toggle('portrait', portrait);
+  CVS.style.width  = (VW * s) + 'px';
+  CVS.style.height = (VH * s) + 'px';
+}
+window.addEventListener('resize', fitCanvas);
+window.addEventListener('orientationchange', fitCanvas);
+fitCanvas();
+
+/* ---------------------------------------------------------------- utils */
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+function hash2(x,y){ let n = x*374761393 + y*668265263; n = (n ^ (n>>13))*1274126177; return ((n ^ (n>>16))>>>0)/4294967295; }
+function rr(a,b){ return a + Math.random()*(b-a); }
+
+/* ============================================================ 5x7 FONT */
+const FONT = {
+'A':["01110","10001","10001","11111","10001","10001","10001"],
+'B':["11110","10001","10001","11110","10001","10001","11110"],
+'C':["01110","10001","10000","10000","10000","10001","01110"],
+'D':["11110","10001","10001","10001","10001","10001","11110"],
+'E':["11111","10000","10000","11110","10000","10000","11111"],
+'F':["11111","10000","10000","11110","10000","10000","10000"],
+'G':["01110","10001","10000","10111","10001","10001","01111"],
+'H':["10001","10001","10001","11111","10001","10001","10001"],
+'I':["11111","00100","00100","00100","00100","00100","11111"],
+'J':["00111","00010","00010","00010","00010","10010","01100"],
+'K':["10001","10010","10100","11000","10100","10010","10001"],
+'L':["10000","10000","10000","10000","10000","10000","11111"],
+'M':["10001","11011","10101","10101","10001","10001","10001"],
+'N':["10001","11001","10101","10011","10001","10001","10001"],
+'O':["01110","10001","10001","10001","10001","10001","01110"],
+'P':["11110","10001","10001","11110","10000","10000","10000"],
+'Q':["01110","10001","10001","10001","10101","10010","01101"],
+'R':["11110","10001","10001","11110","10100","10010","10001"],
+'S':["01111","10000","10000","01110","00001","00001","11110"],
+'T':["11111","00100","00100","00100","00100","00100","00100"],
+'U':["10001","10001","10001","10001","10001","10001","01110"],
+'V':["10001","10001","10001","10001","10001","01010","00100"],
+'W':["10001","10001","10001","10101","10101","11011","10001"],
+'X':["10001","10001","01010","00100","01010","10001","10001"],
+'Y':["10001","10001","01010","00100","00100","00100","00100"],
+'Z':["11111","00001","00010","00100","01000","10000","11111"],
+'Ë':["01010","11111","10000","11110","10000","10000","11111"],
+'0':["01110","10001","10011","10101","11001","10001","01110"],
+'1':["00100","01100","00100","00100","00100","00100","01110"],
+'2':["01110","10001","00001","00110","01000","10000","11111"],
+'3':["11111","00010","00100","00010","00001","10001","01110"],
+'4':["00010","00110","01010","10010","11111","00010","00010"],
+'5':["11111","10000","11110","00001","00001","10001","01110"],
+'6':["00110","01000","10000","11110","10001","10001","01110"],
+'7':["11111","00001","00010","00100","01000","01000","01000"],
+'8':["01110","10001","10001","01110","10001","10001","01110"],
+'9':["01110","10001","10001","01111","00001","00010","01100"],
+' ':["00000","00000","00000","00000","00000","00000","00000"],
+'.':["00000","00000","00000","00000","00000","01100","01100"],
+',':["00000","00000","00000","00000","00110","00110","01100"],
+'!':["00100","00100","00100","00100","00100","00000","00100"],
+'?':["01110","10001","00001","00110","00100","00000","00100"],
+"'":["00100","00100","00000","00000","00000","00000","00000"],
+'-':["00000","00000","00000","01110","00000","00000","00000"],
+':':["00000","01100","01100","00000","01100","01100","00000"],
+'(':["00010","00100","01000","01000","01000","00100","00010"],
+')':["01000","00100","00010","00010","00010","00100","01000"],
+'/':["00001","00010","00100","00100","00100","01000","10000"],
+'+':["00000","00100","00100","11111","00100","00100","00000"],
+'&':["01100","10010","10100","01000","10101","10010","01101"],
+'%':["11001","11010","00010","00100","01000","01011","10011"],
+'"':["01010","01010","00000","00000","00000","00000","00000"],
+'*':["00000","10101","01110","11111","01110","10101","00000"],
+'~':["00111","00101","00101","00100","01100","11100","11000"], /* music note */
+'@':["01010","11111","11111","11111","01110","00100","00000"], /* heart */
+'#':["00100","01110","10101","00100","00100","00100","00100"], /* up arrow */
+'$':["00100","00100","00100","00100","10101","01110","00100"], /* down arrow */
+'[':["00000","01110","01110","01110","01110","01110","00000"], /* box empty */
+']':["00000","01110","01110","01010","01110","01110","00000"], /* nothing */
+'^':["00001","00010","10100","11000","10000","00000","00000"], /* check */
+};
+/* Real scannable QR for the fest page. Version 3-M, 29x29 modules,
+   generated once and baked in - encoding it at runtime would mean
+   shipping a QR encoder for one fixed URL. */
+const QR_URL = "https://www.firsttrinity.net/oktoberfest";
+const FB_URL = "https://facebook.com/events/s/first-trinity-german-lutheran-/4601546486790470/";
+const QR_TEXT = "FIRSTTRINITY.NET/OKTOBERFEST";
+const QR = [
+  "11111110111100001001101111111",
+  "10000010101011000110001000001",
+  "10111010011101011001001011101",
+  "10111010100011111101001011101",
+  "10111010010110111011001011101",
+  "10000010000011100001001000001",
+  "11111110101010101010101111111",
+  "00000000111010001111000000000",
+  "10110111000100101100001001011",
+  "01111001101110101111111110001",
+  "11110111111111100010010110110",
+  "10101101001111111001000110001",
+  "00011010010101110101000001100",
+  "10000100101110011001001100111",
+  "11101011001111100111000110111",
+  "10100000000100001011000110010",
+  "01001111011100110010010011010",
+  "01010000011101010000110101110",
+  "10110111100010010000010100100",
+  "00100101000000101110001000100",
+  "01001011101111000111111111100",
+  "00000000101001001001100011111",
+  "11111110101111001111101011010",
+  "10000010100010011000100011001",
+  "10111010010100100110111110111",
+  "10111010101111111000110011001",
+  "10111010110110100110010100101",
+  "10000010011000001001110101010",
+  "11111110101011110011111001010"];
+
+function drawText(str, x, y, scale, color, align){
+  str = String(str).toUpperCase();
+  const cw = 6*scale;
+  if (align === 'center') x -= Math.floor(str.length*cw/2);
+  if (align === 'right')  x -= str.length*cw;
+  CTX.fillStyle = color;
+  for (let i=0;i<str.length;i++){
+    const g = FONT[str[i]];
+    if (!g) continue;
+    for (let r=0;r<7;r++){
+      const row = g[r];
+      for (let c=0;c<5;c++){
+        if (row[c]==='1') CTX.fillRect(x+i*cw+c*scale, y+r*scale, scale, scale);
+      }
+    }
+  }
+}
+function textW(str,scale){ return String(str).length*6*scale; }
+function drawTextOutlined(str,x,y,scale,color,outline,align){
+  for (const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]])
+    drawTextShifted(str,x+dx*scale, y+dy*scale, scale, outline, align);
+  drawText(str,x,y,scale,color,align);
+}
+function drawTextShifted(s,x,y,sc,c,a){ drawText(s,x,y,sc,c,a); }
+
+/* ================================================================ INPUT */
+const keys = {};
+let interactPressed = false, anyKeyPressed = false;
+window.addEventListener('keydown', e=>{
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key)) e.preventDefault();
+  if (!e.repeat){
+    anyKeyPressed = true;
+    if (e.key==='e'||e.key==='E'||e.key===' '||e.key==='Enter') interactPressed = true;
+    if (e.key==='Tab'||e.key==='c'||e.key==='C') toggleCard();
+    if (e.key==='m'||e.key==='M') toggleMusic();
+  }
+  keys[e.key] = true;
+  startAudioOnGesture();
+});
+window.addEventListener('keyup', e=>{
+  keys[e.key] = false;
+  // shift+W reports 'W' on keydown and can report 'w' on keyup (or the reverse),
+  // which would leave the other case stuck on and the player walking forever
+  if (e.key.length === 1){ keys[e.key.toLowerCase()] = false; keys[e.key.toUpperCase()] = false; }
+});
+
+const padState = {u:false,d:false,l:false,r:false,run:false};
+if (isTouch){
+  const pad = document.getElementById('pad');
+  pad.style.display='block';
+  const act = document.getElementById('actBtn');
+  act.style.display='flex';
+  const padEls = {u:document.getElementById('padU'), d:document.getElementById('padD'),
+                  l:document.getElementById('padL'), r:document.getElementById('padR')};
+  const setPad = (u,d,l,r)=>{
+    padState.u=u; padState.d=d; padState.l=l; padState.r=r;
+    for (const k in padEls) padEls[k].classList.toggle('on', padState[k]);
+  };
+  // One handler for the whole pad: the thumb can slide between directions
+  // without lifting, and corners give diagonals.
+  const padFromTouch = t=>{
+    const rect = pad.getBoundingClientRect();
+    const x = (t.clientX - rect.left)/rect.width  - 0.5;
+    const y = (t.clientY - rect.top)/rect.height - 0.5;
+    const dead = 0.12;
+    setPad(y < -dead, y > dead, x < -dead, x > dead);
+  };
+  const padTouch = e=>{
+    e.preventDefault();
+    if (e.targetTouches.length){ padFromTouch(e.targetTouches[0]); startAudioOnGesture(); }
+    else setPad(false,false,false,false);
+  };
+  pad.addEventListener('touchstart', padTouch, {passive:false});
+  pad.addEventListener('touchmove',  padTouch, {passive:false});
+  pad.addEventListener('touchend',   padTouch, {passive:false});
+  pad.addEventListener('touchcancel',padTouch, {passive:false});
+  act.addEventListener('touchstart',e=>{e.preventDefault();act.classList.add('on');
+    interactPressed=true;anyKeyPressed=true;startAudioOnGesture();},{passive:false});
+  act.addEventListener('touchend',e=>{e.preventDefault();act.classList.remove('on');},{passive:false});
+  act.addEventListener('touchcancel',()=>act.classList.remove('on'));
+}
+document.getElementById('cardBtn').addEventListener('click', ()=>{ toggleCard(); startAudioOnGesture(); });
+document.getElementById('musicBtn').addEventListener('click', toggleMusic);
+
+/* A net under all of it, which phones need. The controls above only ever ask
+   for audio on touchSTART - the A button's touchend doesn't ask, and the
+   d-pad's runs its no-fingers-left branch instead - but a phone browser
+   commonly only lets sound start from the END of a touch. On one of those the
+   game's own controls could never unlock the audio however much you played,
+   and the only thing that could was the music button. Capture phase, so it
+   still fires if a handler stops the event, and passive, so it never
+   interferes with the controls' own preventDefault. */
+for (const ev of ['touchend','pointerup','click'])
+  window.addEventListener(ev, e=>{
+    // ...except the music button, which has its own opinion about whether the
+    // music should be on. Starting it here would let its own tap turn it off.
+    if (e.target && e.target.closest && e.target.closest('#musicBtn')) return;
+    startAudioOnGesture();
+  }, {capture:true, passive:true});
+
+/* Clicking (or tapping) the QR opens the fest page. The canvas is displayed at
+   whatever scale fits, so client coords have to be mapped back to the 480-wide
+   internal space before hit-testing. */
+function canvasPoint(e){
+  const r = CVS.getBoundingClientRect();
+  return [ (e.clientX-r.left) * (VW/r.width), (e.clientY-r.top) * (VH/r.height) ];
+}
+function linkAt(cx,cy){
+  if (state==='qr'  && qrHit(cx,cy))  return QR_URL;
+  if (state==='win' && inRect(winLayout().hit,cx,cy)) return FB_URL;
+  return null;
+}
+CVS.addEventListener('click', e=>{
+  startAudioOnGesture();
+  const [cx,cy] = canvasPoint(e);
+  const url = linkAt(cx,cy);
+  if (url) openUrl(url);
+});
+CVS.addEventListener('mousemove', e=>{
+  const [cx,cy] = canvasPoint(e);
+  const want = linkAt(cx,cy) ? 'pointer' : '';
+  if (CVS.style.cursor !== want) CVS.style.cursor = want;
+});
+
+function dirInput(){
+  let dx=0, dy=0;
+  if (keys['ArrowLeft']||keys['a']||keys['A']||padState.l) dx=-1;
+  if (keys['ArrowRight']||keys['d']||keys['D']||padState.r) dx=1;
+  if (keys['ArrowUp']||keys['w']||keys['W']||padState.u) dy=-1;
+  if (keys['ArrowDown']||keys['s']||keys['S']||padState.d) dy=1;
+  return [dx,dy];
+}
+
+/* ================================================================ AUDIO */
+let AC = null, masterGain = null, musicOn = true, musicStarted = false;
+let tempoMul = 1, sfxGain = null;
+/* Browsers hand back a *suspended* AudioContext unless a real user gesture is
+   behind it, and Safari suspends even one built inside the gesture handler -
+   it only starts on an explicit resume(). A suspended context isn't just
+   quiet: its clock is frozen, so the scheduler below has nothing to schedule
+   against and the fest plays in silence however long you wait. resume() is
+   therefore tried on every gesture, not just the first, since the one that
+   creates the context isn't always the one allowed to start it. */
+function audioReady(){
+  if (!AC){
+    try{
+      AC = new (window.AudioContext||window.webkitAudioContext)();
+      masterGain = AC.createGain(); masterGain.gain.value = 0.16; masterGain.connect(AC.destination);
+      sfxGain = AC.createGain(); sfxGain.gain.value = 0.5; sfxGain.connect(AC.destination);
+    }catch(e){ return false; }   /* no audio at all */
+  }
+  if (AC.state !== 'running' && AC.resume) AC.resume().catch(()=>{});
+  return true;
+}
+function startMusic(){
+  if (!AC || !musicOn || musicStarted) return;
+  musicStarted = true;
+  nextNoteTime = AC.currentTime + 0.1;
+  schedLoop();
+}
+function startAudioOnGesture(){ if (audioReady()) startMusic(); }
+function toggleMusic(){
+  /* Before the first gesture nothing has ever played, so a button reading ON
+     is a promise rather than a state - pressing it then means "start", not
+     "stop". Pressing it once used to start the music and turn it straight back
+     off in the same click, which is why it took an off-and-on to get sound. */
+  const neverPlayed = !AC;
+  audioReady();
+  if (!(neverPlayed && musicOn)) musicOn = !musicOn;
+  document.getElementById('musicBtn').innerHTML = musicOn ? '&#9834; ON' : '&#9834; OFF';
+  startMusic();
+}
+/* jolly original oompah tunes in G — 2/4 time.
+   chords: 0=G 1=D 2=C 3=Em; melody: [freq, eighth-note length], 0 = rest.
+
+   A bar is 4 eighths, and `harm` steps one chord per bar while `mel` runs on
+   its own clock, so a tune's note lengths MUST add up to harm.length*4 or the
+   melody drifts out of phase with the chords a little further on every loop.
+
+   The three requestable tunes each have to sound like the thing the band was
+   asked for. What they can't do is quote it: Beer Barrel Polka (Vejvoda,
+   1927), the Chicken Dance (Werner Thomas, d. 2016) and Don't Stop Believin'
+   (1981) are all still in copyright, and this file gets served from a church
+   website. So each one is written to carry what actually makes the original
+   recognizable and isn't anyone's property - a genre, a structure, a chord
+   loop - rather than its melody. */
+const CHORDS = [
+  [196.0, 246.9, 293.7],   // G
+  [220.0, 293.7, 369.99],  // D
+  [196.0, 261.6, 329.6],   // C
+  [164.8, 196.0, 246.9],   // Em
+];
+const ROOTS = [98.0, 73.42, 65.41, 82.41]; // G2 D2 C2 E2
+const N = {G4:392,A4:440,B4:493.9,C5:523.3,D5:587.3,E5:659.3,F5s:740,G5:784,D4:293.7,E4:329.6,F4s:370};
+const SONGBOOK = {
+  oompah: { tempo:1, harm:[0,0,0,0, 0,0,1,0, 0,2,0,1, 1,1,1,0], mel:[
+    [N.D4,1],[N.G4,1],[N.B4,1],[N.G4,1],[N.D5,2],[N.B4,2],
+    [N.C5,1],[N.B4,1],[N.A4,1],[N.B4,1],[N.G4,4],
+    [N.D4,1],[N.G4,1],[N.B4,1],[N.G4,1],[N.E5,2],[N.C5,2],
+    [N.D5,1],[N.C5,1],[N.B4,1],[N.A4,1],[N.G4,4],
+    [N.B4,2],[N.C5,2],[N.D5,2],[N.G5,2],
+    [N.F5s,1],[N.E5,1],[N.D5,2],[N.B4,2],[N.G4,2],
+    [N.A4,2],[N.B4,1],[N.A4,1],[N.G4,2],[N.E4,2],
+    [N.D4,2],[N.F4s,2],[N.G4,4],
+  ]},
+  /* ROLL OUT THE BARREL - a Bohemian beer-hall polka, where the genre is the
+     whole identity: brisk two-step, arpeggio up to a top note and back, a D7
+     leaning on its seventh, then a repeated-note trio you can shout along to
+     with a stein in your hand. */
+  barrel: { tempo:1.25, harm:[0,0,1,1, 0,0,1,0, 2,2,0,0, 1,1,0,0], mel:[
+    [N.G4,1],[N.B4,1],[N.D5,1],[N.B4,1],
+    [N.G5,2],[N.D5,2],
+    [N.A4,1],[N.C5,1],[N.F4s,1],[N.A4,1],
+    [N.D5,2],[N.A4,2],
+    [N.G4,1],[N.B4,1],[N.D5,1],[N.B4,1],
+    [N.G5,2],[N.D5,2],
+    [N.E5,1],[N.D5,1],[N.C5,1],[N.A4,1],
+    [N.G4,4],
+    [N.E5,1],[N.E5,1],[N.E5,1],[N.C5,1],
+    [N.G5,2],[N.E5,2],
+    [N.D5,1],[N.D5,1],[N.D5,1],[N.B4,1],
+    [N.B4,2],[N.D5,2],
+    [N.C5,1],[N.C5,1],[N.A4,1],[N.C5,1],
+    [N.F4s,2],[N.A4,2],
+    [N.B4,1],[N.A4,1],[N.G4,1],[N.A4,1],
+    [N.G4,4],
+  ]},
+  /* THE CHICKEN DANCE - the dance is the tune. Four beak snaps, four wing
+     flaps, four tail wiggles, then a bar of nothing but oom-pah to clap into,
+     twice and climbing; then the flowing bit where everyone links arms. Fastest
+     thing in the book, because it is. */
+  chicken: { tempo:1.3, harm:[0,0,1,1, 2,2,1,0, 0,0,1,0, 2,2,1,0], mel:[
+    [N.D5,1],[N.D5,1],[N.D5,1],[N.D5,1],          // snap snap snap snap
+    [N.B4,1],[N.B4,1],[N.B4,1],[N.B4,1],          // flap flap flap flap
+    [N.A4,1],[N.A4,1],[N.A4,1],[N.A4,1],          // wiggle wiggle wiggle wiggle
+    [0,4],                                        // clap clap clap clap
+    [N.E5,1],[N.E5,1],[N.E5,1],[N.E5,1],
+    [N.C5,1],[N.C5,1],[N.C5,1],[N.C5,1],
+    [N.F5s,1],[N.F5s,1],[N.F5s,1],[N.F5s,1],
+    [0,4],
+    [N.G4,1],[N.A4,1],[N.B4,1],[N.C5,1],          // and now everyone links arms
+    [N.D5,2],[N.B4,2],
+    [N.C5,1],[N.B4,1],[N.A4,1],[N.F4s,1],
+    [N.G4,2],[N.B4,2],
+    [N.E5,1],[N.D5,1],[N.C5,1],[N.E5,1],
+    [N.C5,2],[N.E5,2],
+    [N.D5,1],[N.C5,1],[N.B4,1],[N.A4,1],
+    [N.G4,4],
+  ]},
+  /* DON'T STOP POLKA-LIEVIN' - a stadium ballad with a tuba under it. The
+     recognizable part of one of those is the four-chord loop, not the tune, so
+     the harmony is G-D-Em-C round and round while the melody climbs a little
+     higher each time. It ends on the fifth over the C rather than resolving,
+     so the loop just keeps going - which is the whole point of the song it is
+     pretending to be. */
+  journey: { tempo:1, harm:[0,1,3,2, 0,1,3,2, 0,1,3,2, 0,1,3,2], mel:[
+    [N.D4,2],[N.G4,2],
+    [N.F4s,2],[N.A4,2],
+    [N.G4,2],[N.B4,2],
+    [N.C5,4],
+    [N.B4,2],[N.D5,2],
+    [N.A4,2],[N.F4s,2],
+    [N.G4,2],[N.E5,2],
+    [N.E5,2],[N.C5,2],
+    [N.D5,4],
+    [N.F5s,4],
+    [N.G5,2],[N.E5,2],
+    [N.E5,2],[N.G5,2],
+    [N.G5,2],[N.D5,2],
+    [N.F5s,2],[N.A4,2],
+    [N.E5,2],[N.B4,2],
+    [N.C5,2],[N.D5,2],
+  ]},
+};
+let curSong = SONGBOOK.oompah;
+let nextNoteTime = 0, eighthIdx = 0, melIdx = 0, melHold = 0;
+function setSong(key){
+  curSong = SONGBOOK[key] || SONGBOOK.oompah;
+  tempoMul = curSong.tempo;
+  eighthIdx = 0; melIdx = 0; melHold = 0;
+}
+/* The pump. Kept separate from the scheduling so that a note the browser
+   refuses can't take the timer chain down with it - that would leave the music
+   dead until something restarted it. */
+function schedLoop(){
+  if (!AC || !musicOn){ musicStarted = false; return; }
+  try{ schedNotes(); }catch(e){ /* a bad note must not silence the rest of the fest */ }
+  setTimeout(schedLoop, 30);
+}
+function schedNotes(){
+  const spb = (60/108) / tempoMul;   // seconds per beat
+  const e8 = spb/2;
+  /* A clock that stalled - a suspended context, a backgrounded tab throttling
+     the timer above - leaves nextNoteTime in the past. Catching up would dump
+     every missed note into one instant, so pick up from now instead. */
+  if (nextNoteTime < AC.currentTime) nextNoteTime = AC.currentTime + 0.05;
+  while (nextNoteTime < AC.currentTime + 0.15){
+    const inBar = eighthIdx % 4;          // 2/4 = 4 eighths per bar
+    const bar = Math.floor(eighthIdx/4) % curSong.harm.length;
+    const ch = curSong.harm[bar];
+    // oom (bass) on beats, pah (chord) on offbeats
+    if (inBar===0 || inBar===2){
+      let f = ROOTS[ch];
+      if (inBar===2){ f *= 1.5; if (f>120) f /= 2; }
+      playTone(f, nextNoteTime, e8*0.9, 'square', 0.16);
+    } else {
+      for (const f of CHORDS[ch]) playTone(f, nextNoteTime, e8*0.55, 'sawtooth', 0.035);
+    }
+    // melody
+    if (melHold<=0){
+      const m = curSong.mel[melIdx % curSong.mel.length];
+      if (m[0]>0){ playTone(m[0], nextNoteTime, e8*m[1]*0.92, 'square', 0.07); playTone(m[0]*1.004, nextNoteTime, e8*m[1]*0.92, 'triangle', 0.06); }
+      melHold = m[1];
+      melIdx++;
+    }
+    melHold--;
+    eighthIdx++;
+    nextNoteTime += e8;
+  }
+}
+function playTone(freq, t, dur, type, vol){
+  if (!AC) return;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(masterGain);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function sfx(kind){
+  if (!AC) return;
+  const t = AC.currentTime;
+  const tone = (f,dt,dur,type,vol)=>{ const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.value=f;
+    g.gain.setValueAtTime(vol,t+dt);g.gain.exponentialRampToValueAtTime(0.001,t+dt+dur);o.connect(g);g.connect(sfxGain);o.start(t+dt);o.stop(t+dt+dur+0.02); };
+  if (kind==='blip') tone(660,0,0.05,'square',0.12);
+  if (kind==='ok'){ tone(523,0,0.09,'square',0.12); tone(784,0.08,0.12,'square',0.12); }
+  if (kind==='tada'){ tone(523,0,0.1,'square',0.14); tone(659,0.09,0.1,'square',0.14); tone(784,0.18,0.1,'square',0.14); tone(1047,0.27,0.25,'square',0.16); }
+  if (kind==='thunk'){ tone(120,0,0.1,'square',0.25); tone(80,0.02,0.15,'sawtooth',0.2); }
+  if (kind==='bark'){ tone(400,0,0.06,'square',0.2); tone(300,0.09,0.07,'square',0.2); }
+  if (kind==='pop'){ tone(880,0,0.04,'square',0.18); tone(1320,0.03,0.05,'square',0.12); }
+  if (kind==='fanfare'){ [392,494,587,784,587,784,988].forEach((f,i)=>tone(f,i*0.11,0.12,'square',0.15)); }
+}
+
+/* ============================================================= THE WORLD
+   ground tile ids */
+const T_GRASS=0, T_PATH=1, T_SIDE=2, T_ROAD=3, T_WOOD=4, T_CARPET=5,
+      T_PINK=6, T_KID=7, T_WALL=8, T_PARK=9, T_PLAZA=10, T_STEP=11, T_FLOWER=12;
+const ground = [], solid = [];
+for (let y=0;y<MH;y++){ ground.push(new Array(MW).fill(T_GRASS)); solid.push(new Array(MW).fill(false)); }
+function setT(x,y,t,s){ if(x<0||y<0||x>=MW||y>=MH)return; ground[y][x]=t; if(s!==undefined) solid[y][x]=s; }
+function rectT(x1,y1,x2,y2,t,s){ for(let y=y1;y<=y2;y++)for(let x=x1;x<=x2;x++) setT(x,y,t,s); }
+function wallRing(x1,y1,x2,y2){
+  for(let x=x1;x<=x2;x++){ setT(x,y1,T_WALL,true); setT(x,y2,T_WALL,true); }
+  for(let y=y1;y<=y2;y++){ setT(x1,y,T_WALL,true); setT(x2,y,T_WALL,true); }
+}
+
+/* --- streets & paths --- */
+rectT(0,49,MW-1,MH-1,T_ROAD,false);
+rectT(0,47,MW-1,48,T_SIDE,false);
+rectT(4,1,61,4,T_PARK,false);               // parking lot behind the buildings
+rectT(59,2,61,48,T_ROAD,false);             // driveway up the right side (in)
+rectT(1,1,3,48,T_ROAD,false);               // exit driveway: back lot, down the left side of the church
+/* (the biergarten + grill areas are just grass; only real walkways are paved) */
+rectT(13,31,14,46,T_PATH,false);            // church walk
+rectT(12,36,43,37,T_PATH,false);            // path along the front, to the kids' walkway
+rectT(28,23,29,46,T_PATH,false);            // the one walkway: street up into the hallway door
+rectT(30,28,52,28,T_PATH,false);            // branch along the building fronts to the rectory
+
+/* --- church (sanctuary) --- */
+wallRing(4,6,24,30);
+rectT(5,7,23,29,T_WOOD,false);
+rectT(5,7,23,9,T_CARPET,false);             // chancel
+rectT(13,10,15,29,T_CARPET,false);          // aisle
+setT(13,30,T_STEP,false); setT(14,30,T_STEP,false);   // door gap
+setT(24,12,T_PINK,false); setT(24,13,T_PINK,false);   // connector to hall (north end)
+
+/* --- fellowship hall corridor (pink), set back from the street --- */
+wallRing(25,10,33,22);
+rectT(26,11,32,21,T_PINK,false);
+setT(28,22,T_PINK,false); setT(29,22,T_PINK,false);   // south door (recessed)
+setT(25,12,T_PINK,false); setT(25,13,T_PINK,false);   // west door to church (north end)
+setT(33,12,T_PINK,false); setT(33,13,T_PINK,false);   // east door to kid center
+
+/* --- kid's center --- */
+wallRing(34,6,52,16);
+rectT(35,7,51,15,T_KID,false);
+setT(34,12,T_KID,false); setT(34,13,T_KID,false);     // west door
+/* (no south door - the kid's center is entered from the side, through the hallway) */
+
+/* flower beds near church steps */
+/* big bushes in mulch beds flank the front steps (drawn as objects) */
+
+/* ============================================================ TILE ART */
+const tileCanvas = document.createElement('canvas');
+tileCanvas.width = MW*TS; tileCanvas.height = MH*TS;
+const TCX = tileCanvas.getContext('2d');
+function bakeTiles(){
+  for (let y=0;y<MH;y++) for (let x=0;x<MW;x++){
+    const t = ground[y][x], px = x*TS, py = y*TS, h = hash2(x,y);
+    if (t===T_GRASS){
+      TCX.fillStyle = h<0.5 ? '#7aa74e' : '#74a14a'; TCX.fillRect(px,py,TS,TS);
+      if (h>0.82){ TCX.fillStyle='#8db65e'; TCX.fillRect(px+((h*91)|0)%12, py+((h*53)|0)%12, 2,1); TCX.fillRect(px+((h*37)|0)%12+2, py+((h*77)|0)%12, 1,2); }
+      if (h>0.965){ TCX.fillStyle=['#e0912f','#c9542f','#d9b23a'][((h*997)|0)%3]; TCX.fillRect(px+((h*61)|0)%13, py+((h*29)|0)%13, 2,2); } // fallen leaf
+    } else if (t===T_PATH){
+      TCX.fillStyle='#c9b283'; TCX.fillRect(px,py,TS,TS);
+      TCX.fillStyle= h<0.5?'#bfa878':'#d2bc8e'; TCX.fillRect(px+((h*83)|0)%12, py+((h*47)|0)%12, 3,2);
+    } else if (t===T_SIDE){
+      TCX.fillStyle='#b6b0a2'; TCX.fillRect(px,py,TS,TS);
+      TCX.fillStyle='#a39d90'; TCX.fillRect(px,py+TS-1,TS,1); if(x%2===0)TCX.fillRect(px,py,1,TS);
+    } else if (t===T_ROAD || t===T_PARK){
+      TCX.fillStyle='#4d4d55'; TCX.fillRect(px,py,TS,TS);
+      TCX.fillStyle='#45454c'; TCX.fillRect(px+((h*83)|0)%12, py+((h*47)|0)%12, 4,2);
+      if (t===T_ROAD && y===49 && x%2===0){ TCX.fillStyle='#d8c65e'; TCX.fillRect(px+2,py+14,10,2);}
+      if (t===T_PARK && (x-30)%3===0 && y>=1 && y<=4){ TCX.fillStyle='#c8c8cf'; TCX.fillRect(px,py,2,TS); }
+    } else if (t===T_WOOD){
+      TCX.fillStyle='#a97e46'; TCX.fillRect(px,py,TS,TS);
+      TCX.fillStyle='#9a7240'; TCX.fillRect(px,py+7,TS,1); TCX.fillRect(px,py+15,TS,1);
+    } else if (t===T_CARPET){
+      TCX.fillStyle='#8e3040'; TCX.fillRect(px,py,TS,TS);
+      TCX.fillStyle='#983648'; if((x+y)%2===0) TCX.fillRect(px+2,py+2,TS-4,TS-4);
+    } else if (t===T_PINK){
+      TCX.fillStyle='#efc5b6'; TCX.fillRect(px,py,TS,TS);
+      TCX.fillStyle='#e5b9aa'; TCX.fillRect(px,py+TS-1,TS,1); if((x+y)%2===0){TCX.fillStyle='#f3cdbf';TCX.fillRect(px+1,py+1,TS-2,TS-2);}
+    } else if (t===T_KID){
+      TCX.fillStyle='#cfe6f4'; TCX.fillRect(px,py,TS,TS);
+      TCX.fillStyle='#c2dded'; if((x+y)%2===0) TCX.fillRect(px,py,TS,TS);
+    } else if (t===T_WALL){
+      TCX.fillStyle='#8b8274'; TCX.fillRect(px,py,TS,TS);
+      TCX.fillStyle='#9c937f'; TCX.fillRect(px,py,TS,3);
+      TCX.fillStyle='#756c5e'; TCX.fillRect(px,py+TS-3,TS,3);
+      TCX.fillStyle='#847b6d'; TCX.fillRect(px+((h*7)|0)%8, py+4+((h*13)|0)%7, 6,1);
+    } else if (t===T_PLAZA){
+      TCX.fillStyle='#c2a56f'; TCX.fillRect(px,py,TS,TS);
+      TCX.fillStyle= h<0.5?'#b89b66':'#cbae78';
+      TCX.fillRect(px+((h*83)|0)%12, py+((h*47)|0)%12, 3,2);
+    } else if (t===T_STEP){
+      TCX.fillStyle='#b6b0a2'; TCX.fillRect(px,py,TS,TS);
+      TCX.fillStyle='#8f897c'; TCX.fillRect(px,py+5,TS,1); TCX.fillRect(px,py+11,TS,1);
+    } else if (t===T_FLOWER){
+      TCX.fillStyle='#5e8c3e'; TCX.fillRect(px,py,TS,TS);
+      const cols=['#e0912f','#d94f4f','#e8d24a','#c17ad4'];
+      for(let i=0;i<5;i++){ TCX.fillStyle=cols[(i+x+y)%4]; TCX.fillRect(px+2+((h*(31+i*17))|0)%11, py+2+((h*(53+i*29))|0)%11, 2,2); }
+    }
+  }
+  // stained glass windows on the sanctuary's top wall
+  for (const wx of [8,12,16,20]){
+    const px = wx*TS, py = 6*TS;
+    TCX.fillStyle='#40372c'; TCX.fillRect(px+3,py+3,10,11);
+    const cols=['#d94f4f','#4f7ed9','#e8d24a','#57b060'];
+    for(let i=0;i<4;i++){ TCX.fillStyle=cols[(i+wx)%4]; TCX.fillRect(px+4+(i%2)*5, py+4+Math.floor(i/2)*5, 4,4); }
+    TCX.fillStyle='#40372c'; TCX.fillRect(px+7,py+3,1,11);
+  }
+}
+
+/* ============================================================== OBJECTS
+   static scenery drawn each frame, y-sorted with entities */
+const objects = [];   // {x,y,sortY,draw,overhead?}
+const solids  = [];   // extra pixel-space solid rects {x,y,w,h}
+const interactables = []; // {x,y,r,name,action}
+function addSolid(x,y,w,h){ solids.push({x,y,w,h}); }
+function obj(x,y,sortY,draw){ const o={x,y,sortY,draw}; objects.push(o); return o; }
+
+/* ----- object painters (x,y in px) ----- */
+function drawTree(g,x,y,kind){
+  g.fillStyle='#6b4a2b'; g.fillRect(x+13,y+26,6,10);
+  const cols = kind===0?['#c9542f','#e0912f']:(kind===1?['#e0912f','#e8c23a']:(kind===2?['#4e7c3a','#639649']:['#b03a3a','#d0642f']));
+  g.fillStyle=cols[0];
+  g.fillRect(x+4,y+8,24,16); g.fillRect(x+8,y+2,16,26); g.fillRect(x,y+12,32,8);
+  g.fillStyle=cols[1];
+  g.fillRect(x+8,y+6,10,8); g.fillRect(x+4,y+14,8,6); g.fillRect(x+18,y+16,9,6);
+  g.fillStyle='rgba(0,0,0,0.12)'; g.fillRect(x+6,y+22,22,4);
+}
+function tree(tx,ty,kind){
+  const x=tx*TS, y=ty*TS;
+  obj(x,y,y+36,(g)=>drawTree(g,x,y,kind));
+  addSolid(x+10,y+28,12,8);
+}
+function pumpkin(tx,ty){
+  const x=tx*TS+2, y=ty*TS+4;
+  obj(x,y,y+12,(g)=>{ g.fillStyle='#d96b1f'; g.fillRect(x,y+3,12,8); g.fillRect(x+1,y+2,10,10);
+    g.fillStyle='#c25a17'; g.fillRect(x+4,y+2,1,9); g.fillRect(x+8,y+2,1,9);
+    g.fillStyle='#4e7c3a'; g.fillRect(x+5,y,2,3); });
+  addSolid(x,y+4,12,8);
+}
+function hay(tx,ty){
+  const x=tx*TS, y=ty*TS;
+  obj(x,y,y+14,(g)=>{ g.fillStyle='#d9b23a'; g.fillRect(x+1,y+2,14,11);
+    g.fillStyle='#c6a02c'; g.fillRect(x+1,y+5,14,1); g.fillRect(x+1,y+9,14,1);
+    g.fillStyle='#e6c65c'; g.fillRect(x+3,y+3,3,2); g.fillRect(x+9,y+7,3,2); });
+  addSolid(x+1,y+3,14,10);
+}
+function picnicTable(tx,ty){
+  const x=tx*TS, y=ty*TS;
+  obj(x,y,y+20,(g)=>{
+    g.fillStyle='#8a5a30'; g.fillRect(x,y+4,44,3); g.fillRect(x,y+17,44,3);  // benches
+    // bavarian check tablecloth
+    g.fillStyle='#f0eee6'; g.fillRect(x+2,y+7,40,10);
+    g.fillStyle='#6aa9dd';
+    for(let i=0;i<10;i++)for(let j=0;j<2;j++){ if((i+j)%2===0) g.fillRect(x+2+i*4,y+7+j*5,4,5); }
+    // steins, pretzel, flower jar
+    g.fillStyle='#e8e4da'; g.fillRect(x+8,y+8,4,5); g.fillRect(x+32,y+9,4,5);
+    g.fillStyle='#d9a441'; g.fillRect(x+14,y+10,6,4); g.fillStyle='#b3812c'; g.fillRect(x+16,y+11,2,2);
+    g.fillStyle='#cfe8f2'; g.fillRect(x+24,y+10,4,5);
+    g.fillStyle='#e8a0b4'; g.fillRect(x+23,y+7,2,2); g.fillRect(x+27,y+7,2,2);
+    g.fillStyle='#f4e9c8'; g.fillRect(x+25,y+6,2,2);
+  });
+  addSolid(x,y+4,44,16);
+}
+function stringPole(tx,ty){
+  const x=tx*TS+6, y=ty*TS;
+  obj(x,y,y+30,(g)=>{ g.fillStyle='#6b4a2b'; g.fillRect(x,y,4,30); g.fillStyle='#553a20'; g.fillRect(x,y+28,4,2); });
+  addSolid(x,y+24,4,6);
+  return {x:x+2,y:y+2};
+}
+function stringLights(p1,p2){
+  obj(0,0,-1,()=>{});
+  overheadDraws.push((g)=>{
+    const segs = 14, sag = 8;
+    g.strokeStyle='#3a2f22'; g.lineWidth=1; g.beginPath();
+    for(let i=0;i<=segs;i++){
+      const t=i/segs, x=p1.x+(p2.x-p1.x)*t, y=p1.y+(p2.y-p1.y)*t + Math.sin(Math.PI*t)*sag;
+      if(i===0)g.moveTo(x+0.5,y+0.5); else g.lineTo(x+0.5,y+0.5);
+    }
+    g.stroke();
+    for(let i=1;i<segs;i+=2){
+      const t=i/segs, x=p1.x+(p2.x-p1.x)*t, y=p1.y+(p2.y-p1.y)*t + Math.sin(Math.PI*t)*sag;
+      const cols=['#ffd94a','#ff9a3d','#7ec8ff','#ff6b6b'];
+      g.fillStyle=cols[(i>>1)%4]; g.fillRect(x-1,y,3,3);
+    }
+  });
+}
+const overheadDraws = [];
+
+/* big open festival tent: canopy at top, open floor below */
+function bigTent(tx,ty,tw,stripeA,stripeB,label,opts){
+  opts = opts || {};
+  const x=tx*TS, y=ty*TS, w=tw*TS;
+  obj(x,y,y+30,(g)=>{
+    // back + canopy panels
+    g.fillStyle=stripeB; g.fillRect(x,y+10,w,22);
+    for(let i=0;i<tw;i++){ g.fillStyle=(i%2===0)?stripeA:stripeB; g.fillRect(x+i*TS,y+10,TS,22); }
+    g.fillStyle=stripeA; g.fillRect(x+2,y+2,w-4,10);
+    g.fillStyle='rgba(255,255,255,0.3)'; g.fillRect(x+2,y+2,w-4,3);
+    // scalloped front edge
+    for(let i=0;i<tw*2;i++){ g.fillStyle=(i%2===0)?stripeA:stripeB; g.fillRect(x+i*8,y+32,8,4); }
+    // blue-check pennant bunting along the eave
+    if (opts.bunting){
+      for(let i=0;i<tw*2;i++){
+        g.fillStyle=(i%2===0)?'#6aa9dd':'#f4f2ea';
+        g.beginPath(); g.moveTo(x+i*8,y+36); g.lineTo(x+i*8+8,y+36); g.lineTo(x+i*8+4,y+42); g.closePath(); g.fill();
+      }
+    }
+    // paper lanterns hanging inside
+    if (opts.lanterns){
+      const cols=['#3b6ea8','#f0eee6','#7ec8ff'];
+      for(let k=0, cx=x+16; cx<x+w-12; k++, cx+=26){
+        g.strokeStyle='#5a5248'; g.lineWidth=1;
+        g.beginPath(); g.moveTo(cx+0.5,y+32); g.lineTo(cx+0.5,y+38+(k%2)*4); g.stroke();
+        g.fillStyle=cols[k%3];
+        g.beginPath(); g.arc(cx,y+42+(k%2)*4,4,0,7); g.fill();
+        g.fillStyle='rgba(255,255,255,0.35)'; g.fillRect(cx-1,y+39+(k%2)*4,2,2);
+      }
+    }
+    // flags
+    g.fillStyle='#355e9e'; g.fillRect(x+6,y-6,2,8); g.fillRect(x+w-8,y-6,2,8);
+    g.fillStyle='#e8d24a'; g.fillRect(x+8,y-6,6,4); g.fillRect(x+w-6,y-6,6,4);
+    if (label){ drawBannerText(g, label, x+w/2, y+16); }
+  });
+  addSolid(x,y+10,4,26); addSolid(x+w-4,y+10,4,26);  // side poles
+}
+function drawBannerText(g,label,cx,cy){
+  const scale=1, w=textW(label,scale)+10;
+  g.fillStyle='#f4e9c8'; g.fillRect(cx-w/2, cy, w, 11);
+  g.fillStyle='#2e5987'; g.fillRect(cx-w/2, cy, w, 1); g.fillRect(cx-w/2, cy+10, w, 1);
+  drawText(label, cx, cy+2, 1, '#8e3040', 'center');
+}
+/* A serving counter running north-south, for a line you walk ALONG rather than
+   queue up to. Drawn as one-tile slices so someone walking beside it sorts per
+   slice instead of the whole slab flipping in front of them. */
+function counterObjV(tx,ty,th,topcol){
+  const x=Math.round(tx*TS), y=Math.round(ty*TS), h=Math.round(th*TS), W=18;
+  for (let sy=0; sy<h; sy+=TS){
+    const yy=y+sy, hh=Math.min(TS,h-sy);
+    obj(x,yy,yy+hh,(g)=>{
+      for(let k=0;k<hh;k+=4){                                  // festival cloth, front face
+        g.fillStyle=(((yy+k)>>2)%2===0)?'#6aa9dd':'#f4f2ea';
+        g.fillRect(x,yy+k,4,Math.min(4,hh-k));
+      }
+      g.fillStyle=topcol;    g.fillRect(x+4,yy,10,hh);         // counter top
+      g.fillStyle='#6e4524'; g.fillRect(x+14,yy,4,hh);         // shaded edge by the wall
+      g.fillStyle='rgba(0,0,0,0.10)'; g.fillRect(x+4,yy,10,1);
+    });
+  }
+  addSolid(x,y,W,h);
+  return {x,y,w:W,h};
+}
+function counterObj(tx,ty,tw,topcol){
+  const x=tx*TS, y=ty*TS, w=tw*TS;
+  obj(x,y,y+14,(g)=>{
+    g.fillStyle='#8a5a30'; g.fillRect(x,y,w,10);
+    g.fillStyle=topcol; g.fillRect(x,y-2,w,4);
+    g.fillStyle='#6e4524'; g.fillRect(x,y+8,w,2);
+  });
+  addSolid(x,y-2,w,12);
+  return {x,y,w};
+}
+
+/* ============================================================ CHARACTERS */
+function drawPerson(g, px, py, dir, frame, cfg){
+  if (cfg.kid) return drawKid(g, px, py, dir, frame, cfg);
+  const x = Math.round(px), y = Math.round(py);
+  g.fillStyle='rgba(0,0,0,0.18)'; g.fillRect(x+2,y+14,8,2);          // shadow
+  const skin = cfg.skin||'#f0c090', hair = cfg.hair||'#6b4a2b';
+  const legs = cfg.legs||'#7a4f2a', shoe = '#3a2a1a';
+  /* Walk cycle. The body block covers everything above y+12, so a stride has
+     to read in the two rows below it - the old one only moved a pixel at the
+     top of a leg, which the body painted straight over, so all three frames
+     came out identical. Frame 1 plants the feet apart, frame 2 brings them
+     together and lifts the body a pixel as it passes; the legs stretch to
+     meet the raised body so nothing floats. Feet and shadow stay planted. */
+  const apart = (frame===1), pass = (frame===2), bob = pass ? -1 : 0;
+  const lx = apart ? x+2 : x+3;      // pass keeps the normal stance and rises;
+  const rx = apart ? x+8 : x+7;      // bringing the legs closer merges them
+  g.fillStyle=legs; g.fillRect(lx,y+12+bob,2,2-bob); g.fillRect(rx,y+12+bob,2,2-bob);
+  g.fillStyle=shoe; g.fillRect(lx,y+14,2,1); g.fillRect(rx,y+14,2,1);
+  g.save(); if (bob) g.translate(0,bob);   // everything above the knees bobs
+  // body
+  if (cfg.dress){
+    g.fillStyle=cfg.dress; g.fillRect(x+3,y+7,6,2); g.fillRect(x+2,y+9,8,3);
+    g.fillStyle=cfg.apron||'#f5f0e6'; g.fillRect(x+4,y+9,4,3);
+    g.fillStyle=cfg.blouse||'#f5f0e6'; g.fillRect(x+3,y+6,6,2);
+  } else {
+    g.fillStyle=cfg.shirt||'#f5f0e6'; g.fillRect(x+3,y+6,6,3);
+    g.fillStyle=cfg.pants||legs; g.fillRect(x+3,y+9,6,3);
+    if (cfg.straps){ g.fillStyle=cfg.pants||legs; g.fillRect(x+4,y+6,1,3); g.fillRect(x+7,y+6,1,3); }
+  }
+  // arms
+  g.fillStyle=skin;
+  if (dir==='left'){ g.fillRect(x+2,y+7,1,3); }
+  else if (dir==='right'){ g.fillRect(x+9,y+7,1,3); }
+  else { g.fillRect(x+2,y+7,1,3); g.fillRect(x+9,y+7,1,3); }
+  // head
+  g.fillStyle=skin; g.fillRect(x+3,y+1,6,5);
+  g.fillStyle=hair;
+  if (dir==='up'){ g.fillRect(x+3,y+1,6,4); }
+  else { g.fillRect(x+3,y+1,6,2); g.fillRect(x+3,y+3,1,2); g.fillRect(x+8,y+3,1,2); }
+  // face
+  if (dir==='down'){ g.fillStyle='#241d16'; g.fillRect(x+4,y+3,1,1); g.fillRect(x+7,y+3,1,1);
+    if (cfg.nose){ g.fillStyle=cfg.nose; g.fillRect(x+5,y+4,2,1); } }
+  else if (dir==='left'){ g.fillStyle='#241d16'; g.fillRect(x+4,y+3,1,1); if(cfg.nose){g.fillStyle=cfg.nose;g.fillRect(x+3,y+4,1,1);} }
+  else if (dir==='right'){ g.fillStyle='#241d16'; g.fillRect(x+7,y+3,1,1); if(cfg.nose){g.fillStyle=cfg.nose;g.fillRect(x+8,y+4,1,1);} }
+  // hats
+  if (cfg.hat==='feather'){
+    g.fillStyle=cfg.hatColor||'#2f7d46'; g.fillRect(x+2,y+0,8,2); g.fillRect(x+3,y-1,6,1);
+    g.fillStyle='#d94f4f'; g.fillRect(x+9,y-2,1,3);
+  } else if (cfg.hat==='cowboy'){
+    g.fillStyle=cfg.hatColor||'#4a3423'; g.fillRect(x+1,y+1,10,1); g.fillRect(x+3,y-2,6,3);
+  } else if (cfg.hat==='cap'){
+    g.fillStyle=cfg.hatColor||'#2b7a78'; g.fillRect(x+3,y+0,6,2); if(dir==='down')g.fillRect(x+3,y+2,7,1);
+  } else if (cfg.hat==='puff'){
+    g.fillStyle=cfg.hatColor||'#e0912f'; g.fillRect(x+2,y-1,3,3); g.fillRect(x+7,y-1,3,3); g.fillRect(x+4,y-2,4,2);
+  } else if (cfg.hat==='collar'){
+    g.fillStyle='#f5f0e6'; g.fillRect(x+5,y+6,2,1);
+  } else if (cfg.hat==='braid'){
+    g.fillStyle=hair; g.fillRect(x+2,y+2,1,4); g.fillRect(x+9,y+2,1,4);
+    g.fillStyle='#d94f4f'; g.fillRect(x+2,y+6,1,1); g.fillRect(x+9,y+6,1,1);
+  }
+  g.restore();
+}
+/* Same build as drawPerson but four rows shorter with a full-size head, which
+   is what reads as "child" at this scale. Same two-frame walk. */
+function drawKid(g, px, py, dir, frame, cfg){
+  const x = Math.round(px), y = Math.round(py);
+  g.fillStyle='rgba(0,0,0,0.18)'; g.fillRect(x+3,y+13,6,2);
+  const skin = cfg.skin||'#f0c090', hair = cfg.hair||'#6b4a2b';
+  const legs = cfg.legs||'#7a4f2a', shoe = '#3a2a1a';
+  const apart = (frame===1), pass = (frame===2), bob = pass ? -1 : 0;
+  const t = cfg.small ? 1 : 0;                                 // the three-year-olds
+  const lx = apart ? x+3 : x+4, rx = apart ? x+8 : x+7;
+  const legTop = y+11+t+bob, legH = 2-t-bob;                   // knees down to the shoes
+  g.fillStyle=legs; g.fillRect(lx,legTop,1,legH); g.fillRect(rx,legTop,1,legH);
+  g.fillStyle=shoe; g.fillRect(lx,y+13,1,1); g.fillRect(rx,y+13,1,1);
+  g.save(); if (bob) g.translate(0,bob);
+  if (cfg.dress){ g.fillStyle=cfg.dress; g.fillRect(x+4,y+8+t,4,2); g.fillRect(x+3,y+10+t,6,1); }
+  else { g.fillStyle=cfg.shirt||'#f5f0e6'; g.fillRect(x+4,y+8+t,4,2);
+         g.fillStyle=cfg.pants||legs; g.fillRect(x+4,y+10+t,4,1); }
+  g.fillStyle=skin;                                            // arms
+  if (dir==='left') g.fillRect(x+3,y+8+t,1,2);
+  else if (dir==='right') g.fillRect(x+8,y+8+t,1,2);
+  else { g.fillRect(x+3,y+8+t,1,2); g.fillRect(x+8,y+8+t,1,2); }
+  g.fillStyle=skin; g.fillRect(x+3,y+3+t,6,5);                 // head, full size on purpose
+  g.fillStyle=hair;
+  if (dir==='up') g.fillRect(x+3,y+3+t,6,4);
+  else { g.fillRect(x+3,y+3+t,6,2); g.fillRect(x+3,y+5+t,1,2); g.fillRect(x+8,y+5+t,1,2); }
+  if (cfg.pigtails){ g.fillStyle=hair; g.fillRect(x+2,y+4+t,1,4); g.fillRect(x+9,y+4+t,1,4);
+    // hair tie at the TOP of the pigtail - down by the chin it reads as a cheek
+    if (cfg.bow){ g.fillStyle=cfg.bow; g.fillRect(x+2,y+3+t,1,1); g.fillRect(x+9,y+3+t,1,1); } }
+  if (dir==='down'){ g.fillStyle='#241d16'; g.fillRect(x+4,y+5+t,1,1); g.fillRect(x+7,y+5+t,1,1); }
+  else if (dir==='left'){ g.fillStyle='#241d16'; g.fillRect(x+4,y+5+t,1,1); }
+  else if (dir==='right'){ g.fillStyle='#241d16'; g.fillRect(x+7,y+5+t,1,1); }
+  g.restore();
+}
+function drawDog(g, px, py, flip, frame){
+  const x=Math.round(px), y=Math.round(py);
+  g.save();
+  if (flip){ g.translate(x+16,0); g.scale(-1,1); g.translate(-x,0); }
+  g.fillStyle='rgba(0,0,0,0.18)'; g.fillRect(x+2,y+9,12,2);
+  g.fillStyle='#7a4a22';
+  g.fillRect(x+1,y+3,11,4);                       // long body
+  g.fillRect(x+10,y+1,4,4);                       // head
+  g.fillStyle='#5c3617'; g.fillRect(x+9,y+0,2,3); // ear
+  g.fillStyle='#241d16'; g.fillRect(x+13,y+2,1,1);// eye
+  g.fillStyle='#5c3617';
+  if (frame===1){ g.fillRect(x+2,y+7,2,2); g.fillRect(x+9,y+7,2,2); }
+  else { g.fillRect(x+3,y+7,2,2); g.fillRect(x+8,y+7,2,2); }
+  g.fillRect(x+0,y+1,2,3);                        // tail up
+  g.fillStyle='#7a4a22'; g.fillRect(x+14,y+3,2,1);// snoot
+  g.restore();
+}
+
+/* ============================================================== NPC DATA */
+const npcs = [];
+function npc(tx,ty,cfg){
+  const n = { x:tx*TS+2, y:ty*TS, dir:'down', frame:0, animT:0, cfg,
+              homeX:tx*TS+2, homeY:ty*TS, wander:cfg.wander||0, wt:rr(1,3), vx:0, vy:0 };
+  npcs.push(n); return n;
+}
+
+/* ============================================================== QUESTS */
+const TASKS = [
+ {id:'pretzel', icon:'PRETZEL',  label:"GRAB A GIANT PRETZEL"},
+ {id:'brat',    icon:'BRAT',     label:"GET A BRAT FROM THE GRILL"},
+ {id:'stein',   icon:'STEIN',    label:"WIN THE STEIN HOLD"},
+ {id:'axe',     icon:'AXE',      label:"HIT A BULLSEYE (AXE THROW)"},
+ {id:'corn',    icon:'BAG',      label:"SINK A CORNHOLE BAG (BEAT KRISTI)"},
+ {id:'balloon', icon:'BALLOON',  label:"GET A BALLOON DACHSHUND"},
+ {id:'song',    icon:'SONG',     label:"REQUEST A POLKAMEISTERS SONG"},
+ {id:'altar',   icon:'CHURCH',   label:"VISIT THE SANCTUARY ALTAR"},
+ {id:'dog',     icon:'DOG',      label:"PET STRUDEL THE DACHSHUND"},
+ {id:'wc',      icon:'WC',       label:"FIND ALL 3 LEGENDARY RESTROOMS"},
+];
+const done = {}; TASKS.forEach(t=>done[t.id]=false);
+const wcFound = {men:false, family:false, women:false};
+let toastMsg = null, toastT = 0, wonGame = false;
+function completeTask(id){
+  if (done[id]) return;
+  done[id] = true;
+  sfx('tada');
+  const t = TASKS.find(t=>t.id===id);
+  toastMsg = 'QUEST DONE: ' + t.label; toastT = 3.2;
+  if (TASKS.every(t=>done[t.id]) && !wonGame){ wonGame = true; setTimeout(()=>{ startWin(); }, 900); }
+}
+function tasksDone(){ return TASKS.filter(t=>done[t.id]).length; }
+
+/* ============================================================== DIALOG */
+/* Dialogue is authored as PHRASES: one phrase is one complete thought, as long
+   as it needs to be. At talk time each phrase is word-wrapped to the box and
+   packed into pages of DLG_ROWS lines, so a long thought fills the box instead
+   of trickling out one stubby line per keypress. Separate phrases still get
+   separate boxes - that is how a punchline keeps its own beat. Use \n inside a
+   phrase to force a break (signs, quoted notices). */
+const DLG_ROWS = 3;    // lines the box shows at once
+const DLG_CPS  = 92;   // typewriter speed, characters per second
+/* VW changes at runtime (portrait phones drop to 360), so the box width has to
+   be measured, not assumed - and an open box re-wraps if the phone rotates. */
+function dlgCols(){ return Math.floor((VW-52)/6); }
+
+function wrapPhrase(str, cols){
+  const out = [];
+  for (const para of String(str).split('\n')){
+    const words = para.split(/\s+/).filter(Boolean);
+    if (!words.length){ out.push(''); continue; }      // deliberate blank line
+    let line = '';
+    for (let word of words){
+      while (word.length > cols){                      // word wider than the box
+        if (line){ out.push(line); line = ''; }
+        out.push(word.slice(0, cols)); word = word.slice(cols);
+      }
+      if (!line) line = word;
+      else if (line.length + 1 + word.length <= cols) line += ' ' + word;
+      else { out.push(line); line = word; }
+    }
+    if (line) out.push(line);
+  }
+  return out;
+}
+/* phrases -> pages; a page is up to DLG_ROWS wrapped lines shown together */
+function paginate(phrases, cols){
+  const pages = [];
+  for (const ph of phrases){
+    const lines = wrapPhrase(ph, cols);
+    for (let i=0;i<lines.length;i+=DLG_ROWS) pages.push(lines.slice(i, i+DLG_ROWS));
+  }
+  return pages.length ? pages : [['']];
+}
+function pageLen(page){ let n=0; for (const l of page) n += l.length; return n; }
+
+let state = 'title';   // title | play | dialog | axe | corn | stein | song | card | qr | win
+let dialog = null;     // {name, phrases, pages:[[line,..],..], cols, idx, chars, onDone}
+function say(name, phrases, onDone){
+  state = 'dialog';
+  dialog = {name, phrases:Array.isArray(phrases)?phrases:[phrases],
+            pages:null, cols:0, idx:0, chars:0, onDone};
+  dlgPages();
+  sfx('blip');
+}
+/* current pages, re-wrapped if the box has changed width since we last did */
+function dlgPages(){
+  const cols = dlgCols();
+  if (dialog.pages && dialog.cols === cols) return dialog.pages;
+  dialog.cols = cols;
+  dialog.pages = paginate(dialog.phrases, cols);
+  if (dialog.idx >= dialog.pages.length) dialog.idx = dialog.pages.length - 1;
+  dialog.chars = Math.min(dialog.chars, pageLen(dialog.pages[dialog.idx]));
+  return dialog.pages;
+}
+/* ------------------------------------------------------------ CHATTER */
+/* A character's repertoire. Talking plays ONE utterance and leaves the rest
+   for next time, so people repeat themselves the way people do - not by
+   reciting their whole part every time you walk past. An utterance is one
+   phrase, or an array of phrases when a joke needs more than one box to land
+   (Alex's three rules only work in a row). Cycles from the top, so the first
+   thing you get is the one that introduces them. */
+const chatterIdx = {};
+const met = {};        // has the player been through a booth's full spiel yet?
+function chatter(name, repertoire, key, onDone){
+  const k = key || name;
+  const i = (chatterIdx[k] || 0) % repertoire.length;
+  chatterIdx[k] = i + 1;
+  const utterance = repertoire[i];
+  say(name, Array.isArray(utterance) ? utterance : [utterance], onDone);
+}
+
+function interactable(tx,ty,r,name,action){
+  interactables.push({x:tx*TS+8, y:ty*TS+8, r:r*TS, name, action});
+}
+
+/* ======================================================== BUILD THE FEST */
+function buildWorld(){
+  /* --- trees around border (the back lot now spans the whole top) --- */
+  for (let y=6;y<28;y+=4){ tree(62, y, ((y+1)%4)); }
+  tree(57.5,22,0); tree(34,25,1); tree(22,32,3); tree(55,17,2);
+
+  /* --- church interior --- */
+  // altar
+  (function(){ const x=13*TS, y=7*TS;
+    obj(x,y,y+18,(g)=>{
+      g.fillStyle='#f5f0e6'; g.fillRect(x,y+6,32,12);
+      g.fillStyle='#d8cfc0'; g.fillRect(x,y+16,32,2);
+      g.fillStyle='#c8a041'; g.fillRect(x+14,y-4,4,4); g.fillRect(x+10,y-1,12,2); // cross
+      g.fillStyle='#e8d24a'; g.fillRect(x+4,y+8,4,4); g.fillRect(x+24,y+8,4,4);   // candles
+    });
+    addSolid(x,y+6,32,12);
+  })();
+  interactable(13.9,8,1.6,'ALTAR',()=>{
+    completeTask('altar');
+    say('SANCTUARY', ["SUNBEAMS DRIFT THROUGH THE STAINED GLASS. EVEN THE TUBA OUTSIDE GOES QUIET FOR A SECOND.",
+      "...OK IT'S BACK."]);
+  });
+  // stairway up to the organ loft (the organ itself is upstairs, out of view)
+  (function(){ const x=5*TS+2, y=27.6*TS;
+    obj(x,y,y+16,(g)=>{
+      g.fillStyle='#6e5a3a'; g.fillRect(x,y,14,20);
+      g.fillStyle='#54432a'; for(let i=0;i<5;i++) g.fillRect(x,y+3+i*4,14,1);
+      g.fillStyle='#8a744c'; g.fillRect(x-2,y,2,20); g.fillRect(x+14,y,2,20);
+    });
+    addSolid(x-2,y,18,18);
+  })();
+  interactable(5.8,28.4,1.5,'ORGAN LOFT',()=>say('ORGAN LOFT',
+    ["STAIRS UP TO THE ORGAN LOFT ABOVE THE NARTHEX. THE PIPE ORGAN LIVES UP THERE. ON SUNDAYS IT MAKES THE FLOOR HUM.",
+     "(NO PLAYING IT. ONE NOTE AND SUDDENLY IT'S A WHOLE THING.)"]));
+  // pews
+  for (let r=0;r<8;r++){
+    const y=(13+r*2)*TS;
+    [[6,7],[16,7]].forEach(([sx,w])=>{
+      const x=sx*TS;
+      obj(x,y,y+12,(g)=>{
+        g.fillStyle='#8a5a30'; g.fillRect(x,y,w*TS,8);
+        g.fillStyle='#754b26'; g.fillRect(x,y+6,w*TS,2);
+        g.fillStyle='#9a6a3a'; g.fillRect(x,y,w*TS,2);
+      });
+      addSolid(x,y,w*TS,8);
+    });
+  }
+  interactable(8,17,1.2,'PEW',()=>say('PEW',["SOMEONE LEFT A BULLETIN HERE. SERMON TITLE: 'GOOD NEWS AND GOOD BREWS.'"]));
+  // OPEN sign at church door
+  (function(){ const x=15.4*TS, y=30.6*TS;
+    obj(x,y,y+14,(g)=>{
+      g.fillStyle='#6b4a2b'; g.fillRect(x+5,y+6,2,8);
+      g.fillStyle='#3b6ea8'; g.fillRect(x,y,12,8);
+      g.fillStyle='#f4e9c8'; g.fillRect(x+1,y+1,10,6);
+      g.fillStyle='#3b6ea8'; g.fillRect(x+2,y+3,8,1);
+    });
+    addSolid(x+4,y+10,4,4);
+  })();
+  interactable(15.7,31,1.2,'SIGN',()=>say('SIGN',["'SANCTUARY OPEN - COME LOOK AROUND!'\n'NO STEINS INSIDE PLEASE. WE LOVE YOU. - THE PASTOR'"]));
+
+  /* --- restroom doors (the legendary trio) --- */
+  function wcDoor(tx,ty,color,icon,key,name,phrases){
+    const x=tx*TS, y=ty*TS;
+    obj(x,y,y+15,(g)=>{
+      g.fillStyle='#5a5248'; g.fillRect(x+2,y,12,14);
+      g.fillStyle=color; g.fillRect(x+3,y+1,10,12);
+      g.fillStyle='#f5f0e6';
+      g.fillRect(x+7,y+3,2,2); g.fillRect(x+6,y+6,4,3);           // little person
+      if (icon==='w'){ g.fillRect(x+5,y+9,6,2); }                 // dress
+      if (icon==='f'){ g.fillRect(x+4,y+5,2,4); g.fillRect(x+10,y+5,2,4); } // group-ish
+      g.fillStyle='#241d16'; g.fillRect(x+12,y+7,1,2);            // handle
+    });
+    interactable(tx+0.5,ty+0.5,1.4,name,()=>{
+      if(!wcFound[key]){ wcFound[key]=true; sfx('ok');
+        const n = ['men','family','women'].filter(k=>wcFound[k]).length;
+        say(name, phrases.concat(['('+n+'/3 LEGENDARY RESTROOMS DISCOVERED)']), ()=>{
+          if (wcFound.men&&wcFound.family&&wcFound.women) completeTask('wc');
+        });
+      } else chatter(name, [
+        "STILL LEGENDARY.",
+        "IT HAS LOST NONE OF ITS POWER.",
+        "YOU JUST WANTED TO SEE IT AGAIN. UNDERSTANDABLE.",
+      ], name);
+    });
+  }
+  wcDoor(28.5,10.05,'#2b6db0','m','men', "MEN'S BASEMENT RESTROOM",
+    ["TWELVE STEPS DOWN. COOL AIR. ANCIENT PIPES. A TRUE PILGRIMAGE."]);
+  wcDoor(31.9,17,'#1f8a5f','f','family', "ACCESS & FAMILY RESTROOM",
+    ["ROOMY. ACCESSIBLE. ACCLAIMED. FIVE STARS. WOULD CHANGE A DIAPER HERE AGAIN."]);
+  // the women's restroom is reached from inside the church, off the narthex
+  wcDoor(23.6,27.6,'#8a4f9e','w','women', "WOMEN'S SANCTUARY RESTROOM",
+    ["TUCKED OFF THE NARTHEX AT THE BACK OF THE CHURCH. THE FANCIEST RESTROOM IN NORTH OAKLAND. IT'S BASICALLY A CHAPEL WITH SINKS."]);
+  // narthex welcome table
+  (function(){ const x=7.2*TS, y=28.2*TS;
+    obj(x,y,y+11,(g)=>{
+      g.fillStyle='#8a5a30'; g.fillRect(x,y,26,10);
+      g.fillStyle='#9a6a3a'; g.fillRect(x,y,26,2);
+      g.fillStyle='#f4e9c8'; g.fillRect(x+3,y+3,8,5);
+      g.fillStyle='#d9cba0'; g.fillRect(x+14,y+3,8,5);
+    });
+    addSolid(x,y,26,10);
+  })();
+  interactable(8,28.5,1.4,'WELCOME TABLE',()=>say('NARTHEX',
+    ["BULLETINS, NAME TAGS, AND A SIGN-UP SHEET FOR SOMETHING CALLED 'PIEROGI NIGHT.'",
+     "YOU SIGN UP. OBVIOUSLY."]));
+
+  /* fellowship hall furnishings */
+  function pottedPlant(tx,ty){
+    const x=tx*TS+3, y=ty*TS+2;
+    obj(x,y,y+12,(g)=>{
+      g.fillStyle='#b0522a'; g.fillRect(x+1,y+7,8,5); g.fillRect(x,y+6,10,2);
+      g.fillStyle='#4e7c3a'; g.fillRect(x+2,y,6,7); g.fillRect(x,y+2,3,4); g.fillRect(x+7,y+2,3,4);
+      g.fillStyle='#639649'; g.fillRect(x+3,y+1,3,3);
+    });
+    addSolid(x,y+5,10,7);
+  }
+  pottedPlant(26,11); pottedPlant(32,20.5); pottedPlant(35,7); pottedPlant(51,7);
+  (function(){ const x=26*TS-6, y=10.2*TS;  // bulletin board on the hall's top wall
+    obj(x,y,y+13,(g)=>{
+      g.fillStyle='#6b4a2b'; g.fillRect(x,y,20,13);
+      g.fillStyle='#d9cba0'; g.fillRect(x+2,y+2,16,9);
+      g.fillStyle='#d94f4f'; g.fillRect(x+3,y+3,5,3);
+      g.fillStyle='#3b6ea8'; g.fillRect(x+10,y+3,6,4);
+      g.fillStyle='#57b060'; g.fillRect(x+4,y+7,7,3);
+    });
+  })();
+  interactable(26.2,10.8,1.2,'BULLETIN BOARD',()=>say('BULLETIN BOARD',
+    ["'POLKA LESSONS - TUESDAYS'\n'CHOIR NEEDS TENORS. DESPERATELY.'\n'FOUND: ONE LEDERHOSEN BUTTON. VERY SHINY.'"]));
+
+  /* --- kid's center --- */
+  for (const bx of [37,41,45]){
+    const x=bx*TS, y=8*TS;
+    obj(x,y,y+12,(g)=>{
+      g.fillStyle='#8a5a30'; g.fillRect(x,y+2,40,10);
+      g.fillStyle='#d94f4f'; g.fillRect(x,y,40,4);
+      g.fillStyle='#f4e9c8'; g.fillRect(x+4,y+5,8,4); g.fillRect(x+16,y+5,8,4); g.fillRect(x+28,y+5,8,4);
+    });
+    addSolid(x,y+2,40,10);
+  }
+  interactable(38,8.5,1.5,'CRAFT BOOTH',()=>chatter('CAITLYN',["WELCOME TO CRAFTS! EVERYTHING ON THIS TABLE IS WASHABLE. MOSTLY.","GLITTER. GOOGLY EYES. POPSICLE STICKS. THE HOLY TRINITY OF CRAFTS.","EVERY YEAR SOMEONE GLUES A GOOGLY EYE TO THE PASTOR. EVERY YEAR HE PRETENDS NOT TO NOTICE."]));
+  interactable(42,8.5,1.5,'PLDM TABLE',()=>chatter('DEBRA',["THIS IS THE PLDM TABLE - PITTSBURGH LUTHERAN DEAF MINISTRIES.","WANT TO LEARN THE SIGN FOR 'PRETZEL'? ...THERE YOU GO. YOUR DAY JUST IMPROVED.","DEAF AND HEARING FOLKS AT THE SAME TABLE, EATING THE SAME PRETZELS. THAT'S THE WHOLE IDEA."]));
+  interactable(46,8.5,1.5,'GAMES BOOTH',()=>chatter('RING TOSS',["THE RINGS ARE PRETZEL-SHAPED.","NOBODY HAS EVER WON. IT'S PERFECT.","THE GRAND PRIZE IS A PRETZEL. SO IS THE CONSOLATION PRIZE."]));
+  // balloon stand
+  (function(){ const x=48*TS, y=10*TS;
+    obj(x,y,y+18,(g)=>{
+      g.fillStyle='#8a5a30'; g.fillRect(x,y+8,30,10);
+      g.fillStyle='#d94f4f'; g.fillRect(x+2,y-8,2,16);
+      const cols=['#d94f4f','#e8d24a','#4f7ed9','#57b060','#c17ad4'];
+      for(let i=0;i<5;i++){ g.fillStyle=cols[i]; g.fillRect(x+6+i*5, y-12+((i%2)*3), 4,5); }
+    });
+    addSolid(x,y+8,30,10);
+  })();
+
+  /* sign over the hallway door (the way in to the kid's center, from the side) */
+  (function(){ const cx=29*TS, y=22*TS+2;
+    obj(cx,y,y+12,(g)=>{
+      const label="KID'S CENTER", w=textW(label,1)+10;
+      g.fillStyle='#f4e9c8'; g.fillRect(cx-w/2, y, w, 11);
+      g.fillStyle='#2b6db0'; g.fillRect(cx-w/2, y, w, 1); g.fillRect(cx-w/2, y+10, w, 1);
+      drawText(label, cx, y+2, 1, '#2b6db0','center');
+    });
+  })();
+
+  /* --- ministry tents (the two blue tents on the map) --- */
+  bigTent(30.5,28,4,'#3b6ea8','#f4e9c8','PALM');
+  bigTent(30.5,32.5,4,'#3b6ea8','#f4e9c8','LSF');
+  interactable(32.5,29.6,1.8,'PALM TENT',()=>say('PALM',
+    ["PITTSBURGH AREA LUTHERAN MINISTRIES. DOING GOOD ALL OVER THE CITY.",
+     "THEY HAVE A CLIPBOARD AND THEY ARE NOT AFRAID TO USE IT."]));
+  interactable(32.5,34.1,1.8,'LSF TENT',()=>say('LSF',
+    ["LUTHERAN STUDENT FELLOWSHIP.",
+     "COLLEGE STUDENTS POWERED BY GENUINE COMMUNITY. (ALSO THE FREE FOOD.)"]));
+
+  /* --- GRUB line: a serving row up against the rectory's west wall. You join
+         at the south end off the path and walk north down the row. --- */
+  counterObjV(46.0,20.6,6.8,'#f4e9c8');
+  (function(){ const x=46.3*TS, y=21.2*TS;   // pretzels, tray, kraut pan down the row
+    for (const [dy,a,b] of [[0,'#d9a441','#b3812c'],[42,'#e8e4da','#d9cba0'],[84,'#c9c9cf','#d4c98a']]){
+      obj(x,y+dy,y+dy+24,(g)=>{        // past the slice below, so it sits on top
+        g.fillStyle=a; g.fillRect(x,y+dy,8,9);
+        g.fillStyle=b; g.fillRect(x+2,y+dy+3,4,3);
+      });
+    }
+  })();
+  // GRUB banner on a post at the serving end
+  (function(){ const x=45.5*TS, y=19*TS;
+    obj(x,y,y+16,(g)=>{
+      g.fillStyle='#6b4a2b'; g.fillRect(x+15,y+11,3,9);
+      drawBannerText(g,'GRUB', x+16, y);
+    });
+  })();
+  // fork & spoon sign at the back of the queue
+  (function(){ const x=43.6*TS, y=26.9*TS;
+    obj(x,y,y+16,(g)=>{
+      g.fillStyle='#6b4a2b'; g.fillRect(x+6,y+4,2,12);
+      g.fillStyle='#57b060'; g.fillRect(x,y-6,14,12);
+      g.fillStyle='#f4e9c8'; g.fillRect(x+3,y-4,2,8); g.fillRect(x+2,y-4,1,3); g.fillRect(x+5,y-4,1,3);
+      g.fillRect(x+9,y-4,2,8); g.fillRect(x+8,y-4,4,3);
+    });
+    addSolid(x+5,y+10,4,6);
+  })();
+  interactable(45.3,22,2.4,'FOOD COUNTER',()=>{
+    if (!done.pretzel){
+      completeTask('pretzel');
+      say('MIRKA', ["ONE GIANT PRETZEL! STILL WARM.","THE SECRET INGREDIENT IS LUTHERAN HOSPITALITY. ...AND BUTTER. MOSTLY BUTTER."]);
+    } else {
+      chatter('MIRKA', [
+        ["POTATO SALAD? SAUERKRAUT? STRUDEL?","YES."],
+        "THE PRETZELS GO FAST. THE POTATO SALAD GOES FASTER.",
+        "YOU LOOK HUNGRY. THAT IS NOT A QUESTION.",
+      ]);
+    }
+  });
+
+  /* --- axe throw --- */
+  for (let x=12;x<=20;x+=2){ hay(x,35); }
+  (function(){ const x=16*TS, y=34.2*TS;   // target
+    obj(x,y,y+30,(g)=>{
+      g.fillStyle='#8a5a30'; g.fillRect(x+6,y+14,4,10);
+      g.fillStyle='#f4e9c8'; g.fillRect(x,y,16,16);
+      g.fillStyle='#d94f4f'; g.fillRect(x+2,y+2,12,12);
+      g.fillStyle='#f4e9c8'; g.fillRect(x+4,y+4,8,8);
+      g.fillStyle='#d94f4f'; g.fillRect(x+6,y+6,4,4);
+      if (axeStuck){ g.fillStyle='#5a5248'; g.fillRect(x+7,y+7,2,6); g.fillStyle='#8a5a30'; g.fillRect(x+7,y+11,2,4);}
+    });
+    addSolid(x,y+6,16,14);
+  })();
+  // rope fence
+  (function(){
+    const posts=[[12,41],[16,41],[20,41],[12,38],[20,38]];
+    for (const [px,py] of posts){
+      const x=px*TS+6,y=py*TS;
+      obj(x,y,y+10,(g)=>{ g.fillStyle='#8a5a30'; g.fillRect(x,y,3,10); g.fillStyle='#d9b23a'; g.fillRect(x,y,3,2); });
+    }
+  })();
+  interactable(16.5,39.5,1.8,'AXE THROW',()=>{
+    if (!met.alex){ met.alex = true;                 // the rules, once
+      say('ALEX', ["AXE THROWING AT A CHURCH FESTIVAL?","IT'S CALLED FAITH, BUDDY.","STEP UP! PRESS THE BUTTON WHEN THE MARKER IS DEAD CENTER!"], ()=>{ startAxe(); });
+    } else chatter('ALEX', [
+      "BACK FOR ANOTHER? STEP UP TO THE LINE.",
+      "THE HAY BALE HAS SEEN WORSE. MUCH WORSE.",
+      "AIM FOR DEAD CENTER. THAT IS THE WHOLE TECHNIQUE.",
+    ], 'ALEX@AXE', ()=>{ startAxe(); });
+  });
+  interactable(16.4,35.4,1.5,'TARGET',()=>{
+    say('ALEX', ["HEY! YOU THROW FROM THE LINE!","...OK, FINE. STEP RIGHT UP!"], ()=>{ startAxe(); });
+  });
+
+  /* --- info tent + QR sign + exit --- */
+  bigTent(5,37,4,'#3b6ea8','#f4e9c8','INFO');
+  counterObj(5,40,4,'#f4e9c8');
+  interactable(6.8,40.4,1.7,'INFO TENT',()=>{
+    if (!met.terry){ met.terry = true;               // the full welcome, once
+      say('TERRY (FOCUS)', ["WILLKOMMEN TO FIRST TRINITY OKTOBERFEST!",
+        "FOOD! MUSIC! AXE THROWING! THREE LEGENDARY RESTROOMS!",
+        "GRAB A FESTKARTE - THAT'S YOUR QUEST LIST. PRESS TAB (OR THE QUESTS BUTTON) ANY TIME!"]);
+    } else chatter('TERRY (FOCUS)', [
+      "FESTKARTE'S IN YOUR POCKET. TAB, OR THE QUESTS BUTTON.",
+      "FOCUS RUNS THIS WHOLE THING. WE'RE THE ONES IN THE MATCHING SHIRTS.",
+      "RESTROOMS? THREE OF THEM. ALL LEGENDARY. I DON'T MAKE THE RULES.",
+    ]);
+  });
+  (function(){ const x=10.2*TS, y=39*TS;  // QR sign
+    obj(x,y,y+16,(g)=>{
+      g.fillStyle='#6b4a2b'; g.fillRect(x+5,y+6,2,10);
+      g.fillStyle='#f4e9c8'; g.fillRect(x,y-6,12,12);
+      g.fillStyle='#241d16';
+      for(let i=0;i<5;i++)for(let j=0;j<5;j++){ if(hash2(i+3,j+7)>0.5) g.fillRect(x+1+i*2,y-5+j*2,2,2); }
+      g.fillRect(x+1,y-5,3,3); g.fillRect(x+8,y-5,3,3); g.fillRect(x+1,y+2,3,3);
+      g.fillStyle='#f4e9c8'; g.fillRect(x+2,y-4,1,1); g.fillRect(x+9,y-4,1,1); g.fillRect(x+2,y+3,1,1);
+    });
+    addSolid(x+4,y+10,4,6);
+  })();
+  interactable(10.5,39.5,1.4,'QR SIGN',()=>{
+    if (!met.qr){ met.qr = true;
+      say('QR CODE',["YOU SCAN THE WOODEN QR CODE. IT JUST LEADS TO MORE OKTOBERFEST.",
+        "INCREDIBLE. NO NOTES.",
+        "THIS ONE IS REAL, BY THE WAY. POINT A PHONE AT IT."], ()=>{ startQR(); });
+    } else startQR();
+  });
+  (function(){ const x=1.2*TS, y=43.8*TS;  // EXIT sign over the west driveway
+    obj(x,y,y+14,(g)=>{
+      g.fillStyle='#6b4a2b'; g.fillRect(x+2,y+4,2,10); g.fillRect(x+40,y+4,2,10);
+      g.fillStyle='#3b6ea8'; g.fillRect(x,y-4,44,10);
+      drawText('EXIT $', x+22, y-3, 1, '#f4e9c8','center');
+    });
+  })();
+  interactable(2.6,44.6,1.8,'EXIT',()=>say('EXIT DRIVEWAY',["THE EXIT DRIVEWAY. ONE WAY, DOWNHILL, BACK TO THE REAL WORLD.","THE PRETZELS WILL MISS YOU.","(THE FEELING IS MUTUAL.)"]));
+
+  /* --- biergarten: one big white canopy tent with lanterns, like the real thing --- */
+  bigTent(48,29,10,'#f2f0ea','#e2dfd6','BIERGARTEN',{bunting:true,lanterns:true});
+  /* Hazel Grove Brewing's bar under the tent. Nine tiles wide rather than six,
+     because the full name at 6px a character needs the room - the old HGB
+     badge fit on a shorter bar, the name does not. */
+  counterObj(48.5,33,9,'#2b7a78');
+  (function(){ const x=49*TS, y=32.4*TS;
+    obj(x,y,y+40,(g)=>{
+      // keg cooler
+      g.fillStyle='#c9c9cf'; g.fillRect(x-2,y-4,14,11);
+      g.fillStyle='#a9a9b2'; g.fillRect(x-2,y-4,14,2); g.fillRect(x-2,y+1,14,1);
+      g.fillStyle='#3a3a40'; g.fillRect(x+10,y+2,3,2);
+      // steins waiting along the back
+      for (const sx of [18,30,42]){
+        g.fillStyle='#e8e4da'; g.fillRect(x+sx,y,5,7);
+        g.fillStyle='#e8b23a'; g.fillRect(x+sx+1,y+2,3,4);
+        g.fillStyle='#f5f0e6'; g.fillRect(x+sx+1,y+1,3,1);
+      }
+      // stack of cups at the far end
+      g.fillStyle='#e8e4da'; g.fillRect(x+96,y+1,6,6);
+      g.fillStyle='#c9c4bb'; g.fillRect(x+96,y+3,6,1);
+      g.fillStyle='#e8e4da'; g.fillRect(x+97,y-1,4,3);
+    });
+    // the counter blocks you, but the kegs behind it did not - you could walk
+    // round the end of the bar and stand in the middle of the taps
+    addSolid(x-8, y-4, 144, 14);
+  })();
+  /* the name across the front of the bar */
+  (function(){ const x=48.5*TS, y=33*TS, w=9*TS;
+    const label='HAZEL GROVE BREWING', bw=textW(label,1)+18;
+    const bx=Math.round(x+(w-bw)/2), by=y+1;
+    obj(x,y,y+15,(g)=>{                                   // above the counter it sits on
+      g.fillStyle='#f4e9c8'; g.fillRect(bx,by,bw,9);
+      g.fillStyle='#8e3040'; g.fillRect(bx,by,bw,1); g.fillRect(bx,by+8,bw,1);
+      for (const dx of [bx+3, bx+bw-6]){                  // a diamond on each end
+        g.fillRect(dx+1,by+3,1,3); g.fillRect(dx,by+4,3,1);
+      }
+      drawText(label, bx+bw/2, by+1, 1, '#8e3040', 'center');
+    });
+  })();
+  interactable(52.7,33.5,2.2,'BEER COUNTER',()=>{
+    if (!met.otto){ met.otto = true;
+      say('OTTO', ["EIN STEIN, BITTE! FESTBIER OR ROOT BEER - WE DO NOT JUDGE, THIS IS A CHURCH.","NOW HOLD IT UP! ARM STRAIGHT! IT'S STEIN HOLD TIME!","MASH THE BUTTON TO KEEP THAT STEIN UP!"], ()=>{ startStein(); });
+    } else chatter('OTTO', [
+      "ANOTHER? THAT'S THE SPIRIT. ARM UP!",
+      "FESTBIER OR ROOT BEER. I HAVE STOPPED ASKING WHICH.",
+      "THE STEIN IS HEAVIER THAN LAST TIME. THAT IS NOT SCIENTIFICALLY TRUE.",
+    ], null, ()=>{ startStein(); });
+  });
+  // kegs
+  (function(){ const x=48.8*TS, y=30.6*TS;
+    obj(x,y,y+16,(g)=>{
+      g.fillStyle='#8a5a30'; g.fillRect(x,y,10,14); g.fillRect(x+12,y+2,10,12);
+      g.fillStyle='#a06c3a'; g.fillRect(x+1,y+2,8,2); g.fillRect(x+1,y+9,8,2); g.fillRect(x+13,y+4,8,2); g.fillRect(x+13,y+10,8,2);
+    });
+    addSolid(x,y+2,22,12);
+  })();
+  // open-air tables on the lawn
+  picnicTable(39,33.6); picnicTable(44.2,33.6);
+  // rows of folding chairs facing the band (like the photo)
+  (function(){
+    for (const [cx,cy] of [[52.4,37.35],[52.4,38.45]]){
+      const x=cx*TS, y=cy*TS;
+      obj(x,y,y+10,(g)=>{
+        for(let i=0;i<4;i++){
+          const px=x+i*12;
+          g.fillStyle='#8a5a30'; g.fillRect(px,y,2,9);
+          g.fillStyle='#a06c3a'; g.fillRect(px+2,y+3,7,4);
+          g.fillStyle='#754b26'; g.fillRect(px+2,y+7,2,3); g.fillRect(px+7,y+7,2,3);
+        }
+      });
+    }
+  })();
+  // the POLKAMEISTERS: between the two rows of tables, right side, facing the people
+  (function(){ const x=56*TS, y=36.6*TS;
+    obj(x,y,y+60,(g)=>{
+      g.fillStyle='#754b26'; g.fillRect(x,y+2,38,56);
+      g.fillStyle='#8a5a30'; g.fillRect(x,y,38,4);
+      // bandleader on accordion - he's the vocalist too, so the mic booms in
+      // over the bellows from a stand set clear of them
+      drawPerson(g, x+14, y-4, 'left', 0, {hat:'feather', hatColor:'#b03a3a', shirt:'#f5f0e6', pants:'#3a3a44', straps:true});
+      g.fillStyle='#3b6ea8'; g.fillRect(x+8,y+3,3,6); g.fillStyle='#f4e9c8'; g.fillRect(x+11,y+3,3,6); g.fillStyle='#3b6ea8'; g.fillRect(x+14,y+3,3,6);
+      g.fillStyle='#4a4a52'; g.fillRect(x+6,y,1,12); g.fillRect(x+6,y,9,1); g.fillRect(x+4,y+11,5,1);
+      g.fillStyle='#c9c9cf'; g.fillRect(x+15,y-1,2,3);
+      // clarinet, in the cowboy hat - angled down from the mouthpiece to the bell
+      drawPerson(g, x+16, y+12, 'left', 0, {hat:'cowboy', shirt:'#3a3a44', pants:'#2b2b33'});
+      g.fillStyle='#17151a'; g.fillRect(x+16,y+16,3,2); g.fillRect(x+13,y+18,3,2); g.fillRect(x+10,y+20,3,2); g.fillRect(x+7,y+21,3,4);
+      g.fillStyle='#c9c9cf'; g.fillRect(x+14,y+17,1,1); g.fillRect(x+11,y+19,1,1);
+      // tuba player
+      drawPerson(g, x+14, y+28, 'left', 0, {hat:'feather', shirt:'#f5f0e6', pants:'#7a4f2a', straps:true});
+      g.fillStyle='#d9b23a'; g.fillRect(x+6,y+26,7,7); g.fillRect(x+9,y+33,3,5);
+      // drummer - kit sits between her and the crowd, cymbal stand first so
+      // the snare paints over its foot
+      drawPerson(g, x+16, y+42, 'left', 0, {dress:'#b23a48', hat:'braid', hair:'#8a5a30'});
+      g.fillStyle='#b9b9c2'; g.fillRect(x+7,y+45,1,7);                            // cymbal stand
+      g.fillStyle='#d9b23a'; g.fillRect(x+4,y+44,8,1); g.fillRect(x+6,y+45,4,1);  // cymbal
+      g.fillStyle='#8a2f38'; g.fillRect(x+9,y+51,9,6);                            // bass drum
+      g.fillStyle='#f4e9c8'; g.fillRect(x+10,y+52,7,4);
+      g.fillStyle='#8a2f38'; g.fillRect(x+12,y+53,3,2);                           // its port hole
+      g.fillStyle='#d9b23a'; g.fillRect(x+9,y+51,9,1); g.fillRect(x+9,y+56,9,1);  // hoops
+      g.fillStyle='#f4e9c8'; g.fillRect(x+2,y+50,6,1);                            // snare
+      g.fillStyle='#b9b9c2'; g.fillRect(x+2,y+51,6,2);
+      g.fillStyle='#5a5a62'; g.fillRect(x+2,y+53,6,1);
+      g.fillStyle='#e0c08a'; g.fillRect(x+13,y+49,5,1);                           // stick, out to her hand
+    });
+    addSolid(x,y+2,38,56);
+  })();
+  interactable(55.4,38.5,2.2,'STAGE',()=>{
+    if (!met.band){ met.band = true;   // greeting is once-per-visit, not once-per-quest:
+      say('POLKAMEISTERS', ["WELCOME TO THE STAGE! ACCORDION, CLARINET, TUBA, DRUMS - AND THE ACCORDION DOES THE SINGING.","WE KNOW 400 POLKAS AND ONE (1) JOURNEY SONG.","GOT A REQUEST?"], ()=>{ startSong(); });
+    } else {
+      chatter('POLKAMEISTERS', [
+        "BACK FOR MORE? WHAT'LL IT BE?",
+        "THE TUBA PLAYER SAYS YES. THE TUBA PLAYER ALWAYS SAYS YES.",
+        "NAME IT. IF WE DON'T KNOW IT, WE'LL PLAY IT ANYWAY.",
+      ], null, ()=>{ startSong(); });
+    }
+  });
+  /* --- the grill, in the space behind the rectory --- */
+  (function(){ const x=50.5*TS, y=17.9*TS;
+    obj(x,y,y+16,(g)=>{
+      g.fillStyle='#3a3a40'; g.fillRect(x,y,26,10); g.fillRect(x+3,y+10,3,6); g.fillRect(x+20,y+10,3,6);
+      g.fillStyle='#222226'; g.fillRect(x+2,y+2,22,6);
+      g.fillStyle='#b0522a'; g.fillRect(x+4,y+3,6,2); g.fillRect(x+12,y+3,6,2); g.fillRect(x+8,y+6,6,2);
+    });
+    addSolid(x,y+2,26,13);
+  })();
+  interactable(51.3,19.2,1.9,'GRILL',()=>{
+    if (!done.brat){
+      completeTask('brat');
+      say('DAVID', ["BRATS! HOT OFF THE PATIO GRILL!","THE SMOKE FOLLOWS YOU BECAUSE IT LIKES YOU.","HERE - EXTRA KRAUT. TELL NO ONE."]);
+    } else chatter('DAVID', [
+      "BACK FOR SECONDS? I RESPECT IT.",
+      "I HAVE BEEN AT THIS GRILL SINCE NINE THIS MORNING. I HAVE SEEN THINGS.",
+      ["HOW DO I GET THE CHAR JUST RIGHT?","PATIENCE. AND NOT ANSWERING QUESTIONS WHILE I'M FLIPPING."],
+    ]);
+  });
+  pottedPlant(54.6,17);
+
+  /* --- the rectory (the pastor really lives here) --- */
+  (function(){ const x=48*TS, y=20*TS, w=9*TS;
+    obj(x,y,y+126,(g)=>{
+      g.fillStyle='rgba(0,0,0,0.15)'; g.fillRect(x+2,y+120,w-4,8);
+      // roof
+      g.fillStyle='#6e4a30'; g.fillRect(x,y+6,w,34);
+      g.fillStyle='#7f5738'; g.fillRect(x,y+6,w,6);
+      g.fillStyle='#5e3f28'; for(let i=1;i<5;i++) g.fillRect(x,y+6+i*7,w,1);
+      g.fillStyle='#5a4326'; g.fillRect(x,y+38,w,3);
+      // chimney
+      g.fillStyle='#8b8274'; g.fillRect(x+112,y-6,12,18);
+      g.fillStyle='#756c5e'; g.fillRect(x+110,y-8,16,4);
+      // upper floor: half-timbered plaster
+      g.fillStyle='#efe6d0'; g.fillRect(x+4,y+41,w-8,37);
+      g.fillStyle='#5a4326';
+      for (const vx of [4, 36, 68, 104, w-12]) g.fillRect(x+vx,y+41,4,37);
+      g.fillRect(x+4,y+74,w-8,4);
+      g.strokeStyle='#5a4326'; g.lineWidth=2;
+      g.beginPath(); g.moveTo(x+12,y+46); g.lineTo(x+32,y+72); g.stroke();
+      g.beginPath(); g.moveTo(x+32,y+46); g.lineTo(x+12,y+72); g.stroke();
+      // warm upper windows
+      g.fillStyle='#e8c25a'; g.fillRect(x+46,y+48,14,16); g.fillRect(x+80,y+48,14,16);
+      g.fillStyle='#5a4326'; g.fillRect(x+52,y+48,2,16); g.fillRect(x+86,y+48,2,16);
+      g.fillRect(x+46,y+55,14,2); g.fillRect(x+80,y+55,14,2);
+      // lower floor: brick
+      g.fillStyle='#b08a6a'; g.fillRect(x+4,y+78,w-8,46);
+      g.fillStyle='#9c785c'; for(let i=0;i<5;i++) g.fillRect(x+4,y+86+i*8,w-8,1);
+      // lower windows + flower boxes
+      g.fillStyle='#e8c25a'; g.fillRect(x+18,y+90,18,14); g.fillRect(x+w-38,y+90,18,14);
+      g.fillStyle='#5a4326'; g.fillRect(x+26,y+90,2,14); g.fillRect(x+w-30,y+90,2,14);
+      g.fillStyle='#57b060'; g.fillRect(x+16,y+104,22,4); g.fillRect(x+w-40,y+104,22,4);
+      g.fillStyle='#d94f4f'; g.fillRect(x+19,y+103,2,2); g.fillRect(x+28,y+103,2,2); g.fillRect(x+w-35,y+103,2,2); g.fillRect(x+w-26,y+103,2,2);
+      // door with little porch
+      g.fillStyle='#6e4a30';
+      g.beginPath(); g.moveTo(x+58,y+90); g.lineTo(x+73,y+78); g.lineTo(x+88,y+90); g.closePath(); g.fill();
+      g.fillStyle='#5a4326'; g.fillRect(x+64,y+90,18,34);
+      g.fillStyle='#3f2e1a'; g.fillRect(x+78,y+106,3,4);
+      g.fillStyle='#c9c2b2'; g.fillRect(x+62,y+122,22,3);
+    });
+    addSolid(x+2,y+16,w-4,108);
+  })();
+  interactable(52.5,27.8,1.9,'RECTORY',()=>say('RECTORY',
+    ["THIS IS THE RECTORY. THE PASTOR REALLY LIVES HERE.","YES, THE BRATWURST SMOKE REACHES THE KITCHEN.","NO, YOU CANNOT SEE THE FRIDGE."]));
+  // picnic tables (pulled up close to the tent so the big tree stands clear)
+  picnicTable(44.2,36); picnicTable(48.5,36); picnicTable(53,36);
+  picnicTable(44.2,39.5); picnicTable(53,39.5);
+  interactable(49.5,37.6,1.4,'TABLE',()=>chatter('EDNA',["I'VE BEEN COMING SINCE 1962.","IN SIXTY YEARS THE PRETZELS HAVE ONLY GOTTEN BIGGER.","SIT. EAT. YOU'RE TOO SKINNY."]));
+  // string lights over the plaza
+  const p1 = stringPole(36,35), p2 = stringPole(46,35), p3 = stringPole(57,35);
+  const p4 = stringPole(36,44), p5 = stringPole(46,44), p6 = stringPole(57,44);
+  stringLights(p1,p2); stringLights(p2,p3); stringLights(p4,p5); stringLights(p5,p6);
+  stringLights(p1,p4); stringLights(p3,p6);
+
+  /* --- oktoberfest banner over church walk --- */
+  (function(){
+    const a = stringPole(11,32), b = stringPole(17,32);
+    overheadDraws.push((g)=>{
+      g.fillStyle='#3b6ea8'; g.fillRect(a.x, a.y+2, b.x-a.x, 10);
+      g.fillStyle='#f4e9c8';
+      drawText('OKTOBERFEST', (a.x+b.x)/2, a.y+4, 1, '#f4e9c8', 'center');
+      for(let i=0;i<8;i++){ g.fillStyle=(i%2)?'#e8d24a':'#f4e9c8'; g.fillRect(a.x+4+i*10, a.y+12, 6,4); }
+    });
+  })();
+
+  /* --- parking --- */
+  function car(tx,ty,col){
+    const x=tx*TS, y=ty*TS;
+    obj(x,y,y+20,(g)=>{
+      g.fillStyle='rgba(0,0,0,0.2)'; g.fillRect(x+1,y+16,26,4);
+      g.fillStyle=col; g.fillRect(x,y+4,28,12);
+      g.fillStyle='#bfe3f2'; g.fillRect(x+4,y+1,20,6);
+      g.fillStyle=col; g.fillRect(x+2,y+1,4,4); g.fillRect(x+22,y+1,4,4);
+      g.fillStyle='#241d16'; g.fillRect(x+3,y+14,6,4); g.fillRect(x+19,y+14,6,4);
+    });
+    addSolid(x,y+4,28,14);
+  }
+  car(30.5,1.6,'#b03a3a'); car(33.5,2.2,'#3b6ea8'); car(36.6,1.8,'#d9b23a');
+  car(42.5,2.1,'#57b060'); car(45.6,1.7,'#8a4f9e'); car(51.5,2.3,'#e8e4da');
+  car(10.5,1.8,'#3a3a44'); car(17.5,2.2,'#b3812c');
+  (function(){ const x=57.8*TS, y=42.5*TS;   // P sign pointing up the driveway
+    obj(x,y,y+16,(g)=>{
+      g.fillStyle='#6b4a2b'; g.fillRect(x+7,y+2,2,14);
+      g.fillStyle='#2b6db0'; g.fillRect(x,y-8,16,10);
+      drawText('P#', x+8, y-7, 1, '#f4e9c8','center');
+    });
+    addSolid(x+6,y+12,4,4);
+  })();
+  interactable(58.2,43,1.6,'PARKING SIGN',()=>say('SIGN',["'PARKING: FOLLOW THE DRIVEWAY ALL THE WAY UP.'\n'THE LOT IS BEHIND THE BUILDING.'","'TRUST THE SIGN. THE SIGN KNOWS.'"]));
+  interactable(45,3,2.5,'PARKING LOT',()=>say('THE BACK LOT',["THE SECRET PARKING LOT BEHIND THE CHURCH. ONLY LOCALS KNOW ABOUT IT.","...AND NOW YOU. WELCOME TO THE INNER CIRCLE."]));
+
+  /* --- pumpkins scattered --- */
+  pumpkin(12.2,31.6); pumpkin(16,32); pumpkin(5,36); pumpkin(35.3,43.8); pumpkin(21,35.9); pumpkin(57.4,20.6);
+
+  /* --- low stone retaining wall along the front lawn (street view!) --- */
+  function stoneWall(tx,ty,tw){
+    const x=tx*TS, y=ty*TS, w=tw*TS;
+    obj(x,y,y+9,(g)=>{
+      g.fillStyle='#a8a094'; g.fillRect(x,y,w,9);
+      g.fillStyle='#b8b0a4'; g.fillRect(x,y,w,2);
+      g.fillStyle='#948c80'; for(let i=10;i<w;i+=10) g.fillRect(x+i,y+2,1,7);
+      g.fillStyle='#8a8276'; g.fillRect(x,y+8,w,1);
+    });
+    addSolid(x,y+1,w,8);
+  }
+  stoneWall(4,46.3,8); stoneWall(17,46.3,11); stoneWall(30,46.3,14); stoneWall(44,46.3,15);
+
+  /* --- the big street tree, on its own grass south of the biergarten --- */
+  (function(){ const x=48*TS, y=42.2*TS;
+    obj(x,y,y+66,(g)=>{
+      g.fillStyle='rgba(0,0,0,0.15)'; g.fillRect(x+12,y+58,40,8);
+      g.fillStyle='#b3701e'; g.fillRect(x+26,y+40,12,24);
+      g.fillStyle='#8a5416'; g.fillRect(x+26,y+40,4,24);
+      g.fillStyle='#4e7a42'; g.fillRect(x+6,y+10,52,34);
+      g.fillStyle='#5d8f4e'; g.fillRect(x+12,y+2,40,34); g.fillRect(x+2,y+16,60,22);
+      g.fillStyle='#6fa35e'; g.fillRect(x+18,y+6,22,12); g.fillRect(x+8,y+20,14,10);
+      g.fillStyle='#82b56e'; g.fillRect(x+22,y+8,10,6);
+    });
+    addSolid(x+24,y+56,16,8);
+  })();
+
+  /* --- corn stalks flanking the doors (fall decor, like the photos) --- */
+  function cornStalk(tx,ty){
+    const x=tx*TS+3, y=ty*TS-6;
+    obj(x,y,y+20,(g)=>{
+      g.fillStyle='#c9a43a'; g.fillRect(x+3,y,2,18); g.fillRect(x,y+3,2,14); g.fillRect(x+6,y+2,2,15);
+      g.fillStyle='#b3812c'; g.fillRect(x,y+7,8,2);
+      g.fillStyle='#d9b23a'; g.fillRect(x+2,y+1,1,5); g.fillRect(x+7,y+3,1,4);
+    });
+  }
+  cornStalk(12.3,30.1); cornStalk(15.2,30.1);
+
+  /* --- big bushes in red-mulch beds by the front steps --- */
+  function bigBush(tx,ty){
+    const x=tx*TS, y=ty*TS;
+    obj(x,y,y+18,(g)=>{
+      g.fillStyle='#6e3a2e'; g.fillRect(x,y+8,24,12);
+      g.fillStyle='#5e3226'; g.fillRect(x,y+18,24,2);
+      g.fillStyle='#5d7a4e'; g.fillRect(x+2,y+2,20,13);
+      g.fillStyle='#6f8f5f'; g.fillRect(x+4,y,16,12); g.fillRect(x+1,y+5,22,7);
+      g.fillStyle='#82a06e'; g.fillRect(x+6,y+1,8,4); g.fillRect(x+3,y+6,5,3);
+    });
+    addSolid(x+1,y+6,22,12);
+  }
+  bigBush(10.4,30.6); bigBush(15.9,30.6);
+
+  /* --- the church sign board on the front lawn --- */
+  (function(){ const x=19.5*TS, y=32.6*TS;
+    obj(x,y,y+16,(g)=>{
+      g.fillStyle='#6b4a2b'; g.fillRect(x+3,y+6,3,10); g.fillRect(x+26,y+6,3,10);
+      g.fillStyle='#2b2b33'; g.fillRect(x,y-14,32,22);
+      g.fillStyle='#f4e9c8'; g.fillRect(x+1,y-13,30,1);
+      g.fillStyle='#d9cba0';
+      g.fillRect(x+4,y-9,24,2); g.fillRect(x+6,y-5,20,2); g.fillRect(x+4,y-1,24,2); g.fillRect(x+8,y+3,16,2);
+      g.fillStyle='#c8a041'; g.fillRect(x+14,y-19,4,4); g.fillRect(x+12,y-17,8,2);
+    });
+    addSolid(x+2,y+10,28,6);
+  })();
+  interactable(20.5,33.2,1.6,'CHURCH SIGN',()=>say('CHURCH SIGN',
+    ["FIRST TRINITY EVANGELICAL LUTHERAN CHURCH\nDIVINE SERVICE: SUNDAY 11:00 AM",
+     "TODAY'S MESSAGE:\n'THE WURST IS YET TO COME.'"]));
+  cornStalk(27.1,23.05); cornStalk(30,23.05);
+
+  /* --- red velvet rope running down the lane, in front of the serving row --- */
+  (function(){
+    const posts=[[704,332],[704,364],[704,396],[704,428]];
+    for(let i=0;i<posts.length;i++){
+      const [px,py]=posts[i], next=posts[i+1];
+      obj(px-2,py,py+13,(g)=>{                       // one object per post, so people
+        if (next){                                   // walking the lane sort correctly
+          g.strokeStyle='#c03636'; g.lineWidth=2;
+          g.beginPath(); g.moveTo(px+2,py+3);
+          g.quadraticCurveTo((px+next[0])/2-5,(py+next[1])/2+6, next[0]+2,next[1]+3); g.stroke();
+        }
+        g.fillStyle='#c9c9cf'; g.fillRect(px,py+2,3,10); g.fillRect(px-1,py,5,3);
+        g.fillStyle='#8f8f98'; g.fillRect(px-2,py+11,7,2);
+      });
+    }
+  })();
+  interactable(43.9,26.4,1.1,'VELVET ROPE',()=>say('VELVET ROPE',
+    ["A RED VELVET ROPE. VERY EXCLUSIVE.","THE PRETZEL LINE HAS STANDARDS."]));
+
+  /* --- cornhole on the front lawn --- */
+  function cornholeBoard(tx,ty,flip){
+    const x=tx*TS, y=ty*TS;
+    obj(x,y,y+16,(g)=>{
+      g.fillStyle='#c99548'; g.fillRect(x,y,30,14);
+      g.fillStyle='#b3812c'; g.fillRect(x,y+12,30,2);
+      g.fillStyle='#241d16'; g.fillRect(flip? x+5 : x+19, y+4, 6,5);
+      g.fillStyle='#8a5a30'; g.fillRect(x+(flip?26:0),y+10,4,6);
+    });
+    addSolid(x,y+4,30,10);
+  }
+  cornholeBoard(4,32.6,false); cornholeBoard(8.6,33.4,true);
+  (function(){ const x=6.6*TS, y=33.4*TS;
+    obj(x,y,y+4,(g)=>{
+      g.fillStyle='#e8d24a'; g.fillRect(x,y,3,3);
+      g.fillStyle='#d94f4f'; g.fillRect(x+8,y+3,3,3);
+      g.fillStyle='#e8d24a'; g.fillRect(x+4,y+8,3,3);
+    });
+  })();
+  interactable(6.6,33.2,1.9,'CORNHOLE',()=>{
+    if (!met.kristi){ met.kristi = true;
+      say('KRISTI', ["CORNHOLE! AND YES, YOU ARE LOOKING AT THE REIGNING CHAMPION.","THE OFFICIAL SPORT OF WAITING FOR BRATS.","SET YOUR POWER, THEN YOUR AIM. SINK ONE AND I'LL BE IMPRESSED."], ()=>{ startCorn(); });
+    } else chatter('KRISTI', [
+      "AGAIN? GOOD. SET YOUR POWER.",
+      "I AM STILL THE REIGNING CHAMPION. JUST SO WE ARE CLEAR.",
+      "THE BOARDS ARE REGULATION. I MEASURED. TWICE.",
+    ], null, ()=>{ startCorn(); });
+  });
+
+  /* --- lamp posts on the lawn --- */
+  function lampPost(tx,ty){
+    const x=tx*TS+6, y=ty*TS-10;
+    obj(x,y,y+32,(g)=>{
+      g.fillStyle='#241d16'; g.fillRect(x,y+6,3,26); g.fillRect(x-2,y+30,7,3);
+      g.fillRect(x-2,y,7,7);
+      g.fillStyle='#e8c25a'; g.fillRect(x-1,y+1,5,5);
+      g.fillStyle='#241d16'; g.fillRect(x+1,y-2,2,2);
+    });
+    addSolid(x-1,y+28,5,5);
+  }
+  lampPost(16.2,33.2); lampPost(35.5,34.6);
+
+  /* --- trash + recycling bins --- */
+  function bins(tx,ty){
+    const x=tx*TS, y=ty*TS;
+    obj(x,y,y+14,(g)=>{
+      g.fillStyle='#3a3f3a'; g.fillRect(x,y,10,13);
+      g.fillStyle='#2e332e'; g.fillRect(x-1,y-1,12,3);
+      g.fillStyle='#2b6db0'; g.fillRect(x+12,y,10,13);
+      g.fillStyle='#245b94'; g.fillRect(x+11,y-1,12,3);
+      g.fillStyle='#f5f0e6'; g.fillRect(x+15,y+4,4,2); g.fillRect(x+16,y+7,2,2);
+    });
+    addSolid(x,y+2,22,11);
+  }
+  bins(53.8,18.4); bins(38,30.5);
+
+  /* --- PA speakers on tripods by the stage --- */
+  function paSpeaker(tx,ty){
+    const x=tx*TS, y=ty*TS;
+    obj(x,y,y+22,(g)=>{
+      g.fillStyle='#241d16'; g.fillRect(x+2,y,10,13);
+      g.fillStyle='#3a3a40'; g.fillRect(x+4,y+2,6,6);
+      g.fillStyle='#241d16';
+      g.fillRect(x+6,y+13,2,5); g.fillRect(x+2,y+18,4,2); g.fillRect(x+8,y+18,4,2);
+    });
+    addSolid(x+2,y+14,10,6);
+  }
+  paSpeaker(55.5,35.2); paSpeaker(55.5,41);
+
+  /* --- Officer Dan, keeping the peace from a folding chair --- */
+  (function(){ const x=32.9*TS, y=23.45*TS;
+    obj(x,y,y+10,(g)=>{
+      g.fillStyle='#8a5a30'; g.fillRect(x,y+2,11,3); g.fillRect(x+1,y+5,2,6); g.fillRect(x+8,y+5,2,6);
+    });
+  })();
+
+  /* ------------------------------------------------------------- NPCs */
+  npc(14.2,33.8,{name:'PASTOR JANSSEN', hat:'collar', shirt:'#2b2b33', pants:'#1e1e26', hair:'#9a9a9a', wander:18,
+    says:["WELCOME, WELCOME! GOD'S WORK, FUN TIMES.","TRY THE PRETZELS. THEOLOGICALLY EXCELLENT.","WE'VE BEEN HERE SINCE 1837. THE BRATS ARE FRESHER."]});
+  npc(47.15,22.6,{name:'MIRKA', dress:'#2f7d46', hat:'braid', hair:'#3a2a1a', still:true});
+  npc(52.5,32.4,{name:'OTTO', hat:'feather', shirt:'#f5f0e6', pants:'#7a4f2a', straps:true, still:true});
+  npc(52.3,18,{name:'DAVID', shirt:'#f5f0e6', pants:'#3a3a44', hat:'cap', hatColor:'#b03a3a', still:true,
+    apron:true});
+  npc(19,39.5,{name:'ALEX', shirt:'#b03a3a', pants:'#3a3a44', hair:'#e0c070', wander:8,
+    says:[["RULE ONE: THROW THE AXE AT THE TARGET.","RULE TWO: ONLY AT THE TARGET.","THERE ARE NO OTHER RULES."],
+      "I'VE BEEN RUNNING THIS SINCE THE 2019 FEST. ZERO INCIDENTS. ASK ANYONE.",
+      "PEOPLE ASK IF IT'S SAFE. THEN THEY GET IN LINE ANYWAY."]});
+  npc(7.5,31.8,{name:'KRISTI', dress:'#2b6db0', hat:'braid', hair:'#e8d24a', still:true});
+  npc(38.2,7.1,{name:'CAITLYN', shirt:'#8a4f9e', pants:'#3a3a44', hair:'#6b4a2b', still:true});
+  npc(42.2,7.1,{name:'DEBRA', dress:'#2b6db0', hat:'braid', hair:'#241d16', still:true});
+  npc(49.5,11,{name:'DOODLES', hat:'puff', shirt:'#c17ad4', pants:'#e8d24a', nose:'#d94f4f', still:true});
+  npc(6.8,39.4,{name:'TERRY', shirt:'#2b7a78', pants:'#3a3a44', hair:'#6b4a2b', hat:'cap', hatColor:'#2b7a78', still:true});
+  npc(49.5,34.3,{name:'MIKE', shirt:'#3b6ea8', pants:'#3a3a44', hair:'#6b4a2b', wander:10,
+    says:["LIFELONG MEMBER. FIRST IN LINE FOR BRATS EVERY YEAR.",
+      "I PACE MYSELF ON THE BRATS. THE PACE IS FOUR.",
+      "I SURE HOPE THEY GOT LIABILITY INSURANCE FOR THIS!",
+      "THE CHURCH BOILER GOES OUT EVERY JANUARY. GUESS WHO'S IN THE BASEMENT BY SEVEN A.M.",
+      "THAT BOILER AND I HAVE AN ARRANGEMENT. IT BREAKS, I FIX IT, WE DON'T DISCUSS IT.",
+      "IF IT'S WARM IN HERE ON A SUNDAY IN FEBRUARY, YOU'RE WELCOME.",
+      "THIRTY YEARS AN ENGINEER. NOW I DO THE SAME WORK FOR FREE, IN A BASEMENT, IN A COAT.",
+      "I STILL BRING A TAPE MEASURE TO CHURCH. TWICE NOW IT HAS BEEN THE RIGHT CALL."]});
+  npc(54.5,34.5,{name:'NORM', shirt:'#57b060', pants:'#241d16', hair:'#9a9a9a', wander:10,
+    says:["CONGREGATION PRESIDENT. MOSTLY THAT MEANS I RUN THE MEETINGS AND COUNT THE VOTES.",
+      ["I DO FREELANCE WEB WORK. I BUILT THIS CHURCH A SITE ONCE, FOR FREE.",
+       "THEY REPLACED IT WITH A WIX ONE. I'M NOT BITTER. I'M A LITTLE BITTER."],
+      "EVERY VOTERS' MEETING RUNS LONG. EVERY SINGLE ONE. I HAVE STOPPED FIGHTING IT.",
+      "COUNCIL MEETS THE SECOND TUESDAY. TRUSTEES THE THIRD. I AM AT BOTH, OBVIOUSLY.",
+      "I SCHEDULED A MEETING ABOUT HAVING FEWER MEETINGS. IT RAN NINETY MINUTES.",
+      "IF YOU DON'T COME TO THE MEETING, YOU GET VOLUNTEERED AT THE MEETING. THAT'S THE SYSTEM.",
+      "I CAME FOR THE POLKA. I STAYED BECAUSE I SAT DOWN, AND THESE CHAIRS ARE BETTER THAN THEY LOOK.",
+      "SOMEONE BROUGHT ME A PRETZEL WITHOUT ME EVEN ASKING. BEST CHURCH IN PITTSBURGH."]});
+  npc(35.2,29,{name:'BRANDON', shirt:'#f5f0e6', pants:'#7a4f2a', hair:'#3a2a1a', wander:10,
+    says:["PALM - PITTSBURGH AREA LUTHERAN MINISTRIES. I'M THE TREASURER, WHICH IS WHY I HAVE THE CLIPBOARD.","SIGN UP FOR SOMETHING. ANYTHING. THAT'S HOW THEY GET YOU. I SIGNED UP IN 2009.","IS IT JUST ME, OR DOES EVERYTHING LOOK A LITTLE... PIXELATED TODAY?"]});
+  npc(35.2,33.4,{name:'PASTOR ANDRAE', hat:'collar', shirt:'#2b2b33', pants:'#1e1e26', hair:'#241d16', wander:10,
+    says:["I'M HERE WITH LSF - LUTHERAN STUDENT FELLOWSHIP.",
+      "COLLEGE STUDENTS RUN ON FREE FOOD AND GENUINE COMMUNITY. IN THAT ORDER.",
+      "ASK ME ABOUT SWEDEN. GO ON, ASK ME. I HAVE SLIDES.",
+      "BO GIERTZ WROTE 'THE HAMMER OF GOD.' READ IT, THEN COME BACK AND WE'LL TALK."]});
+  npc(46,40.5,{name:'BOB', shirt:'#4a6a8a', pants:'#3a3a44', hair:'#8a8a8a', hat:'cap', hatColor:'#4a6a8a', wander:30,
+    says:["TRUSTEE. WHICH MEANS I LOOK AT THE BUILDING WHILE EVERYONE ELSE LOOKS AT THE BAND.",
+      "LOOK AT THIS GRASS. WE AERATED IN APRIL AND IT CAME BACK BEAUTIFUL.",
+      "THE NORTH GUTTERS NEED DOING BEFORE WINTER. I HAVE MENTIONED THIS. TWICE."]});
+  npc(40,13,{name:'ZO\u00cb', shirt:'#e8d24a', pants:'#4f7ed9', hair:'#3a2a1a', wander:40, fast:true,
+    says:["THIS PRETZEL IS PRETTY TWISTED. TAKES ONE TO KNOT ONE.",
+      "I ASKED THE BAND FOR SOMETHING UPBEAT. THEY SAID THEY'D POLKA AROUND AND FIND OUT.",
+      "THE BRATWURST HERE IS THE WURST. I MEAN THAT AS A COMPLIMENT.",
+      "I'D MAKE A JOKE ABOUT THE ORGAN LOFT, BUT IT WOULD GO OVER YOUR HEAD.",
+      "I TRIED THE SAUERKRAUT AND IT REALLY GREW ON ME.",
+      "I'M NO GOOD AT AXE THROWING. I KEEP MISSING THE POINT.",
+      "THE ACCORDION PLAYER AND I GET ALONG. WE'RE BOTH A LITTLE DRAWN OUT.",
+      "THE POTATO SALAD IS A BIG DILL AROUND HERE.",
+      "THE BALLOON GUY ALMOST QUIT. HE COULDN'T HANDLE THE PRESSURE.",
+      "I'M ON A ROLL TODAY. SPECIFICALLY A KAISER ROLL."]});
+  npc(52,36.5,{name:'CINDY', dress:'#b23a48', hair:'#6b4a2b', wander:16,
+    says:["I'M HERE WITH MIKE. THE ONE PACING HIMSELF ON THE BRATS.",
+      "I BOWL TUESDAY NIGHTS. ROLLED A 212 LAST WEEK. NOBODY HERE IS IMPRESSED.",
+      "LOVELY FESTIVAL. WOULD BE LOVELIER WITH A LITTLE WHISKEY. I'M JUST SAYING."]});
+  /* the kid's center regulars, running the place with authority nobody granted */
+  npc(38.6,11.6,{name:'LILY', kid:true, dress:'#e0912f', hair:'#3a2a1a', pigtails:true, bow:'#d94f4f', wander:14, fast:true,
+    says:["I'M FIVE. THAT'S THE BIGGEST NUMBER AT THIS TABLE.",
+      "MY DADDY COUNTS ALL THE MONEY AND MY MOMMY WINS AT CORNHOLE.",
+      "I MADE A CROWN AT THE CRAFT TABLE. I'M IN CHARGE NOW."]});
+  npc(41.6,12.2,{name:'DANIELLE', kid:true, small:true, dress:'#8a4f9e', hair:'#d9b23a', pigtails:true, bow:'#e8d24a', wander:10,
+    says:["I'M THREE. LILY IS FIVE. THAT IS NOT FAIR.",
+      "I HAVE GLITTER ON ME AND NOBODY KNOWS HOW.",
+      "*HOLDS UP A PRETZEL* THIS IS MINE NOW."]});
+  npc(44.4,11.8,{name:'HALLIE', kid:true, small:true, dress:'#2f7d46', hair:'#e8cf6a', pigtails:true, bow:'#4f7ed9', wander:10,
+    says:["MY DADDY MAKES THE HOT DOGS. THEY'RE CALLED BRATS.",
+      "MOMMY SAID ONE MORE GOOGLY EYE. I USED ELEVEN.",
+      "I'M GETTING A PAW PATROL CAKE WHEN I TURN THREE. THAT'S IN OCTOBER.",
+      "MARSHALL IS THE FIRE PUP. STRUDEL IS NOT A FIRE PUP. I CHECKED."]});
+  npc(32.95,22.9,{name:'OFFICER DAN', shirt:'#2b2b33', pants:'#241d16', hat:'cap', hatColor:'#241d16', still:true,
+    says:["EVERYTHING IS UNDER CONTROL.","THE ONLY CRIME HERE IS HOW GOOD THE BRATS ARE.","YES, I'VE HAD FOUR PRETZELS. IT'S CALLED COMMUNITY POLICING."]});
+
+  /* balloon clown interactable */
+  interactable(49.5,11.5,1.8,'BALLOONS',()=>{
+    if (!done.balloon){
+      say('DOODLES', ["ONE BALLOON DACHSHUND, COMING UP!","*SQUEAK* *SQUEAK* *SQUEEEEAK*","...HE SAYS HIS NAME IS MR. LONGDOG. CONGRATS!"], ()=>{ completeTask('balloon'); sfx('pop'); });
+    } else chatter('DOODLES', [
+      ["MR. LONGDOG MISSES YOU ALREADY.","THEY GROW UP SO FAST. THEN THEY POP."],
+      "I CAN DO A SWAN, A SWORD, AND A DACHSHUND. GUESS WHICH ONE THEY ASK FOR.",
+      "*SQUEAK* ...SORRY. THAT ONE WAS ME.",
+    ]);
+  });
+
+  /* wandering NPC dialogue hookup happens in interaction scan */
+}
+
+/* ================================================================ DOG */
+const dog = { x:30*TS, y:33*TS, vx:0.4, vy:0, flip:false, frame:0, animT:0, wt:2 };
+interactables.push({x:0,y:0,r:0,name:'',action:null}); // placeholder (dog handled specially)
+
+/* ============================================================== PLAYER */
+const player = {
+  x: 13.5*TS, y: 42*TS, dir:'down', frame:0, animT:0, speed: 1.35,
+};
+let cam = {x:0,y:0};
+
+/* Drawn extent of a person, relative to their x,y - the half-open box
+   drawPerson paints into. Left edge is the cowboy brim at x+1, right is the
+   hat feather at x+10, top is a hat at y-2 lifted another row by the walk
+   bob, bottom is the shadow at y+15. */
+const SPR_L=1, SPR_R=11, SPR_T=-3, SPR_B=16;
+
+function collides(px,py){
+  /* The map edge stops the whole sprite, not just the feet: the camera can't
+     pan past the map, so any part hanging over the edge is simply never drawn
+     - stopping at the feet box would leave you standing with your head cut
+     off by the top of the screen. */
+  if (px+SPR_L<0 || px+SPR_R>MW*TS || py+SPR_T<0 || py+SPR_B>MH*TS) return true;
+  // player collision box: x+2..x+9, y+9..y+15
+  const x1=px+2, y1=py+9, x2=px+9, y2=py+15;
+  for (const [cx,cy] of [[x1,y1],[x2,y1],[x1,y2],[x2,y2]]){
+    /* floor, not |0: truncation rounds -1..-15 *up* to tile 0, so a step off
+       the top or left edge read as walkable grass instead of out of bounds. */
+    const tx=Math.floor(cx/TS), ty=Math.floor(cy/TS);
+    if (tx<0||ty<0||tx>=MW||ty>=MH) return true;
+    if (solid[ty][tx]) return true;
+  }
+  for (const s of solids){
+    if (x1 < s.x+s.w && x2 > s.x && y1 < s.y+s.h && y2 > s.y) return true;
+  }
+  return false;
+}
+
+/* ============================================================ PARTICLES */
+const leaves = [];
+for (let i=0;i<26;i++) leaves.push({x:rr(0,MW*TS), y:rr(0,MH*TS), t:rr(0,7), col:['#e0912f','#c9542f','#d9b23a'][i%3]});
+const notes = [];   // floating music notes
+const confetti = [];
+const smoke = [];
+
+/* ============================================================ MINIGAMES */
+let axeState = null, axeStuck = false;
+function startAxe(){ state='axe'; axeState = {t:0, ph:rr(0,6), result:null, resT:0, axeFly:0}; }
+let cornState = null;
+function startCorn(){ state='corn'; cornState = {phase:'power', t:0, ph:rr(0,6), power:null, aim:null, result:null, resT:0, fly:0}; }
+let steinState = null;
+function startStein(){ state='stein'; steinState = {meter:30, time:6.0, doneFlag:null}; }
+let songState = null;
+const SONGS = ["ROLL OUT THE BARREL","THE CHICKEN DANCE (EXTENDED CUT)","DON'T STOP POLKA-LIEVIN'"];
+function startSong(){ state='song'; songState = {sel:0}; }
+let winState = null;
+function startWin(){
+  state='win'; winState={t:0};
+  sfx('fanfare');
+  for(let i=0;i<160;i++) confetti.push({x:rr(0,VW), y:rr(-VH,0), vx:rr(-0.3,0.3), vy:rr(0.6,1.6),
+    col:['#d94f4f','#e8d24a','#3b6ea8','#57b060','#c17ad4','#f4e9c8'][i%6], s:rr(2,4)});
+}
+
+/* ============================================================== UPDATE */
+let lastTime = 0, playT = 0;
+function update(dt){
+  playT += dt;
+  if (state==='title'){
+    if (interactPressed || anyKeyPressed){ if(interactPressed||keys['Enter']){ state='play'; sfx('ok'); } }
+    interactPressed = false; anyKeyPressed = false;
+    return;
+  }
+  if (state==='dialog'){
+    const pages = dlgPages();
+    const total = pageLen(pages[dialog.idx]);
+    dialog.chars += dt*DLG_CPS;
+    if (interactPressed){
+      interactPressed = false;
+      if (dialog.chars < total) dialog.chars = total;      // first press: fill the page
+      else {
+        dialog.idx++; dialog.chars = 0; sfx('blip');
+        if (dialog.idx >= pages.length){
+          const cb = dialog.onDone; dialog = null; state='play';
+          if (cb) cb();
+        }
+      }
+    }
+    return;
+  }
+  if (state==='card'){ if (interactPressed){ interactPressed=false; state='play'; } return; }
+  if (state==='qr'){ if (interactPressed){ interactPressed=false; state='play'; } return; }
+  if (state==='axe'){ updateAxe(dt); return; }
+  if (state==='corn'){ updateCorn(dt); return; }
+  if (state==='stein'){ updateStein(dt); return; }
+  if (state==='song'){ updateSong(dt); return; }
+  if (state==='win'){
+    winState.t += dt;
+    updateConfetti(dt);
+    if (winState.t>1.2 && interactPressed){ interactPressed=false; state='play'; }
+    return;
+  }
+
+  /* ------- play ------- */
+  const [dx,dy] = dirInput();
+  let moving = (dx!==0||dy!==0);
+  if (moving){
+    const sprinting = !!(keys['Shift'] || padState.run);
+    const sp = player.speed * (sprinting?1.7:1) * (dx!==0&&dy!==0 ? 0.72 : 1);
+    const nx = player.x + dx*sp, ny = player.y + dy*sp;
+    if (!collides(nx, player.y)) player.x = nx;
+    if (!collides(player.x, ny)) player.y = ny;
+    player.dir = dy<0?'up':(dy>0?'down':(dx<0?'left':'right'));
+    player.animT += dt*(sprinting?9:6);
+    player.frame = 1 + (((player.animT)|0)%2);
+  } else { player.frame = 0; player.animT = 0; }
+
+  /* interact scan */
+  if (interactPressed){
+    interactPressed = false;
+    const pcx = player.x+6, pcy = player.y+10;
+    // dog first
+    const ddx = (dog.x+8)-pcx, ddy = (dog.y+5)-pcy;
+    if (ddx*ddx+ddy*ddy < 24*24){
+      sfx('bark');
+      if (!done.dog){ completeTask('dog'); }
+      chatter('STRUDEL', [
+        ["STRUDEL THE DACHSHUND ACCEPTS YOUR PETS.","TAIL SPEED: MAXIMUM.","*HAPPY BORK*"],
+        "STRUDEL ROLLS OVER. THIS IS NOT A REQUEST FOR BELLY RUBS. IT IS AN INSTRUCTION.",
+        "STRUDEL HAS FOUND A DROPPED PIECE OF BRAT. STRUDEL IS NOT SHARING.",
+      ]);
+    } else {
+      let best=null, bd=1e9;
+      for (const it of interactables){
+        if (!it.action) continue;
+        const idx = it.x-pcx, idy = it.y-pcy, d=idx*idx+idy*idy;
+        if (d < it.r*it.r && d < bd){ bd=d; best=it; }
+      }
+      if (!best){
+        // wandering NPCs with lines
+        for (const n of npcs){
+          if (!n.cfg.says) continue;
+          const nx=(n.x+6)-pcx, nyy=(n.y+8)-pcy, d=nx*nx+nyy*nyy;
+          if (d < 22*22 && d < bd){ bd=d; best={npc:n}; }
+        }
+      }
+      if (best){
+        if (best.npc){
+          const n=best.npc;
+          n.dir = (pcx < n.x+6) ? 'left' : 'right';
+          if (Math.abs(pcy-(n.y+8)) > Math.abs(pcx-(n.x+6))) n.dir = (pcy<n.y+8)?'up':'down';
+          chatter(n.cfg.name, n.cfg.says);
+        }
+        else best.action();
+      }
+    }
+  }
+
+  /* NPC wander */
+  for (const n of npcs){
+    if (n.cfg.still) continue;
+    n.wt -= dt;
+    if (n.wt<=0){
+      n.wt = rr(1.2,3.5);
+      const ang = rr(0,Math.PI*2);
+      const sp = n.cfg.fast?0.32:0.16;
+      n.vx = Math.cos(ang)*sp; n.vy = Math.sin(ang)*sp;
+      if (Math.random()<0.45){ n.vx=0; n.vy=0; }
+    }
+    if (n.vx||n.vy){
+      const nx=n.x+n.vx, ny=n.y+n.vy;
+      const distH = Math.abs(nx-n.homeX), distV = Math.abs(ny-n.homeY);
+      if (distH < n.wander*2 && !collides(nx,n.y)) n.x=nx; else n.vx*=-1;
+      if (distV < n.wander && !collides(n.x,ny)) n.y=ny; else n.vy*=-1;
+      n.dir = Math.abs(n.vx)>Math.abs(n.vy) ? (n.vx<0?'left':'right') : (n.vy<0?'up':'down');
+      n.animT += dt*(n.cfg.fast?5:3); n.frame = 1+((n.animT|0)%2);
+    } else n.frame = 0;
+  }
+
+  /* dog wander */
+  dog.wt -= dt;
+  if (dog.wt<=0){ dog.wt=rr(1.5,4);
+    if (Math.random()<0.3){ dog.vx=0; dog.vy=0; }
+    else { const a=rr(0,Math.PI*2); dog.vx=Math.cos(a)*0.3; dog.vy=Math.sin(a)*0.18; } }
+  if (dog.vx||dog.vy){
+    const nx=clamp(dog.x+dog.vx, 18*TS, 44*TS), ny=clamp(dog.y+dog.vy, 30*TS, 43*TS);
+    if (!collides(nx-2,dog.y-6)) dog.x=nx; else dog.vx*=-1;
+    if (!collides(dog.x-2,ny-6)) dog.y=ny; else dog.vy*=-1;
+    if (dog.vx!==0) dog.flip = dog.vx<0;
+    dog.animT+=dt*8; dog.frame=(dog.animT|0)%2;
+  }
+
+  /* particles */
+  for (const l of leaves){
+    l.t += dt; l.y += dt*14; l.x += Math.sin(l.t*2)*0.4;
+    if (l.y > MH*TS){ l.y = -8; l.x = rr(0,MW*TS); }
+  }
+  if (musicOn && Math.random()<dt*3){
+    notes.push({x:56.5*TS+rr(-20,20), y:37.5*TS+rr(-20,20), t:0});
+  }
+  for (let i=notes.length-1;i>=0;i--){ const n=notes[i]; n.t+=dt; n.y-=dt*18; n.x+=Math.sin(n.t*5)*0.5; if(n.t>2)notes.splice(i,1); }
+  if (Math.random()<dt*4) smoke.push({x:50.6*TS+rr(0,20), y:17.8*TS, t:0});
+  for (let i=smoke.length-1;i>=0;i--){ const s=smoke[i]; s.t+=dt; s.y-=dt*12; if(s.t>1.6)smoke.splice(i,1); }
+}
+
+function updateConfetti(dt){
+  for (const c of confetti){ c.y += c.vy; c.x += c.vx + Math.sin((c.y+c.x)*0.05)*0.3; if (c.y>VH+8){ c.y=-8; c.x=rr(0,VW);} }
+}
+function updateAxe(dt){
+  const a = axeState;
+  if (a.result===null){
+    a.t += dt;
+    if (interactPressed){
+      interactPressed=false;
+      const v = Math.sin(a.t*3.1 + a.ph);            // -1..1 marker
+      a.hit = v; a.result = Math.abs(v)<0.16 ? 'bull' : (Math.abs(v)<0.5?'close':'miss');
+      a.resT = 0; sfx('thunk');
+      if (a.result==='bull'){ axeStuck = true; }
+    }
+  } else {
+    a.resT += dt;
+    if (a.resT>0.7 && interactPressed){
+      interactPressed=false;
+      if (a.result==='bull'){
+        state='play';
+        completeTask('axe');
+        say('ALEX',["BULLSEYE! INCREDIBLE!","YOU'RE BASICALLY A LUMBERJACK NOW. THAT'S LEGALLY BINDING IN CANADA."]);
+      } else if (a.result==='close'){
+        say('ALEX',["SO CLOSE! THE HAY BALE FELT THAT.","AGAIN! AGAIN!"], ()=>startAxe());
+      } else {
+        say('ALEX',["THAT HIT THE LAWN.","THE LAWN IS FINE. YOUR PRIDE, LESS SO.","AGAIN!"], ()=>startAxe());
+      }
+      axeState = a.result==='bull' ? null : axeState;
+    }
+  }
+}
+function updateCorn(dt){
+  const c = cornState;
+  c.t += dt;
+  if (c.phase==='power'){
+    if (interactPressed){ interactPressed=false;
+      c.power = 50 + 50*Math.sin(c.t*3.4 + c.ph);
+      c.phase='aim'; c.t=0; c.ph=rr(0,6); sfx('blip');
+    }
+  } else if (c.phase==='aim'){
+    if (interactPressed){ interactPressed=false;
+      c.aim = Math.sin(c.t*2.6 + c.ph);
+      c.phase='fly'; c.fly=0; sfx('thunk');
+    }
+  } else if (c.phase==='fly'){
+    c.fly += dt;
+    if (c.fly>=0.55){
+      const goodPower = c.power>=52 && c.power<=82;
+      if (goodPower && Math.abs(c.aim)<0.18){ c.result='hole'; sfx('tada'); }
+      else if (goodPower && Math.abs(c.aim)<0.55) c.result='board';
+      else if (c.power<52) c.result='short';
+      else if (c.power>82) c.result='long';
+      else c.result='wide';
+      c.phase='done'; c.resT=0;
+    }
+  } else {
+    c.resT += dt;
+    if (c.resT>0.7 && interactPressed){
+      interactPressed=false;
+      if (c.result==='hole'){
+        state='play'; cornState=null;
+        completeTask('corn');
+        say('KRISTI',["IN THE HOLE! CLUNK.","KRISTI NODS SLOWLY. THAT IS HER HIGHEST HONOR."]);
+      } else if (c.result==='board'){
+        say('KRISTI',["ON THE BOARD. IT SLID... AND STAYED.","'NOT BAD!' - KRISTI. AGAIN!"], ()=>startCorn());
+      } else if (c.result==='short'){
+        say('KRISTI',["PLOP. RIGHT IN FRONT OF THE BOARD.","'MORE ARM!' - KRISTI"], ()=>startCorn());
+      } else if (c.result==='long'){
+        say('KRISTI',["IT SAILED CLEAN OVER THE BOARD.","KRISTI DUCKED. SHE DID NOT HAVE TO. SHE DID IT FOR DRAMA."], ()=>startCorn());
+      } else {
+        say('KRISTI',["WIDE. VERY WIDE.","A SQUIRREL IS NOW INVESTIGATING IT."], ()=>startCorn());
+      }
+    }
+  }
+}
+function updateStein(dt){
+  const s = steinState;
+  if (s.doneFlag===null){
+    s.time -= dt;
+    s.meter -= dt*22;                       // gravity!
+    if (interactPressed){ interactPressed=false; s.meter += 9; sfx('blip'); }
+    s.meter = clamp(s.meter, 0, 100);
+    if (s.meter<=0){ s.doneFlag='drop'; sfx('thunk'); }
+    else if (s.time<=0){ s.doneFlag='win'; sfx('tada'); }
+  } else if (interactPressed){
+    interactPressed=false;
+    if (s.doneFlag==='win'){
+      state='play';
+      completeTask('stein');
+      say('OTTO',["ARMS OF STEEL! STEIN OF GLORY!","YOU WIN THE RESPECT OF EVERYONE AND ONE (1) COMMEMORATIVE COASTER."]);
+    } else {
+      state='play'; steinState=null;
+      say('OTTO',["THE STEIN HAS FALLEN!","THE FIVE SECOND RULE DOES NOT APPLY TO BEVERAGES.","COME BACK WHEN YOUR ARM FORGIVES YOU."]);
+    }
+  }
+}
+function updateSong(dt){
+  const s = songState;
+  if (keys['ArrowUp']||keys['w']||padState.u){ if(!s.held){ s.sel=(s.sel+SONGS.length-1)%SONGS.length; s.held=true; sfx('blip'); } }
+  else if (keys['ArrowDown']||keys['s']||padState.d){ if(!s.held){ s.sel=(s.sel+1)%SONGS.length; s.held=true; sfx('blip'); } }
+  else s.held=false;
+  if (interactPressed){
+    interactPressed=false;
+    state='play';
+    completeTask('song');
+    if (!musicOn) toggleMusic();
+    setSong(['barrel','chicken','journey'][s.sel]);
+    for(let i=0;i<10;i++) notes.push({x:56.3*TS+rr(-25,25), y:37.5*TS+rr(-20,20), t:rr(0,-0.5)});
+    say('POLKAMEISTERS', ["'"+SONGS[s.sel]+"' COMIN' RIGHT UP!","A-EINS! A-ZWEI! A-TUBA!"]);
+  }
+}
+
+/* ================================================================ DRAW */
+function draw(){
+  CTX.clearRect(0,0,VW,VH);
+  if (state==='title'){ drawTitle(); return; }
+
+  /* camera */
+  cam.x = clamp(player.x+6 - VW/2, 0, MW*TS - VW);
+  cam.y = clamp(player.y+8 - VH/2, 0, MH*TS - VH);
+  const cx = Math.round(cam.x), cy = Math.round(cam.y);
+
+  CTX.drawImage(tileCanvas, cx, cy, VW, VH, 0, 0, VW, VH);
+
+  /* y-sorted world */
+  CTX.save();
+  CTX.translate(-cx, -cy);
+  const drawList = [];
+  for (const o of objects){ if (o.sortY>=0) drawList.push(o); }
+  drawList.push({sortY: player.y+15, draw:(g)=>{
+    const f = player.frame===0?0:player.frame;
+    drawPerson(g, player.x, player.y, player.dir, f, {hat:'feather', shirt:'#f5f0e6', pants:'#7a4f2a', straps:true});
+  }});
+  for (const n of npcs){
+    drawList.push({sortY:n.y+15, draw:(g)=>drawPerson(g,n.x,n.y,n.dir,n.frame,n.cfg)});
+  }
+  drawList.push({sortY:dog.y+10, draw:(g)=>drawDog(g,dog.x,dog.y,dog.flip,dog.frame)});
+  drawList.sort((a,b)=>a.sortY-b.sortY);
+  for (const d of drawList) d.draw(CTX);
+
+  /* overhead: string lights, banner */
+  for (const od of overheadDraws) od(CTX);
+
+  /* particles in world space */
+  for (const l of leaves){ CTX.fillStyle=l.col; CTX.fillRect(l.x, l.y, 2,2); }
+  for (const n of notes){ CTX.globalAlpha = clamp(2-n.t,0,1); drawText('~', n.x, n.y, 1, '#2e2a44'); CTX.globalAlpha=1; }
+  for (const s of smoke){ CTX.globalAlpha = clamp(1.2-s.t*0.7,0,0.55); CTX.fillStyle='#c9c4bb'; CTX.fillRect(s.x+Math.sin(s.t*4)*2, s.y-s.t*4, 4,4); CTX.globalAlpha=1; }
+  CTX.restore();
+
+  /* prompt when near something */
+  drawPrompt();
+
+  /* HUD */
+  drawHUD();
+
+  if (state==='dialog') drawDialog();
+  if (state==='card') drawCard();
+  if (state==='qr') drawQRPanel();
+  if (state==='axe') drawAxe();
+  if (state==='corn') drawCorn();
+  if (state==='stein') drawStein();
+  if (state==='song') drawSong();
+  if (state==='win') drawWin();
+
+  /* toast */
+  if (toastT>0){
+    toastT -= 1/60;
+    const w = textW(toastMsg,1)+16;
+    CTX.fillStyle='rgba(20,28,40,0.88)'; CTX.fillRect(VW/2-w/2, 28, w, 15);
+    CTX.fillStyle='#e8d24a'; CTX.fillRect(VW/2-w/2, 28, w, 1); CTX.fillRect(VW/2-w/2, 42, w, 1);
+    drawText(toastMsg, VW/2, 32, 1, '#e8d24a', 'center');
+  }
+}
+
+function drawPrompt(){
+  if (state!=='play') return;
+  const pcx=player.x+6, pcy=player.y+10;
+  let near=false, label='';
+  const ddx=(dog.x+8)-pcx, ddy=(dog.y+5)-pcy;
+  if (ddx*ddx+ddy*ddy<24*24){ near=true; label='PET STRUDEL'; }
+  if (!near) for (const it of interactables){
+    if (!it.action) continue;
+    const dx=it.x-pcx, dy=it.y-pcy;
+    if (dx*dx+dy*dy < it.r*it.r){ near=true; label=it.name; break; }
+  }
+  if (!near) for (const n of npcs){
+    if (!n.cfg.says) continue;
+    const dx=(n.x+6)-pcx, dy=(n.y+8)-pcy;
+    if (dx*dx+dy*dy < 22*22){ near=true; label='TALK: '+n.cfg.name; break; }
+  }
+  if (near){
+    const msg = (isTouch?'TAP A: ':'PRESS E: ')+label;
+    const w=textW(msg,1)+10;
+    CTX.fillStyle='rgba(20,28,40,0.85)'; CTX.fillRect(VW/2-w/2, VH-58, w, 13);
+    drawText(msg, VW/2, VH-55, 1, '#f4e9c8', 'center');
+  }
+}
+
+function drawHUD(){
+  CTX.fillStyle='rgba(20,28,40,0.85)'; CTX.fillRect(6,6,132,16);
+  CTX.fillStyle='#e8d24a'; CTX.fillRect(6,6,132,1); CTX.fillRect(6,21,132,1);
+  drawText('FESTKARTE '+tasksDone()+'/'+TASKS.length, 12, 10, 1, '#f4e9c8');
+}
+
+function panel(x,y,w,h,title){
+  CTX.fillStyle='rgba(15,22,33,0.94)'; CTX.fillRect(x,y,w,h);
+  CTX.fillStyle='#e8d24a'; CTX.fillRect(x,y,w,2); CTX.fillRect(x,y+h-2,w,2);
+  CTX.fillRect(x,y,2,h); CTX.fillRect(x+w-2,y,2,h);
+  CTX.fillStyle='#3b6ea8'; CTX.fillRect(x+2,y+2,w-4,14);
+  if (title) drawText(title, x+w/2, y+5, 1, '#f4e9c8', 'center');
+}
+
+function drawDialog(){
+  const page = dlgPages()[dialog.idx];
+  /* box grows to fit the page and stays anchored at the bottom, so a one-line
+     phrase gets a one-line box instead of a mostly empty one */
+  const h = 34 + page.length*10, y = VH-12-h;
+  panel(14, y, VW-28, h, dialog.name);
+  let rem = dialog.chars|0;                              // reveal runs across lines
+  for (let i=0;i<page.length;i++){
+    const n = Math.max(0, Math.min(page[i].length, rem));
+    drawText(page[i].slice(0, n), 26, y+20+i*10, 1, '#f4e9c8');
+    rem -= page[i].length;
+  }
+  if ((dialog.chars|0) >= pageLen(page) && (playT*2|0)%2===0)
+    drawText(isTouch?'TAP A':'E', isTouch?VW/2:VW-52, y+20+page.length*10+2, 1, '#e8d24a',
+             isTouch?'center':undefined);
+}
+
+function startQR(){ state='qr'; sfx('ok'); }
+/* Panel geometry lives here so the drawing and the clickable area can't drift
+   apart - they read the same numbers. */
+function qrLayout(){
+  const n = QR.length, QZ = 4, total = n + QZ*2;
+  const s = Math.max(2, Math.min(6, Math.floor(Math.min(VW-56, VH-130)/total)));
+  const side = total*s;
+  const pw = Math.max(side+28, 210), ph = side + 74;
+  const px = Math.round((VW-pw)/2), py = Math.round((VH-ph)/2);
+  const qx = px + Math.round((pw-side)/2), qy = py + 22;
+  return {n, QZ, s, side, px, py, pw, ph, qx, qy,
+          hit:{x:qx, y:qy, w:side, h:side+16}};   // the code plus its url line
+}
+function qrHit(cx,cy){ return inRect(qrLayout().hit, cx, cy); }
+/* Opens a link in a new tab. An anchor click is more reliable than window.open
+   here: it opens a tab rather than a popup window, and carries noopener so the
+   new page can't reach back through window.opener. */
+function openUrl(url){
+  const a = document.createElement('a');
+  a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function inRect(r,cx,cy){ return cx>=r.x && cx<r.x+r.w && cy>=r.y && cy<r.y+r.h; }
+/* Draws the code big enough to actually scan off the screen: dark modules on a
+   light field, with the 4-module quiet zone the spec wants - an inverted code,
+   or one butted against the dark panel, will not read on most phones. */
+function drawQRPanel(){
+  const L = qrLayout(), n = L.n, QZ = L.QZ, s = L.s;
+  panel(L.px, L.py, L.pw, L.ph, 'FIRST TRINITY OKTOBERFEST');
+  CTX.fillStyle = '#ffffff'; CTX.fillRect(L.qx, L.qy, L.side, L.side);  // field + quiet zone
+  CTX.fillStyle = '#000000';
+  for (let y=0;y<n;y++) for (let x=0;x<n;x++)
+    if (QR[y][x]==='1') CTX.fillRect(L.qx+(x+QZ)*s, L.qy+(y+QZ)*s, s, s);
+  drawText(QR_TEXT, VW/2, L.qy+L.side+7, 1, '#f4e9c8', 'center');
+  drawText(isTouch?'TAP THE CODE TO OPEN IT':'CLICK THE CODE TO OPEN IT',
+           VW/2, L.qy+L.side+21, 1, '#e8d24a', 'center');
+  drawText(isTouch?'TAP A TO CLOSE':'E TO CLOSE', VW/2, L.qy+L.side+35, 1, '#8fa3bf', 'center');
+}
+function drawCard(){
+  const px = VW >= 440 ? 60 : 16, ch = Math.min(VH-36, 284), cb = 18 + ch;
+  panel(px, 18, VW-px*2, ch, 'FESTKARTE - QUESTS');
+  for (let i=0;i<TASKS.length;i++){
+    const t = TASKS[i], y = 42 + i*21;
+    CTX.fillStyle = done[t.id]?'#57b060':'#5a5248';
+    CTX.fillRect(px+16, y, 12, 12);
+    CTX.fillStyle='#0f1621'; CTX.fillRect(px+18, y+2, 8, 8);
+    if (done[t.id]) drawText('^', px+16, y+2, 1, '#7bde8e');
+    drawText(t.label, px+36, y+2, 1, done[t.id]?'#7bde8e':'#f4e9c8');
+  }
+  drawText(tasksDone()===TASKS.length?'ZEHN VON ZEHN! PROST!':'EXPLORE THE FEST TO FINISH THEM ALL!', VW/2, cb-36, 1, '#e8d24a','center');
+  drawText(isTouch?'TAP A TO CLOSE':'E / TAB TO CLOSE', VW/2, cb-22, 1, '#8fa3bf','center');
+}
+
+function drawAxe(){
+  panel(70, 40, VW-140, 200, 'AXE THROW');
+  const a = axeState;
+  // target
+  const tx = VW/2, ty = 110;
+  for (const [r,c] of [[34,'#f4e9c8'],[26,'#d94f4f'],[18,'#f4e9c8'],[10,'#d94f4f'],[4,'#e8d24a']]){
+    CTX.fillStyle=c; CTX.fillRect(tx-r, ty-r, r*2, r*2);
+  }
+  const v = a.result===null ? Math.sin(a.t*3.1+a.ph) : a.hit;
+  // marker bar
+  CTX.fillStyle='#0f1621'; CTX.fillRect(tx-70, 176, 140, 14);
+  CTX.fillStyle='#57b060'; CTX.fillRect(tx-12, 176, 24, 14);
+  CTX.fillStyle='#e8d24a'; CTX.fillRect(tx + v*62 - 2, 174, 4, 18);
+  if (a.result!==null){
+    // axe in target
+    const ax = tx + v*30;
+    CTX.fillStyle='#5a5248'; CTX.fillRect(ax-2, ty-8, 4, 10);
+    CTX.fillStyle='#8a5a30'; CTX.fillRect(ax-1, ty+2, 2, 12);
+    const msg = a.result==='bull'?'BULLSEYE!!':(a.result==='close'?'SO CLOSE!':'THE LAWN HAS BEEN SLAIN');
+    drawText(msg, VW/2, 200, 1, a.result==='bull'?'#7bde8e':'#e8d24a', 'center');
+    if (a.resT>0.7) drawText(isTouch?'TAP A':'PRESS E', VW/2, 216, 1, '#8fa3bf','center');
+  } else {
+    drawText(isTouch?'TAP A AT DEAD CENTER!':'PRESS E AT DEAD CENTER!', VW/2, 200, 1, '#f4e9c8','center');
+  }
+}
+
+function drawCorn(){
+  panel(70, 26, VW-140, 228, 'CORNHOLE');
+  const c = cornState;
+  const bx = VW/2, by = 96;
+  // lawn + the board, seen from the throwing end
+  CTX.fillStyle='#3f5e38'; CTX.fillRect(bx-84, by-44, 168, 130);
+  CTX.fillStyle='#c99548'; CTX.fillRect(bx-30, by-30, 60, 46);
+  CTX.fillStyle='#b3812c'; CTX.fillRect(bx-30, by+12, 60, 4);
+  CTX.fillStyle='#241d16'; CTX.fillRect(bx-7, by-22, 14, 11);
+  // power bar (vertical, left)
+  const pv = c.phase==='power' ? 50+50*Math.sin(c.t*3.4+c.ph) : c.power;
+  CTX.fillStyle='#0f1621'; CTX.fillRect(88, 56, 12, 130);
+  CTX.fillStyle='#57b060'; CTX.fillRect(88, 56+130-Math.round(0.82*130), 12, Math.round(0.30*130));
+  CTX.fillStyle='#e8d24a'; CTX.fillRect(85, 56+130-(pv/100)*130-2, 18, 4);
+  drawText('POWER', 94, 192, 1, '#8fa3bf','center');
+  // aim bar (horizontal, bottom)
+  if (c.phase!=='power'){
+    const av = c.phase==='aim' ? Math.sin(c.t*2.6+c.ph) : (c.aim||0);
+    CTX.fillStyle='#0f1621'; CTX.fillRect(bx-70, 204, 140, 12);
+    CTX.fillStyle='#57b060'; CTX.fillRect(bx-12, 204, 24, 12);
+    CTX.fillStyle='#e8d24a'; CTX.fillRect(bx + av*62 - 2, 202, 4, 16);
+  }
+  // the bag in flight / landed
+  if (c.phase==='fly' || c.phase==='done'){
+    const t = c.phase==='fly' ? Math.min(1, c.fly/0.55) : 1;
+    const targetX = bx + c.aim*46;
+    let targetY;
+    if (c.power<52) targetY = by+36;
+    else if (c.power>82) targetY = by-40;
+    else targetY = (c.phase==='done' && c.result==='hole') ? by-16 : by+2;
+    const px = bx + (targetX-bx)*t;
+    const py = 196 + (targetY-196)*t - Math.sin(t*Math.PI)*44;
+    CTX.fillStyle='#e8d24a'; CTX.fillRect(px-4, py-4, 9, 9);
+    CTX.fillStyle='#c9a43a'; CTX.fillRect(px-4, py+2, 9, 3);
+  }
+  if (c.phase==='power') drawText(isTouch?'TAP A TO SET POWER!':'PRESS E TO SET POWER!', VW/2, 226, 1, '#f4e9c8','center');
+  else if (c.phase==='aim') drawText(isTouch?'TAP A TO SET AIM!':'PRESS E TO SET AIM!', VW/2, 226, 1, '#f4e9c8','center');
+  else if (c.phase==='done'){
+    const msgs = {hole:'IN THE HOLE!!', board:'ON THE BOARD!', short:'TOO SHORT!', long:'TOO STRONG!', wide:'WAY WIDE!'};
+    drawText(msgs[c.result], VW/2, 226, 1, c.result==='hole'?'#7bde8e':'#e8d24a', 'center');
+    if (c.resT>0.7) drawText(isTouch?'TAP A':'PRESS E', VW/2, 240, 1, '#8fa3bf','center');
+  }
+}
+
+function drawStein(){
+  panel(70, 40, VW-140, 200, 'STEIN HOLD');
+  const s = steinState;
+  // arm + stein rises with meter
+  const lift = s.meter/100;
+  const sx = VW/2, sy = 170 - lift*60;
+  CTX.fillStyle='#f0c090'; CTX.fillRect(sx-4, 176-((176-sy)/2)|0, 8, ((176-sy)/2)|0);  // arm-ish
+  CTX.fillStyle='#e8e4da'; CTX.fillRect(sx-12, sy-24, 24, 26);
+  CTX.fillStyle='#e8b23a'; CTX.fillRect(sx-9, sy-18, 18, 17);
+  CTX.fillStyle='#f5f0e6'; CTX.fillRect(sx-9, sy-21, 18, 4);
+  CTX.fillStyle='#e8e4da'; CTX.fillRect(sx+12, sy-16, 5, 10);
+  // meter
+  CTX.fillStyle='#0f1621'; CTX.fillRect(100, 200, VW-200, 12);
+  CTX.fillStyle = s.meter>35?'#57b060':'#d94f4f';
+  CTX.fillRect(100, 200, (VW-200)*s.meter/100, 12);
+  drawText('TIME '+Math.max(0,s.time).toFixed(1), VW/2, 220, 1, '#f4e9c8','center');
+  if (s.doneFlag==='win') drawText('PROST!! YOU DID IT!', VW/2, 60, 1, '#7bde8e','center');
+  else if (s.doneFlag==='drop') drawText('THE STEIN HAS FALLEN', VW/2, 60, 1, '#d94f4f','center');
+  else drawText(isTouch?'MASH A! KEEP IT UP!':'MASH E! KEEP IT UP!', VW/2, 60, 1, '#e8d24a','center');
+}
+
+function drawSong(){
+  panel(60, 60, VW-120, 150, 'REQUEST A SONG');
+  for (let i=0;i<SONGS.length;i++){
+    const y = 96 + i*28, sel = songState.sel===i;
+    if (sel){ CTX.fillStyle='rgba(232,210,74,0.16)'; CTX.fillRect(74, y-6, VW-148, 22); }
+    drawText((sel?'~ ':'  ')+SONGS[i], 84, y, 1, sel?'#e8d24a':'#f4e9c8');
+  }
+  drawText('# $ TO CHOOSE - '+(isTouch?'A':'E')+' TO REQUEST', VW/2, 186, 1, '#8fa3bf','center');
+}
+
+/* Layout in one place, like the QR panel, so the facebook button's hit box is
+   the box that got drawn. Centred rather than pinned, so it still sits right
+   on a tall portrait screen. */
+const WIN_LINK = 'SEE THE EVENT ON FACEBOOK';
+function winLayout(){
+  const pw = Math.min(VW-40, 380), ph = 230;
+  const px = Math.round((VW-pw)/2), py = Math.round((VH-ph)/2);
+  const linkY = py+180, lw = textW(WIN_LINK,1)+12;
+  return {px, py, pw, ph, linkY,
+          hit:{x:Math.round(VW/2-lw/2), y:linkY-4, w:lw, h:14}};
+}
+function drawWin(){
+  updateConfettiDraw();
+  const L = winLayout(), y = L.py;
+  panel(L.px, y, L.pw, L.ph, 'ZEHN VON ZEHN!');
+  drawText('YOU DID EVERYTHING AT OKTOBERFEST!', VW/2, y+34, 1, '#f4e9c8','center');
+  drawText('PRETZELS EATEN. AXES THROWN. BAGS SUNK.', VW/2, y+52, 1, '#f4e9c8','center');
+  drawText('RESTROOMS DISCOVERED. DOGS PETTED.', VW/2, y+66, 1, '#f4e9c8','center');
+  drawText('YOU ARE AN', VW/2, y+90, 1, '#f4e9c8','center');
+  drawText('OKTOBERFEST LEGEND', VW/2, y+104, 2, '#e8d24a','center');
+  drawText('PROST! @', VW/2, y+130, 1, '#d94f4f','center');
+  /* now send them to the real thing */
+  drawText('NOW COME TO THE REAL ONE:', VW/2, y+152, 1, '#f4e9c8','center');
+  drawText('OCTOBER 10 AT 11 AM', VW/2, y+166, 1, '#e8d24a','center');
+  const h = L.hit;
+  CTX.fillStyle='#3b6ea8'; CTX.fillRect(h.x,h.y,h.w,h.h);
+  CTX.fillStyle='#5a8cc4'; CTX.fillRect(h.x,h.y,h.w,1);
+  drawText(WIN_LINK, VW/2, L.linkY, 1, '#f4e9c8','center');
+  if (winState.t>1.2) drawText(isTouch?'TAP A TO KEEP PARTYING':'PRESS E TO KEEP PARTYING',
+    VW/2, y+206, 1, '#8fa3bf','center');
+}
+function updateConfettiDraw(){
+  for (const c of confetti){ CTX.fillStyle=c.col; CTX.fillRect(c.x, c.y, c.s, c.s); }
+}
+
+/* ------------------------------------------------------------- TITLE */
+function drawTitle(){
+  // paper
+  CTX.fillStyle='#efe8d8'; CTX.fillRect(0,0,VW,VH);
+  const fs = 0.9*VW/480;
+  CTX.save(); CTX.translate(36*VW/480,46); CTX.scale(fs,fs);
+  drawFacade(CTX);
+  CTX.restore();
+  // paper bands so the text stays readable over the sketch
+  CTX.fillStyle='rgba(239,232,216,0.9)'; CTX.fillRect(0,0,VW,98);
+  CTX.fillStyle='rgba(239,232,216,0.94)'; CTX.fillRect(0,VH-28,VW,28);
+  CTX.fillStyle='#c9bfa8'; CTX.fillRect(0,98,VW,1); CTX.fillRect(0,VH-28,VW,1);
+  // bunting
+  for (let i=0;i<12;i++){
+    const x = 12+i*40, y = 2 + Math.sin(i*1.2+playT)*2;
+    CTX.fillStyle = i%2?'#3b6ea8':'#d94f4f';
+    CTX.beginPath(); CTX.moveTo(x,y); CTX.lineTo(x+16,y); CTX.lineTo(x+8,y+12); CTX.fill();
+  }
+  drawText('FIRST TRINITY', VW/2, 18, 2, '#2a2320','center');
+  drawText('OKTOBERFEST', VW/2, 38, 3, '#8e3040','center');
+  drawText('A VERY SILLY PIXEL FEST', VW/2, 66, 1, '#3b6ea8','center');
+  drawText(isTouch?'':'MOVE: WASD/ARROWS  INTERACT: E  QUESTS: TAB  MUSIC: M', VW/2, 84, 1, '#6a6154','center');
+  drawText('EST. 1837 - N NEVILLE ST, PITTSBURGH', VW/2, VH-22, 1, '#6a6154','center');
+  if ((playT*1.6|0)%2===0)
+    drawText(isTouch?'TAP THE A BUTTON TO START':'PRESS ENTER TO START', VW/2, VH-11, 1, '#8e3040','center');
+}
+
+/* the church facade, from the pen sketch */
+function drawFacade(g){
+  const ink='#2a2320', stone='#ddd5c2', dark='#4a4030', mid='#c7bda6';
+  const oy = 96;
+  g.save();
+  g.translate(60,0);
+  // ground line
+  g.fillStyle=ink; g.fillRect(-20, oy+164, 420, 1);
+  /* ---- left porte-cochere ---- */
+  g.fillStyle=stone; g.fillRect(10, oy+92, 60, 72);
+  g.fillStyle=ink; g.fillRect(10, oy+92, 60, 1); g.fillRect(10, oy+92, 1, 72);
+  g.beginPath(); g.moveTo(6,oy+92); g.lineTo(40,oy+76); g.lineTo(74,oy+92); g.closePath();
+  g.fillStyle=mid; g.fill(); g.strokeStyle=ink; g.stroke();
+  g.fillStyle=dark; g.fillRect(24,oy+112,32,52);
+  g.beginPath(); g.moveTo(24,oy+112); g.lineTo(40,oy+100); g.lineTo(56,oy+112); g.fillStyle=dark; g.fill();
+  /* ---- tower ---- */
+  const txx=70, tw=64, ttop=oy-58;
+  g.fillStyle=stone; g.fillRect(txx, ttop, tw, oy+164-ttop);
+  g.strokeStyle=ink; g.strokeRect(txx+0.5, ttop+0.5, tw, oy+164-ttop);
+  // pinnacles
+  for (const px of [txx-4, txx+tw-6]){
+    g.fillStyle=mid; g.fillRect(px, ttop-6, 10, 30);
+    g.strokeStyle=ink; g.strokeRect(px+0.5, ttop-5.5, 10, 30);
+    g.beginPath(); g.moveTo(px,ttop-6); g.lineTo(px+5,ttop-20); g.lineTo(px+10,ttop-6); g.closePath();
+    g.fillStyle=dark; g.fill();
+  }
+  // battlement + shield
+  g.fillStyle=mid; g.fillRect(txx, ttop, tw, 12);
+  for(let i=0;i<8;i++){ g.fillStyle=(i%2)?stone:ink; if(i%2===0)g.fillRect(txx+i*8, ttop-3, 8, 3); }
+  g.fillStyle=dark; g.fillRect(txx+tw/2-5, ttop+3, 10, 12);
+  g.fillStyle='#8e3040'; g.fillRect(txx+tw/2-3, ttop+5, 6, 8);
+  // bell openings (3 lancets)
+  for (let i=0;i<3;i++){
+    const bx = txx+12+i*14;
+    g.fillStyle=dark; g.fillRect(bx, ttop+20, 10, 44);
+    g.beginPath(); g.moveTo(bx,ttop+20); g.lineTo(bx+5,ttop+12); g.lineTo(bx+10,ttop+20); g.closePath(); g.fill();
+    g.fillStyle='#6a5c42'; for(let l=0;l<5;l++) g.fillRect(bx+1, ttop+26+l*8, 8, 2);
+  }
+  // stringcourse
+  g.fillStyle=ink; g.fillRect(txx, ttop+70, tw, 1); g.fillRect(txx, ttop+74, tw, 1);
+  // great window (pointed arch, diamond lattice)
+  const wx=txx+10, wy=ttop+84, ww=tw-20, wh=54;
+  g.fillStyle=dark; g.fillRect(wx, wy+12, ww, wh-12);
+  g.beginPath(); g.moveTo(wx,wy+14); g.lineTo(wx+ww/2,wy-6); g.lineTo(wx+ww,wy+14); g.closePath(); g.fill();
+  g.save();
+  g.beginPath(); g.moveTo(wx,wy+14); g.lineTo(wx+ww/2,wy-6); g.lineTo(wx+ww,wy+14);
+  g.lineTo(wx+ww,wy+wh); g.lineTo(wx,wy+wh); g.closePath(); g.clip();
+  g.strokeStyle='#9a8b6a'; g.lineWidth=1;
+  for(let i=-4;i<8;i++){ g.beginPath(); g.moveTo(wx+i*8, wy-6); g.lineTo(wx+i*8+30, wy+wh); g.stroke();
+    g.beginPath(); g.moveTo(wx+i*8+30, wy-6); g.lineTo(wx+i*8, wy+wh); g.stroke(); }
+  g.restore();
+  g.strokeStyle=ink; g.beginPath(); g.moveTo(wx,wy+14); g.lineTo(wx+ww/2,wy-6); g.lineTo(wx+ww,wy+14); g.stroke();
+  g.fillStyle=stone; g.fillRect(wx-2, wy+wh, ww+4, 3);
+  // TRINITY CHURCH inscription
+  drawText('TRINITY', txx+tw/2, ttop+142, 1, ink, 'center');
+  drawText('CHURCH', txx+tw/2, ttop+150, 1, ink, 'center');
+  // door (pointed arch)
+  const dxx=txx+16, dyy=ttop+156, dw=tw-32, dh=36;
+  g.fillStyle='#5a4326'; g.fillRect(dxx, dyy+8, dw, dh-8);
+  g.beginPath(); g.moveTo(dxx,dyy+10); g.lineTo(dxx+dw/2,dyy-2); g.lineTo(dxx+dw,dyy+10); g.closePath(); g.fill();
+  g.strokeStyle=ink; g.stroke();
+  g.strokeStyle='#3a2c18';
+  for(let i=1;i<4;i++){ g.beginPath(); g.moveTo(dxx+i*dw/4, dyy+4); g.lineTo(dxx+i*dw/4, dyy+dh); g.stroke(); }
+  for(let i=1;i<4;i++){ g.beginPath(); g.moveTo(dxx, dyy+8+i*8); g.lineTo(dxx+dw, dyy+8+i*8); g.stroke(); }
+  // steps
+  g.fillStyle=mid; g.fillRect(dxx-6, oy+156, dw+12, 3); g.fillRect(dxx-10, oy+160, dw+20, 3);
+  g.strokeStyle=ink; g.strokeRect(dxx-6.5, oy+156.5, dw+12, 3); g.strokeRect(dxx-10.5, oy+160.5, dw+20, 3);
+  // bushes
+  for (const bx of [txx-14, txx+tw+2]){
+    g.fillStyle='#6a6a4a';
+    g.beginPath(); g.arc(bx+6, oy+158, 9, 0, 7); g.fill();
+    g.beginPath(); g.arc(bx+14, oy+160, 7, 0, 7); g.fill();
+    g.strokeStyle=ink; g.beginPath(); g.arc(bx+6, oy+158, 9, 0, 7); g.stroke();
+  }
+  /* ---- nave roof behind, sloping right ---- */
+  g.beginPath(); g.moveTo(txx+tw, oy-10); g.lineTo(txx+tw+80, oy+52); g.lineTo(txx+tw+80, oy+92); g.lineTo(txx+tw, oy+92);
+  g.closePath(); g.fillStyle=mid; g.fill(); g.strokeStyle=ink; g.stroke();
+  g.strokeStyle='#a89a7e';
+  for(let i=1;i<7;i++){ g.beginPath(); g.moveTo(txx+tw, oy-10+i*8); g.lineTo(txx+tw+80-i*2, oy+52+i*5); g.stroke(); }
+  /* ---- middle hall (gabled stone) ---- */
+  const hx=txx+tw+80;
+  g.fillStyle=stone; g.fillRect(hx, oy+72, 66, 92);
+  g.strokeStyle=ink; g.strokeRect(hx+0.5, oy+72.5, 66, 92);
+  g.beginPath(); g.moveTo(hx-4, oy+72); g.lineTo(hx+26, oy+48); g.lineTo(hx+56, oy+72); g.closePath();
+  g.fillStyle=mid; g.fill(); g.strokeStyle=ink; g.stroke();
+  // chimney
+  g.fillStyle=stone; g.fillRect(hx+8, oy+26, 10, 30); g.strokeStyle=ink; g.strokeRect(hx+8.5, oy+26.5, 10, 30);
+  // gothic window + door
+  g.fillStyle=dark; g.fillRect(hx+18, oy+84, 16, 22);
+  g.beginPath(); g.moveTo(hx+18,oy+86); g.lineTo(hx+26,oy+78); g.lineTo(hx+34,oy+86); g.closePath(); g.fill();
+  g.fillStyle='#5a4326'; g.fillRect(hx+22, oy+134, 20, 30);
+  g.beginPath(); g.moveTo(hx+22,oy+136); g.lineTo(hx+32,oy+126); g.lineTo(hx+42,oy+136); g.closePath(); g.fill();
+  g.strokeStyle=ink; g.strokeRect(hx+22.5, oy+134.5, 20, 30);
+  /* ---- tudor parish house ---- */
+  const ux=hx+66;
+  // roof
+  g.beginPath(); g.moveTo(ux-6, oy+92); g.lineTo(ux+40, oy+64); g.lineTo(ux+96, oy+92); g.closePath();
+  g.fillStyle='#8a7a5e'; g.fill(); g.strokeStyle=ink; g.stroke();
+  g.fillStyle='#efe6d0'; g.fillRect(ux, oy+92, 92, 72);
+  g.strokeStyle=ink; g.strokeRect(ux+0.5, oy+92.5, 92, 72);
+  // half timbering
+  g.fillStyle='#5a4326';
+  for (const vx of [8, 30, 52, 74]) g.fillRect(ux+vx, oy+92, 4, 40);
+  g.fillRect(ux, oy+112, 92, 3); g.fillRect(ux, oy+130, 92, 3);
+  g.strokeStyle='#5a4326';
+  g.beginPath(); g.moveTo(ux+12,oy+95); g.lineTo(ux+30,oy+112); g.stroke();
+  g.beginPath(); g.moveTo(ux+56,oy+95); g.lineTo(ux+74,oy+112); g.stroke();
+  // brick lower floor
+  g.fillStyle='#b9a68a'; g.fillRect(ux, oy+133, 92, 31);
+  g.strokeStyle='#a08d72'; for(let i=0;i<4;i++){ g.beginPath(); g.moveTo(ux,oy+140+i*7); g.lineTo(ux+92,oy+140+i*7); g.stroke(); }
+  // windows
+  g.fillStyle=dark; g.fillRect(ux+14, oy+98, 12, 10); g.fillRect(ux+58, oy+98, 12, 10);
+  g.fillRect(ux+12, oy+140, 14, 12);
+  // door with little porch
+  g.fillStyle='#5a4326'; g.fillRect(ux+40, oy+138, 16, 26);
+  g.beginPath(); g.moveTo(ux+34, oy+138); g.lineTo(ux+48, oy+128); g.lineTo(ux+62, oy+138); g.closePath();
+  g.fillStyle='#8a7a5e'; g.fill(); g.strokeStyle=ink; g.stroke();
+  // bay window right
+  g.fillStyle='#efe6d0'; g.fillRect(ux+70, oy+134, 22, 30); g.strokeStyle=ink; g.strokeRect(ux+70.5,oy+134.5,22,30);
+  g.fillStyle=dark; g.fillRect(ux+73, oy+138, 7, 12); g.fillRect(ux+82, oy+138, 7, 12);
+  g.restore();
+}
+
+/* ================================================================ CARD */
+function toggleCard(){
+  if (state==='play') state='card';
+  else if (state==='card') state='play';
+}
+
+/* ================================================================ LOOP */
+bakeTiles();
+buildWorld();
+/* tiny hook for automated testing / embedding tricks */
+window.__tp = (tx,ty)=>{ player.x=tx*TS; player.y=ty*TS; };
+window.__state = ()=>state;
+window.__axe = ()=> axeState && axeState.result===null ? Math.sin(axeState.t*3.1+axeState.ph) : null;
+window.__corn = ()=>{
+  if (!cornState) return null;
+  if (cornState.phase==='power') return {phase:'power', v: 50+50*Math.sin(cornState.t*3.4+cornState.ph)};
+  if (cornState.phase==='aim') return {phase:'aim', v: Math.sin(cornState.t*2.6+cornState.ph)};
+  return {phase: cornState.phase};
+};
+window.__dog = ()=>({x:dog.x, y:dog.y});
+window.__tasks = ()=>TASKS.map(t=>t.id+':'+done[t.id]).join(',');
+function frame(t){
+  const dt = Math.min(0.05, (t-lastTime)/1000 || 0.016);
+  lastTime = t;
+  update(dt);
+  draw();
+  interactPressed = false;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
