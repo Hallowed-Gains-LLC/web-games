@@ -367,15 +367,202 @@ const DAD_LINES = [
   'The gales of November came early, kiddo. Christmas does not get to.',
 ];
 
-// Short lines the radio crackles out during play.
-const RADIO_LINES = [
-  ['Lake Superior', 'brr'], ['Lake Erie', 'can i play?'], ['Lake Ontario', 'sorry!'], ['Lake Huron', 'hello? anyone?'],
-  ['Lake Michigan', 'chicago says hi'], ['Lake Superior', "this is fine. i'm fine."], ['Cook', 'pasties are up!'],
-  ['Deckhand', 'one of the elves waved at me'], ['Deckhand', 'is it bad that i kinda like the candy canes'],
-  ['Captain', 'yes.'], ['Dad', "that's {n}."], ['Coast Guard', 'S.S. November, please stop honking at the mall'],
-  ['Lake Erie', 'can i be the boss next year'], ['Lake Superior', 'no'], ['Mall Santa', 'ho ho h-'], ['Everyone', 'NOT YET.'],
-  ['Weather Radio', 'gale warning: november, arriving early, as usual'], ['Lake Superior', 'the gales of november come early. read a book.'],
-];
+// The radio at the bottom of the screen. Each entry is a conversation:
+// lines play one after another, so replies land right after their setup.
+// Pools unlock as the game goes (a threat's lines start on the day it shows
+// up), and Radio.pick() won't repeat a conversation until its pool runs dry.
+// Same rules as everywhere else in this game: no lyrics, and nothing about
+// the real ship or crew.
+const RADIO = {
+  general: [
+    [['Lake Superior', 'brr'], ['Lake Erie', "you're literally the coldest one"], ['Lake Superior', "i know. i'm bragging."]],
+    [['Lake Erie', 'can i play?'], ['Lake Superior', "you're 210 feet deep at most. sit down."]],
+    [['Lake Ontario', 'sorry!'], ['Deckhand', 'for what?'], ['Lake Ontario', 'just in general!']],
+    [['Lake Huron', 'hello? anyone?'], ['Lake Huron', '...'], ['Lake Huron', 'i have a bay so big it has its own name, you know']],
+    [['Lake Michigan', 'chicago says hi'], ['Lake Superior', 'tell chicago to stop calling you an ocean']],
+    [['Lake Superior', "this is fine. i'm fine. it's 36 degrees."]],
+    [['Cook', 'pasties are up!'], ['Deckhand', 'is it PASS-tee or PASTE-ee'], ['Cook', 'say it wrong one more time']],
+    [['Deckhand', 'one of the elves waved at me'], ['Captain', "don't wave back."]],
+    [['Deckhand', 'is it bad that i kinda like the candy canes'], ['Captain', 'yes.']],
+    [['Coast Guard', 'S.S. November, please stop honking at the mall'], ['Coast Guard', "...they're asking nicely"]],
+    [['Lake Erie', 'can i be the boss next year'], ['Lake Superior', 'no'], ['Lake Erie', "what if i'm really mean"], ['Lake Superior', 'still no']],
+    [['Mall Santa', 'ho ho h-'], ['Everyone', 'NOT YET.']],
+    [['Weather Radio', 'gale warning: november, arriving early, as usual']],
+    [['Lake Superior', 'the gales of november come early. read a book.']],
+    [['Dad', "that's {n}."], ['Mom', 'he means the song.'], ['Mom', 'he always means the song.']],
+    [['Dad', 'kiddo, you ever notice how good a song gets when it runs six minutes'], ['Deckhand', 'is this about the boat song'], ['Dad', "it's always about the boat song"]],
+    [['Soo Locks', 'friendly reminder: we close for the winter in january'], ['Lake Superior', "that's my favorite part"]],
+    [['Seagull', 'MINE'], ['Deckhand', "that's my sandwich"], ['Seagull', 'MINE']],
+    [['Lighthouse Keeper', "beam's on. vibes are bad. carry on."]],
+    [['Duluth', "hey, it's Duluth. someone put a wreath on city hall"], ['Captain', 'take it down'], ['Duluth', "it's forty feet up"]],
+    [['Lake Michigan', 'i have sand dunes'], ['Lake Superior', 'i have agates'], ['Lake Huron', 'i have... um'], ['Everyone', 'we know, Huron']],
+    [['Deckhand', "captain, what's the plan"], ['Captain', 'pop christmas. go home. pasties.']],
+    [['Cook', "today's special: pasty"], ['Deckhand', "yesterday's special was pasty"], ['Cook', "and tomorrow's will be too"]],
+    [['Weather Radio', 'tonight: cloudy, cold, with a 30% chance of tinsel']],
+    [['Weather Radio', 'winds northwest at 25 knots. christmas spirit at 0 knots, as it should be.']],
+    [['Lake Ontario', 'niagara falls says hi!'], ['Lake Erie', "that's MY water going over that"]],
+    [['Lake Superior', 'fun fact: all the other lakes could fit in me'], ['Lake Michigan', "we've heard"], ['Lake Superior', 'plus three more eries'], ['Lake Erie', 'hey']],
+    [['Mom', 'your father is teaching the neighbors the boat song'], ['Mom', 'they did not ask']],
+    [['Dad', 'do you know what time of year it is'], ['Deckhand', 'November—'], ['Dad', 'FITZ SEASON']],
+    [['An Elf', 'hi, quick question, can we put up ONE light'], ['Everyone', 'NO']],
+    [['Mall Santa', 'just one little wreath?'], ['Captain', 'somebody get the horn']],
+    [['Lake Superior', 'i hold enough water to cover north and south america a foot deep'], ['Lake Erie', 'why would you do that'], ['Lake Superior', "i won't. but i could."]],
+    [['Coast Guard', 'reminder: the lake is cold. please do not swim out to fight the inflatables']],
+    [['Deckhand', 'i put on two flannels'], ['Cook', 'rookie numbers']],
+    [['Cook', "coffee's on"], ['Deckhand', "it's 4pm"], ['Cook', "coffee's on"]],
+    [['Lake Huron', "if anyone needs me i'll be between michigan and ontario"], ['Lake Michigan', "technically we're the same lake, huron"], ['Lake Huron', "DON'T"]],
+    [['Radio DJ', 'and now, a six-minute song about a—'], ['Captain', 'we know']],
+    [['Dad', 'your grandpa loved that song. and HIS grandpa—'], ['Mom', 'it came out in 1976'], ['Dad', 'let me have this']],
+    [['Duluth', 'the mall says the decorations are "just for inventory"'], ['Captain', 'sure they are']],
+    [['Lake Superior', 'shoutout to the S.S. November. only boat out here with taste.']],
+    [['Deckhand', 'i saw a reindeer wink at me'], ['Captain', 'red nose?'], ['Deckhand', 'no. legally, it cannot have one.']],
+    [['Lake Erie', "i'm the walleye capital of the world"], ['Lake Superior', 'and?'], ['Lake Erie', 'just saying it']],
+    [['Weather Radio', 'small craft advisory in effect. large santa advisory also in effect.']],
+    [['Cook', 'someone keeps leaving candy canes in the galley'], ['Cook', "i've started using them as stir sticks"], ['Cook', 'honestly? delicious. still mad.']],
+    [['Deckhand', 'how many tons of taconite are we carrying'], ['Captain', 'enough'], ['Deckhand', 'enough for what'], ['Captain', 'november']],
+    [['Mom', 'is your father on that radio again'], ['Dad', 'no'], ['Mom', 'Gary.']],
+    [['Lake Ontario', "i'm technically the last stop before the ocean"], ['Lake Superior', "and i'm the first stop for awesome"], ['Lake Ontario', 'sorry, what?']],
+    [['Deckhand', 'are we the good guys?'], ['Captain', 'we are defending a month. so yes.']],
+    [['Coast Guard', 'S.S. November, your horn just set off every car alarm in Two Harbors'], ['Captain', 'good']],
+    [['Lake Michigan', 'did you know Mackinac is pronounced mack-in-aw'], ['Deckhand', 'everybody knows that'], ['Lake Michigan', 'tourists do NOT']],
+    [['Cook', 'the pasties are rutabaga today'], ['Deckhand', "they're always rutabaga"], ['Cook', 'and THAT is why they work']],
+    [['Lake Superior', "they call me superior. i didn't pick it. but i don't hate it."]],
+    [['Dad', 'did you remember your hat'], ['Captain', 'Dad, I\'m on a boat'], ['Dad', 'so you DIDN\'T remember your hat']],
+    [['Weather Radio', 'thanksgiving remains on schedule. christmas has been told to wait in the car.']],
+    // ----- The internet's Fitz memes -----
+    [['Deckhand', 'my girlfriend just texted "come over, my parents aren\'t home"'], ['Captain', 'and?'],
+     ['Deckhand', 'i told her the gales of november came early'], ['Captain', 'proud of you.']],
+    [['Deckhand', 'wait. the boat song is about 1975?'], ['Deckhand', 'i thought it was like 1812'],
+     ['Dad', 'they had color TV, son'], ['Mom', 'and disco'], ['Dad', 'and 8-tracks. it was a GOLDEN AGE.']],
+    [['Mom', "men don't want to go to the club"], ['Mom', 'they want to stare out a rainy window in a wool sweater and think about 26,000 tons of iron ore'],
+     ['Dad', '...is that bad'], ['Mom', 'Gary.']],
+    [['Mom', 'some men think about the roman empire every day'], ['Mom', "your father's roman empire is a boat"]],
+    [['Cook', "fellas, it's too rough to cook"], ['Cook', 'pasties are self-serve tonight']],
+    [['Parent PSA', 'know what your teen is texting this november'], ['Parent PSA', 'TBH: taconite being hauled'],
+     ['Parent PSA', 'NGL: november gale looming'], ['Parent PSA', "WTF: where's the fitz"]],
+    [['Parent PSA', 'more codes your teen may be using'], ['Parent PSA', 'FML: fifteen miles from whitefish bay'],
+     ['Parent PSA', "SMH: superior's mood, hostile"], ['Parent PSA', 'IYKYK: if you know (the song), you know']],
+    [['Parent PSA', 'is your teen saying LOL?'], ['Parent PSA', "it may mean lake's obviously livid"], ['Parent PSA', 'talk to them']],
+    [['Deckhand', 'who would win: the titanic or a lake freighter'], ['Dad', 'son. the lake freighter has the better SONG.']],
+    [['Deckhand', 'i work out to the boat song'], ['Cook', 'on a treadmill?'], ['Deckhand', 'on a treadmill. nobody knows.']],
+    [['Weather Radio', 'experts confirm: gen z is holding back christmas with a shipwreck song. so far it is working.']],
+    [['Duluth', "someone's still wearing their freighter halloween costume"], ['Duluth', 'respect']],
+    [['Deckhand', 'all this because i called the boat song "kinda long"'], ['Dad', 'WE DO NOT SAY THAT IN THIS FAMILY']],
+    [['Lake Superior', "they say i don't give up much"], ['Lake Superior', "that's right. not even november."]],
+  ],
+  // Unlocked on the day each threat first shows up.
+  santa: [
+    [['Deckhand', 'that Santa is smiling at me'], ['Captain', "it's vinyl. it's always smiling."]],
+    [['Duluth', 'a twelve-foot santa just floated past the pier'], ['Duluth', 'it gave me a thumbs up']],
+    [['Lake Superior', 'who keeps putting inflatables in me']],
+    [['Deckhand', 'how do inflatables even float this well'], ['Cook', "spite"]],
+  ],
+  jingle: [
+    [['Deckhand', "i can't get the mall music out of my head"], ['Dad', "put the boat song on. fixes it every time."]],
+    [['Lake Ontario', 'oh, i love this one!'], ['Everyone', 'ONTARIO.']],
+    [['Mall Speaker', '♪ jingle b—'], ['Deckhand', 'POP IT POP IT']],
+    [['Cook', "if i hear that song one more time i'm putting the speaker in a pasty"]],
+  ],
+  reindeer: [
+    [['Deckhand', 'reindeer, twelve o\'clock!'], ['Captain', "it's four in the afternoon"], ['Deckhand', 'UP, captain. up.']],
+    [['Deckhand', 'why are the reindeer throwing presents at us'], ['Cook', 'they heard you like the candy canes']],
+    [['Coast Guard', 'reminder: reindeer are not cleared for this airspace until december 24']],
+  ],
+  elfski: [
+    [['Coast Guard', 'jet skis are not permitted this late in the season'], ['An Elf', 'we have a permit'], ['Coast Guard', 'from WHO']],
+    [['Deckhand', 'those elves have no life jackets'], ['Captain', "they're elves. they bounce."]],
+    [['Lake Superior', 'little guys on jet skis in NOVEMBER'], ['Lake Superior', "i'm almost impressed"]],
+  ],
+  deckelf: [
+    [['Deckhand', 'it moved. i swear it moved.']],
+    [['Cook', 'the elf is in the galley now'], ['Cook', "it's watching me make pasties"]],
+    [['Deckhand', 'why does it only move when nobody is looking'], ['Captain', 'blow the horn and find out']],
+  ],
+  latte: [
+    [['Deckhand', "it's not even thanksgiving and it's already peppermint season"], ['Cook', "i make a pumpkin pasty. just saying."]],
+    [['Lake Michigan', 'chicago coffee shops are 80% peppermint by volume right now']],
+    [['Deckhand', 'a latte just split into three peppermints'], ['Captain', "that's not how coffee works"], ['Deckhand', "it's not how ANYTHING works"]],
+  ],
+  // Day 8, the gale.
+  gale: [
+    [['Weather Radio', 'gale warning in effect. christmas advisory also in effect.']],
+    [['Lake Superior', 'sorry about the waves'], ['Lake Superior', 'not really']],
+    [['Deckhand', "i'm holding my coffee with both hands"], ['Cook', "that's the only safe way to hold coffee"]],
+    [['Coast Guard', 'S.S. November, hold on to something'], ['Captain', "we're holding on to november"]],
+  ],
+  // Day 9, the boss.
+  boss: [
+    [['Duluth', 'whose santa is that'], ['Duluth', 'seriously, whose santa is that']],
+    [['Lake Superior', "it's touching my floor. i hate it."]],
+    [['Coast Guard', 'S.S. November, you are cleared to pop that santa']],
+    [['Mom', 'is that the Hendersons\' santa?'], ['Dad', 'the Hendersons ALWAYS go too big']],
+  ],
+  night: [
+    [['Lighthouse Keeper', "getting dark. that's when the inflatables get brave."]],
+    [['Deckhand', 'stars are out'], ['Lake Superior', 'so am i']],
+    [['Cook', 'midnight snack: pasty']],
+    [['Weather Radio', 'tonight: dark, cold, and absolutely not christmas']],
+    [['Deckhand', "almost midnight. we're almost there."], ['Captain', 'one more push']],
+  ],
+  // Said when the gales of November come early (one line each).
+  earlyGale: [
+    [['Lake Superior', 'november gales, right on schedule. early, even.']],
+    [['Deckhand', 'the wind is blowing christmas back out to sea!']],
+    [['Dad', 'the gales of november came early! TAKE THAT, MALL.']],
+    [['Weather Radio', 'sudden november gale. christmas has been blown back to the canadian side.']],
+    [['Lake Ontario', 'sorry, is that wind coming my way?']],
+    [['Captain', 'the gales of november came early. november takes care of its own.']],
+    [['Duluth', 'all the inflatables just blew back out over the lake. thank you, november']],
+    [['Mom', "your father is cheering at the window. at the WIND."]],
+    [['Deckhand', 'my brother in christ, the gales came early']],
+    [['Weather Radio', 'my brother in christ, it is a gale. in NOVEMBER. as is tradition.']],
+  ],
+  // Reactions to what just happened (each has a cooldown).
+  creep: [
+    [['Duluth', 'uh. someone just put a tree up in the town square']],
+    [['Mom', 'the neighbors turned their lights on. your father is furious.']],
+    [['Duluth', 'the hallmark channel just switched over. HELP']],
+    [['Duluth', 'a radio station went all-christmas. it is NOVEMBER.']],
+    [['Dad', 'somebody on my street just put up a blow-up snowman'], ['Dad', 'i am going to have a WORD']],
+    [['Duluth', 'the coffee shop has a "holiday menu" now. we tried to stop them.']],
+  ],
+  hull: [
+    [['Deckhand', "captain, she's pretty dented"], ['Cook', 'still serving pasties though']],
+    [['Coast Guard', "S.S. November, no shame in heading in if you need to"]],
+    [['Deckhand', 'grab a pasty! they fix everything']],
+    [['Cook', 'i taped a pasty over the worst dent. it is holding.']],
+    [['Lake Superior', 'you ok there, big boat?']],
+  ],
+  horn: [
+    [['Coast Guard', 'we heard that in Thunder Bay']],
+    [['Dad', "THAT'S my kid"]],
+    [['Lake Superior', 'ow. respect.']],
+    [['Mall Santa', 'rude']],
+    [['Seagull', '...mine?']],
+    [['Lake Erie', 'i felt that from here']],
+    [['Mom', 'was that you? the windows rattled.']],
+    [['Lighthouse Keeper', 'nice salute, S.S. November']],
+  ],
+  pasty: [
+    [['Cook', "you're welcome"]],
+    [['Deckhand', 'pasty in the lake, pasty in my heart']],
+    [['Cook', 'that one had extra rutabaga']],
+    [['Deckhand', 'how is it still warm'], ['Cook', 'love']],
+    [['Lake Superior', 'fished a pasty out of me? bold.']],
+  ],
+  combo: [
+    [['Deckhand', "we're on a roll!"], ['Cook', 'like a pasty']],
+    [['Lake Superior', 'ok, that was impressive']],
+    [['Dad', 'did you see that? DID EVERYONE SEE THAT?']],
+    [['Coast Guard', 'S.S. November, that was some fine shooting']],
+    [['Lake Huron', 'wow!'], ['Lake Huron', 'did anyone else see that or just me'], ['Lake Huron', 'ok just me']],
+  ],
+  ope: [
+    [['Deckhand', 'ope!'], ['Lake Michigan', 'ope, sorry'], ['Lake Ontario', 'no, sorry!']],
+    [['Everyone', 'ope']],
+    [['Deckhand', 'ope, just gonna squeeze past ya, candy cane']],
+  ],
+};
 
 // Picked between days. Each can be taken up to `max` times.
 const UPGRADES = [
@@ -835,7 +1022,7 @@ const KINDS = {
         e.attached = true; e.targetable = false;
         e.lx = clamp(toShip(e.x, e.y).x, -ship.L / 2 + 85, ship.L / 2 - 70);
         floater(e.x, e.y - 20, '👀', '#fff');
-        say('Deckhand', 'uh, captain? something is watching us');
+        Radio.now('Deckhand', 'uh, captain? something is watching us');
       } else if (e.y > surf(e.x)) { e.swim = true; splash(e.x, e.y, 6); }
     },
     draw(e) { drawDeckElf(e.x, e.y, e.attached ? ship.ang : 0, e.swim); },
@@ -882,7 +1069,7 @@ function surfSlope(x) { return Math.atan2(surf(x + 10) - surf(x - 10), 20); }
 const BOSS_HP = 560;
 function spawnBoss() {
   G.boss = { x: W - bossGap(), y: waterY + 260, hp: BOSS_HP, rise: 0, t: 0, atk: 2, minion: 3, flying: false, hitT: 0, dying: 0, s: 1, said: {} };
-  say('Lake Superior', 'there is a SANTA standing in me');
+  Radio.now('Lake Superior', 'there is a SANTA standing in me');
 }
 
 function bossCenter(b) { return { x: b.x, y: b.y - 150 * b.s, r: 92 * b.s }; }
@@ -912,14 +1099,14 @@ function updateBoss(dt) {
     b.atk -= dt;
     if (b.atk <= 0) { lobPresents(b, 3); b.atk = 2.0; }
   } else if (p > 0.33) {
-    if (!b.said.p2) { b.said.p2 = true; Music.mall = true; say('Mall Santa', 'ho ho HOLD ON, music time'); }
+    if (!b.said.p2) { b.said.p2 = true; Music.mall = true; Radio.now('Mall Santa', 'ho ho HOLD ON, music time'); }
     b.atk -= dt; b.minion -= dt;
     if (b.atk <= 0) { spawnEnemy('jingle').x = b.x - 60; b.atk = 0.6; }
     if (b.minion <= 0) { const e = spawnEnemy('elfski'); e.x = b.x - 60; b.minion = 2.6; if (Math.random() < 0.5) lobPresents(b, 2); }
   } else {
     if (!b.said.p3) {
       b.said.p3 = true; b.flying = true; Music.mall = false;
-      say('Deckhand', "it sprang a leak! it's... flying?");
+      Radio.now('Deckhand', "it sprang a leak! it's... flying?");
       SFX.deflate();
     }
     // Leaking: flits around the sky and shrinks as it loses air.
@@ -957,7 +1144,7 @@ function damageBoss(dmg) {
     confetti(c.x, c.y, 120);
     addScore(2000, c.x, c.y);
     G.shake = 14;
-    say('Everyone', 'NOT. YET.');
+    Radio.now('Everyone', 'NOT. YET.');
   }
 }
 
@@ -986,6 +1173,7 @@ function updatePickups(dt) {
     }
     if (hitsShip(p.x, p.y, 14)) {
       p.done = true; PICKUPS[p.kind].apply(); SFX.pickup();
+      if (p.kind === 'pasty') Radio.react('pasty', 30);
       floater(p.x, p.y - 30, PICKUPS[p.kind].label, '#6fd3a6');
     }
     if (p.x < SHORE_X - 20) p.done = true;
@@ -1044,6 +1232,7 @@ function popEnemy(e, quiet) {
   if (e.dead) return;
   e.dead = true;
   G.combo++; G.comboT = 1.3;
+  if (G.combo === 15) Radio.react('combo');
   G.stats.pops++;
   addScore(e.pts, e.x, e.y - 10);
   G.horn = Math.min(1, G.horn + 0.035 * G.up.hornMul);
@@ -1062,11 +1251,13 @@ function hurtShip(dmg) {
   if (G.ope) {
     G.ope = false; G.iframes = 0.6; SFX.ope();
     floater(ship.x, ship.y - 80, 'ope!', '#9ad1ff');
+    Radio.react('ope', 15);
     return;
   }
   G.hull -= dmg * G.up.armor;
   G.iframes = 0.5; ship.flash = 1; G.shake = Math.max(G.shake, 6);
   SFX.hit();
+  if (G.hull < G.maxHull * 0.3) Radio.react('hull', 30);
 }
 
 // ----- Cannons -----
@@ -1150,6 +1341,7 @@ function blowHorn() {
   G.rings.push({ x: ship.x, y: ship.y - 30, r: 0, max: G.up.hornR, hitBoss: false });
   G.shake = 8;
   floater(ship.x, ship.y - 100, 'HOOONK', '#ffd166');
+  Radio.react('horn');
 }
 
 function updateRings(dt) {
@@ -1175,6 +1367,7 @@ function newRun() {
     dad: 2 + ((Math.random() * 3) | 0), horn: 0.3, lastDay: null,
     stats: { pops: 0, horns: 0, creepTotal: 0, start: performance.now() },
   });
+  Radio.reset();
 }
 
 /**
@@ -1190,6 +1383,7 @@ function setupDay(retry) {
     gust: 0, gustRamp: 0, gustAt: G.day >= 2 && G.day <= 7 ? d.len * rand(0.35, 0.7) : 0,
   });
   stopCoach();
+  Radio.queue = []; Radio.gap = 0;
   if (G.day === 1 && (store.get('coached', '0') !== '1' || params.has('coach'))) {
     G.coach = { seen: new Set(), current: null, t: 0, moved: 0, gap: 0 };
   }
@@ -1246,6 +1440,7 @@ function updatePlay(dt) {
     } else if (e.x < SHORE_X - 10 && e.creep > 0) {
       e.dead = true; G.creep += e.creep; G.stats.creepTotal += e.creep;
       SFX.creep(); floater(SHORE_X + 10, e.y, '🎄 +' + e.creep, '#ff8fa3');
+      if (G.creep > 55) Radio.react('creep');
     } else if (e.x < -60 || e.y > H + 40) e.dead = true;
   }
   G.enemies = G.enemies.filter(e => !e.dead);
@@ -1256,7 +1451,8 @@ function updatePlay(dt) {
   updatePickups(dt);
 
   G.radioT -= dt;
-  if (G.radioT <= 0) { const [who, line] = pick(RADIO_LINES); say(who, line); G.radioT = rand(8, 13); }
+  Radio.tick(dt);
+  if (G.radioT <= 0 && !Radio.queue.length) G.radioT = rand(7, 11) + Radio.ambient() * 3;
 
   if (G.hull <= 0) failDay('hull');
   else if (G.creep >= 100) failDay('creep');
@@ -1345,12 +1541,7 @@ function updateEarlyGale(dt) {
     floater(W / 2, waterY - 240, 'THE GALES OF NOVEMBER CAME EARLY', '#ffffff', 3.5);
     for (let i = 0; i < 2; i++) G.swells.push({ x: -100 - i * 260, w: 110, a: 26, v: -170 }); // rolling out to sea
     Audio.noise(3, { freq: 500, sweep: 1400, q: 0.6, vol: 0.25 });
-    G.radioT = 7; // let this line stay up
-    say(...pick([
-      ['Lake Superior', 'november gales, right on schedule. early, even.'],
-      ['Deckhand', 'the wind is blowing christmas back out to sea!'],
-      ['Dad', 'the gales of november came early! TAKE THAT, MALL.'],
-    ]));
+    Radio.now(...Radio.pick(RADIO.earlyGale)[0]);
   }
 }
 
@@ -1568,6 +1759,51 @@ function bossBanner() {
   SFX.deflate();
   G.shake = 10;
 }
+
+// Plays radio conversations one line at a time, without repeats.
+const Radio = {
+  queue: [], gap: 0, seen: new Set(), cool: {},
+  reset() { this.queue = []; this.gap = 0; this.seen.clear(); this.cool = {}; },
+  /** A conversation from `pool` that hasn't played this run, if any are left. */
+  pick(pool) {
+    let fresh = pool.filter(c => !this.seen.has(c));
+    if (!fresh.length) { pool.forEach(c => this.seen.delete(c)); fresh = pool; }
+    const c = pick(fresh);
+    this.seen.add(c);
+    return c;
+  },
+  play(convo) { this.queue = convo.slice(); this.gap = 0; },
+  /** Something important happened: say it now, over whatever was playing. */
+  now(who, text) { this.queue = []; this.gap = 3.5; say(who, text); G.radioT = Math.max(G.radioT, 6); },
+  /** React to an event, unless mid-conversation or reacted recently. */
+  react(key, cooldown = 25) {
+    // Don't talk over a line that's still up, or repeat a reaction too soon.
+    if (this.queue.length || this.gap > 0 || (this.cool[key] || 0) > G.t) return;
+    this.cool[key] = G.t + cooldown;
+    this.play(this.pick(RADIO[key]));
+  },
+  tick(dt) {
+    this.gap -= dt;
+    if (!this.queue.length || this.gap > 0) return;
+    const [who, text] = this.queue.shift();
+    say(who, text);
+    this.gap = 2.6 + text.length * 0.025; // give longer lines time to be read
+  },
+  /** Every so often, play something that fits the moment. */
+  ambient() {
+    const d = DAYS[G.day];
+    let pool = RADIO.general.slice();
+    for (const kind of ['santa', 'jingle', 'reindeer', 'elfski', 'deckelf', 'latte']) {
+      if (d.mix[kind]) pool = pool.concat(RADIO[kind], RADIO[kind]); // weight what's on screen
+    }
+    if (G.day === 8) pool = pool.concat(RADIO.gale, RADIO.gale);
+    if (d.boss) pool = pool.concat(RADIO.boss, RADIO.boss);
+    if (nightness() > 0.3) pool = pool.concat(RADIO.night, RADIO.night);
+    const c = this.pick(pool);
+    this.play(c);
+    return c.length;
+  },
+};
 
 let radioTimer = 0;
 function say(who, text) {
