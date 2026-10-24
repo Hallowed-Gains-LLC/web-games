@@ -7,6 +7,7 @@ anyone with the link can play.
 
 | Folder | Game | Live at |
 | --- | --- | --- |
+| [`fitz-season/`](fitz-season/) | Fitz Season: It Ain't Christmas Yet, a six-minute game about a boat holding back Christmas on Lake Superior | [/games/fitz-season/](https://hallowedgains.com/games/fitz-season/) |
 | [`first-trinity/`](first-trinity/) | First Trinity Oktoberfest, a pixel-art stroll around the church's Oktoberfest | [/games/first-trinity/](https://hallowedgains.com/games/first-trinity/) |
 | [`lily/`](lily/) | Lily's games: Unicorn Quest and Walk Me Home | [/games/lily/](https://hallowedgains.com/games/lily/) |
 

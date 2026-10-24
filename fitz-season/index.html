@@ -1,0 +1,1862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Fitz Season: It Ain't Christmas Yet</title>
+<meta name="description" content="A six-minute game about a boat. Captain a Lake Superior freighter and hold back Christmas until November is over.">
+<meta name="theme-color" content="#1d2733">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9A%A2%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+<style>
+  /* November palette: slate sky, cold lake, flannel red. Christmas is the
+     garish stuff that doesn't belong yet. */
+  :root {
+    --slate: #1d2733;
+    --slate-2: #2b3846;
+    --ink: #f3efe6;
+    --muted: #b9c2c9;
+    --flannel: #b3261e;
+    --flannel-dark: #5c1410;
+    --gold: #e8b64c;
+    --mint: #6fd3a6;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--slate); }
+  body {
+    font-family: 'Nunito', system-ui, sans-serif; font-weight: 600;
+    color: var(--ink); user-select: none; -webkit-user-select: none;
+  }
+  canvas { display: block; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    position: fixed; top: max(10px, env(safe-area-inset-top)); left: 12px; right: 12px;
+    display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center;
+    pointer-events: none; z-index: 5;
+  }
+  #hud[hidden], #controls[hidden] { display: none; }
+  .pill {
+    background: rgba(13, 20, 28, .72); border: 2px solid rgba(255,255,255,.14);
+    border-radius: 999px; padding: 4px 12px; font-family: 'Bungee', sans-serif;
+    font-size: 15px; letter-spacing: .5px; white-space: nowrap; position: relative; overflow: hidden;
+  }
+  #datePill i { /* day progress, filled behind the date text */
+    position: absolute; inset: 0 auto 0 0; width: var(--p, 0%);
+    background: rgba(232, 182, 76, .28); z-index: -1;
+  }
+  .meter { display: flex; align-items: center; gap: 6px; }
+  .meter .label { font-family: 'Bungee', sans-serif; font-size: 11px; color: var(--muted); }
+  .bar {
+    width: clamp(70px, 14vw, 150px); height: 13px; border-radius: 7px;
+    background: rgba(13, 20, 28, .72); border: 2px solid rgba(255,255,255,.16); overflow: hidden;
+  }
+  .bar i { display: block; height: 100%; width: 100%; background: #d9534f; transition: width .15s; }
+  #hullBar { background: linear-gradient(#f07167, #b3261e); }
+  /* The creep meter is a candy cane, obviously. */
+  #creepBar { background: repeating-linear-gradient(135deg, #e63946 0 8px, #fff 8px 16px); }
+  #bossMeter[hidden] { display: none; }
+  #bossBar { background: linear-gradient(#ff8fa3, #c9184a); }
+  #scorePill { margin-left: auto; }
+  @media (max-width: 720px) { #dadPill { display: none; } }
+  #dadPill { font-size: 11px; font-family: 'Nunito', sans-serif; font-weight: 800; color: var(--muted); }
+
+  /* ---------- Touch controls ---------- */
+  #controls { position: fixed; inset: 0; pointer-events: none; z-index: 6; }
+  #hornBtn {
+    position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom));
+    width: 92px; height: 92px; border-radius: 50%; pointer-events: auto;
+    border: 3px solid rgba(255,255,255,.25); font-family: 'Bungee', sans-serif; font-size: 14px;
+    /* --charge (0..1) fills the ring as the horn charges */
+    background:
+      radial-gradient(circle at center, rgba(13,20,28,.9) 58%, transparent 59%),
+      conic-gradient(var(--gold) calc(var(--charge, 0) * 360deg), rgba(255,255,255,.12) 0);
+    box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  }
+  #hornBtn.ready { animation: pulse 0.9s ease-in-out infinite; color: var(--gold); }
+  @keyframes pulse { 50% { transform: scale(1.08); } }
+  #pauseBtn {
+    position: absolute; right: max(12px, env(safe-area-inset-right)); top: 58px; pointer-events: auto;
+    width: 40px; height: 40px; border-radius: 10px; font-family: 'Bungee', sans-serif;
+    background: rgba(13,20,28,.72); border: 2px solid rgba(255,255,255,.18);
+  }
+  #radio {
+    position: fixed; left: 12px; bottom: max(14px, env(safe-area-inset-bottom)); z-index: 6;
+    max-width: min(460px, calc(100vw - 140px)); padding: 8px 12px; border-radius: 12px;
+    background: rgba(13,20,28,.8); border-left: 4px solid var(--gold);
+    font-size: 14px; opacity: 0; transform: translateY(8px); transition: opacity .3s, transform .3s;
+    pointer-events: none;
+  }
+  #radio.show { opacity: 1; transform: none; }
+  #radio b { font-family: 'Bungee', sans-serif; font-weight: 400; font-size: 12px; color: var(--gold); margin-right: 6px; }
+
+  /* ---------- Cards (title, day briefings, results) ---------- */
+  #overlay {
+    position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
+    padding: 16px; background: rgba(10, 15, 22, .45); overflow-y: auto;
+  }
+  #overlay[hidden] { display: none; }
+  .card {
+    width: min(560px, 100%); margin: auto; padding: 22px 22px 18px; border-radius: 18px;
+    background: var(--slate-2);
+    /* flannel trim */
+    border: 6px solid transparent;
+    background-image:
+      linear-gradient(var(--slate-2), var(--slate-2)),
+      repeating-linear-gradient(0deg, rgba(0,0,0,.35) 0 4px, transparent 4px 12px),
+      repeating-linear-gradient(90deg, var(--flannel) 0 12px, var(--flannel-dark) 12px 24px);
+    background-origin: border-box; background-clip: padding-box, border-box, border-box;
+    box-shadow: 0 18px 50px rgba(0,0,0,.5); text-align: center;
+  }
+  .card h1, .card h2, .card h3 { font-family: 'Bungee', sans-serif; font-weight: 400; margin: 0; line-height: 1.1; }
+  .card h1 { font-size: clamp(38px, 9vw, 58px); color: var(--ink); text-shadow: 0 4px 0 var(--flannel-dark); }
+  .card h2 { font-size: clamp(24px, 6vw, 34px); }
+  .card h3 { font-size: 15px; color: var(--gold); margin-top: 14px; }
+  .card p { margin: 8px 0; line-height: 1.45; }
+  .sub { font-family: 'Bungee', sans-serif; color: var(--gold); font-size: clamp(16px, 4vw, 20px); margin-top: 6px !important; }
+  .tag { color: var(--muted); font-style: italic; }
+  .date { font-family: 'Bungee', sans-serif; color: var(--gold); font-size: 14px; letter-spacing: 1px; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .btn {
+    display: inline-block; margin: 6px 4px; padding: 11px 20px; border-radius: 12px; border: 0;
+    background: var(--flannel); font-family: 'Bungee', sans-serif; font-size: 17px; color: #fff;
+    box-shadow: 0 4px 0 var(--flannel-dark); text-decoration: none;
+  }
+  .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--flannel-dark); }
+  .btn.ghost { background: rgba(255,255,255,.1); box-shadow: none; font-size: 14px; }
+  .link { background: none; border: 0; color: var(--muted); text-decoration: underline; padding: 4px; }
+  a { color: var(--muted); }
+  .threat {
+    display: flex; gap: 12px; align-items: center; text-align: left; margin: 12px 0;
+    background: rgba(0,0,0,.22); border-radius: 12px; padding: 10px;
+  }
+  .threat img { width: 64px; height: 64px; flex-shrink: 0; }
+  .threat b { font-family: 'Bungee', sans-serif; font-weight: 400; color: var(--mint); }
+  .chat { text-align: left; background: rgba(0,0,0,.22); border-radius: 12px; padding: 8px 12px; margin: 10px 0; font-size: 14px; }
+  .chat div { margin: 3px 0; }
+  .chat b { font-family: 'Bungee', sans-serif; font-weight: 400; font-size: 11px; color: var(--gold); margin-right: 6px; }
+  .fact { font-size: 14px; color: var(--muted); }
+  .fact::before { content: '⚓ '; }
+  .upgrades { display: grid; gap: 8px; margin-top: 8px; }
+  .upgrade {
+    text-align: left; padding: 10px 12px; border-radius: 12px; border: 2px solid rgba(255,255,255,.14);
+    background: rgba(0,0,0,.25);
+  }
+  .upgrade:hover, .upgrade:focus-visible { border-color: var(--gold); outline: none; }
+  .upgrade b { display: block; font-family: 'Bungee', sans-serif; font-weight: 400; color: var(--gold); }
+  .upgrade span { font-size: 14px; color: var(--muted); }
+  .stats { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; text-align: left; max-width: 300px; margin: 12px auto; }
+  .stats span:nth-child(even) { font-family: 'Bungee', sans-serif; text-align: right; }
+  .how { text-align: left; }
+  .how li { margin: 6px 0; }
+  .memorial { background: #11161d; }
+  .memorial p { font-size: 16px; }
+  .rotate { font-size: 13px; color: var(--gold); }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud" hidden>
+  <div class="pill" id="datePill"><i></i><span id="dateText">NOV 1</span></div>
+  <div class="meter"><span class="label">HULL</span><div class="bar"><i id="hullBar"></i></div></div>
+  <div class="meter"><span class="label">CHRISTMAS CREEP</span><div class="bar"><i id="creepBar" style="width:0"></i></div></div>
+  <div class="meter" id="bossMeter" hidden><span class="label">INFLATABLE</span><div class="bar"><i id="bossBar"></i></div></div>
+  <div class="pill" id="scorePill">0</div>
+  <div class="pill" id="dadPill">📻 Dad played the song 0×</div>
+</div>
+
+<div id="controls" hidden>
+  <button id="pauseBtn" aria-label="Pause">II</button>
+  <button id="hornBtn" aria-label="Blow the horn">HORN</button>
+</div>
+<div id="radio"></div>
+
+<div id="overlay"><div class="card" id="card"></div></div>
+
+<script>
+'use strict';
+/* ==========================================================================
+   FITZ SEASON: It Ain't Christmas Yet
+   --------------------------------------------------------------------------
+   A six-minute game about a boat, riffing on the internet's yearly
+   "Fitz season" memes: the stretch between Halloween and November 10 when
+   everyone remembers the Edmund Fitzgerald (and Gordon Lightfoot's song)
+   and Christmas is NOT allowed to start early.
+
+   You captain the S.S. November, a fictional Lake Superior freighter. Your
+   taconite cannons fire on their own; you steer, ride the waves, and blow
+   the horn. Hold back Christmas from November 1 to 9, then beat the boss.
+
+   Respect rules this game follows on purpose:
+     - The real ship, its crew and the wreck are never shown or joked about.
+       Nobody dies: losing means heading back to port, or Christmas winning.
+     - No song lyrics or melody. All music is original, plus "Jingle Bells",
+       which is public domain.
+     - November 10 gets a short, sincere tribute instead of a level.
+
+   Layout of this file:
+     1. Setup: canvas, saves, helpers
+     2. Content: days, enemies, upgrades, writing
+     3. Audio: tiny Web Audio synth + music
+     4. World: waves, ship, enemies, pickups, particles
+     5. Game flow: days, cards, failing, winning
+     6. Drawing
+     7. Input and main loop
+   ========================================================================== */
+
+/* =====================  1. SETUP  ===================== */
+
+const $ = id => document.getElementById(id);
+const canvas = $('game');
+const mainCtx = canvas.getContext('2d');
+let ctx = mainCtx; // swapped briefly to draw enemy previews for the cards
+
+// Saves are prefixed with fitz_ because every game on the site shares one
+// localStorage (see the repo README).
+const store = {
+  get(key, fallback) {
+    try { const v = localStorage.getItem('fitz_' + key); return v === null ? fallback : v; }
+    catch (e) { return fallback; }
+  },
+  set(key, value) { try { localStorage.setItem('fitz_' + key, String(value)); } catch (e) { /* private mode */ } },
+};
+
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const pick = arr => arr[(Math.random() * arr.length) | 0];
+const lerp = (a, b, t) => a + (b - a) * t;
+
+/** Pick a key from {key: weight}. */
+function weighted(weights) {
+  let total = 0;
+  for (const k in weights) total += weights[k];
+  let r = Math.random() * total;
+  for (const k in weights) { r -= weights[k]; if (r <= 0) return k; }
+  return Object.keys(weights)[0];
+}
+
+// The world is measured in "units": about 900 x 560 of them fill the screen
+// at scale 1, and wider or taller screens just see more sky and lake.
+let W = 960, H = 540, scale = 1, dpr = 1, waterY = 400;
+const SHORE_X = 70; // the town on the left; Christmas that gets past here counts as creep
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = window.innerWidth, ch = window.innerHeight;
+  scale = Math.max(0.4, Math.min(cw / 900, ch / 560));
+  W = cw / scale;
+  H = ch / scale;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  waterY = H - clamp(H * 0.3, 140, 200);
+}
+window.addEventListener('resize', resize);
+resize();
+
+/** Highest point enemies spawn at, kept clear of the HUD. */
+const skyTop = () => Math.max(waterY - 400, 96 / scale);
+
+const params = new URLSearchParams(location.search);
+// No screen shake for people who've asked their device for less motion.
+const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const DEBUG = params.has('debug');
+// ?debug&speed=N runs the simulation N times faster (for balance testing).
+const SPEED = DEBUG ? clamp(parseInt(params.get('speed'), 10) || 1, 1, 20) : 1;
+
+/* =====================  2. CONTENT  ===================== */
+
+// One entry per day of November. `mix` weights which decorations spawn;
+// `rate` is spawns per second; `len` is seconds until midnight.
+const ALL = { candy: 1, santa: 0.3, jingle: 0.4, reindeer: 0.25, elfski: 0.45, deckelf: 0.3, latte: 0.35 };
+const DAYS = [
+  null,
+  { title: 'The Day After Halloween', blurb: "The jack-o'-lanterns aren't even cold yet, and the candy canes are already here.",
+    intro: 'candy', mix: { candy: 1 }, rate: 1.25, len: 30, gale: 0.15 },
+  { title: 'The Inflatables', blurb: "Somebody's twelve-foot inflatable Santa broke loose. Then all of them did.",
+    intro: 'santa', mix: { candy: 1, santa: 0.4 }, rate: 1.4, len: 32, gale: 0.25 },
+  { title: 'The Playlist', blurb: 'The mall turned on the music. It is November third.',
+    intro: 'jingle', mix: { candy: 1, santa: 0.3, jingle: 0.6 }, rate: 1.6, len: 34, gale: 0.3 },
+  { title: 'Air Support', blurb: 'Reindeer spotted over Duluth. They brought presents. The presents are not for you.',
+    intro: 'reindeer', mix: { candy: 1, santa: 0.3, jingle: 0.45, reindeer: 0.35 }, rate: 1.75, len: 35, gale: 0.35 },
+  { title: 'Elves on Watercraft', blurb: 'Turns out the North Pole has jet skis. Nobody is happy about this.',
+    intro: 'elfski', mix: { candy: 0.9, santa: 0.3, jingle: 0.4, reindeer: 0.25, elfski: 0.55 }, rate: 1.9, len: 36, gale: 0.4 },
+  { title: 'Surveillance Season', blurb: "Something just landed on the deck. It's watching. It's always watching.",
+    intro: 'deckelf', mix: { candy: 0.9, santa: 0.3, jingle: 0.4, reindeer: 0.25, elfski: 0.45, deckelf: 0.4 }, rate: 2.0, len: 37, gale: 0.45 },
+  { title: 'Seasonal Beverages', blurb: 'Peppermint everything. Already. On the seventh.',
+    intro: 'latte', mix: { ...ALL, latte: 0.45 }, rate: 2.15, len: 38, gale: 0.5 },
+  { title: 'Gale Warning', blurb: "Lake Superior is in a mood. It's not personal. It's November.",
+    intro: 'gale', mix: ALL, rate: 2.3, len: 40, gale: 1 },
+  { title: 'The Great Inflatable', blurb: "Somebody's forty-foot lawn Santa is standing in the lake. This is the last stand.",
+    intro: 'boss', mix: { candy: 1, jingle: 0.25 }, rate: 0.8, len: 0, gale: 0.6, boss: true },
+];
+const LAST_DAY = DAYS.length - 1;
+
+// Shown on each day's briefing card when that threat first appears.
+const THREATS = {
+  candy: ['Candy Canes', 'Fast, pointy, minty. Pop them before they reach shore.'],
+  santa: ['Inflatable Santas', 'Tanky, floaty, deeply unsettling. They make a great pffffft.'],
+  jingle: ['Mall Music', 'Homes in on your ears. Every one you pop plays a note.'],
+  reindeer: ['Reindeer', 'Fly over and drop presents on your deck. Shoot the presents too.'],
+  elfski: ['Jet-Ski Elves', 'Ride the waves and ram the boat. Very rude.'],
+  deckelf: ['Elf on the Deck', 'Lands on your boat and stares. Your cannons get shy. Blow the horn to shoo it.'],
+  latte: ['Seasonal Peppermint Beverage', 'Pop one and it splits into three peppermints.'],
+  gale: ['Gale Warning', 'Huge waves, and wind shoving everything toward shore. Ride the swells.'],
+  boss: ['The Great Inflatable', 'Forty feet of nylon and holiday spirit. Pop it.'],
+};
+
+// Great Lakes group chat, one exchange per day. (The lakes have opinions.)
+const LAKE_CHATS = [
+  null,
+  [['Lake Superior', "it's 36 degrees btw"], ['Lake Erie', 'im warm!! :)'], ['Lake Superior', 'nobody asked, erie']],
+  [['Lake Huron', "hi, i'm also here"], ['Lake Michigan', 'did someone say something?']],
+  [['Lake Michigan', "i'm basically an ocean"], ['Lake Superior', 'i could hold you, huron, erie and ontario and still have room. for three more eries.']],
+  [['Lake Ontario', 'sorry, are we doing the christmas thing yet?'], ['Everyone', 'NO.']],
+  [['Lake Erie', 'remember when that river caught fire'], ['Lake Superior', 'erie we have talked about this']],
+  [['Lake Huron', 'fun fact i have 30,000 islands'], ['(nobody)', '...'], ['Lake Huron', 'ok']],
+  [['Lake Superior', "i make my own weather. today's forecast: no."], ['Lake Ontario', 'sorry to hear that!']],
+  [['Lake Superior', "not personal. it's just november."], ['Lake Erie', "she's like this every year"]],
+  [['Lake Superior', 'there is a SANTA standing in me'], ['Lake Michigan', 'pop it pop it pop it']],
+];
+
+// Real, light facts about the lake and the boats. (Nothing about the wreck.)
+const FACTS = [
+  null,
+  'Lake Superior holds about 10% of all the fresh surface water on Earth.',
+  'Lake Superior is up to 1,333 feet deep. Your boat is 729 feet long. Do the math and then stop doing the math.',
+  "Taconite pellets are marble-sized balls of iron ore. Lake freighters haul millions of them. Yours shoots them.",
+  'Lake freighters greet each other with their horns: one long blast and two short ones is the master salute.',
+  "The biggest lake freighters today are over 1,000 feet long. People call them thousand-footers.",
+  'The Soo Locks lift ships about 21 feet between Lake Superior and Lake Huron.',
+  "They say Lake Superior's shoreline, stretched out straight, would reach from Duluth to the Bahamas.",
+  "Great Lakes sailors have long called November's storms the gales of November. Superior makes its own weather.",
+  'Lake Superior has fully frozen over only a handful of times on record. It is very committed to being a lake.',
+];
+
+// Dad is on the CB radio. Dad has been playing the song since October 31st.
+const DAD_LINES = [
+  "Played the song again. That's {n} times today.",
+  'Your mother says no boat song at dinner. I am playing it at dinner.',
+  'Back in my day nobody decorated before Thanksgiving. Uphill. In the snow.',
+  "I'm not crying. The lake's just extra wet today.",
+  'Proud of you, kiddo. Now get off the radio, my song is on.',
+  'Got the flannel. Got the coffee. Got the song on repeat. Most wonderful time of the year.',
+  'If you see a Christmas tree before the tenth, you have my permission to honk.',
+  "Played it {n} times. The dog left.",
+  'Six-plus minutes of perfect storytelling. They do not make them like that anymore.',
+];
+
+// Short lines the radio crackles out during play.
+const RADIO_LINES = [
+  ['Lake Superior', 'brr'], ['Lake Erie', 'can i play?'], ['Lake Ontario', 'sorry!'], ['Lake Huron', 'hello? anyone?'],
+  ['Lake Michigan', 'chicago says hi'], ['Lake Superior', "this is fine. i'm fine."], ['Cook', 'pasties are up!'],
+  ['Deckhand', 'one of the elves waved at me'], ['Deckhand', 'is it bad that i kinda like the candy canes'],
+  ['Captain', 'yes.'], ['Dad', "that's {n}."], ['Coast Guard', 'S.S. November, please stop honking at the mall'],
+  ['Lake Erie', 'can i be the boss next year'], ['Lake Superior', 'no'], ['Mall Santa', 'ho ho h-'], ['Everyone', 'NOT YET.'],
+];
+
+// Picked between days. Each can be taken up to `max` times.
+const UPGRADES = [
+  { id: 'twin', name: 'Twin Taconite Cannons', desc: 'Another cannon on deck. Twice the taconite.', max: 2,
+    apply() { G.up.cannons++; } },
+  { id: 'pellets', name: 'Bigger Pellets', desc: 'Every pellet hits 50% harder.', max: 3, apply() { G.up.dmg *= 1.5; } },
+  { id: 'thermos', name: "Dad's Good Thermos", desc: "Fire 25% faster. It's the coffee.", max: 3, apply() { G.up.rate *= 1.25; } },
+  { id: 'ballast', name: 'Extra Ballast', desc: '+25 max hull, and patch her up all the way.', max: 3,
+    apply() { G.maxHull += 25; G.hull = G.maxHull; } },
+  { id: 'horn', name: 'Louder Horn', desc: 'Horn charges 35% faster and reaches farther.', max: 3,
+    apply() { G.up.hornMul *= 1.35; G.up.hornR += 90; } },
+  { id: 'flannel', name: 'Flannel Hull Lining', desc: 'Take 20% less damage. Cozy.', max: 3, apply() { G.up.armor *= 0.8; } },
+  { id: 'pasties', name: 'Pasty Pantry', desc: 'Popped decorations drop goodies more often.', max: 2, apply() { G.up.drop += 0.05; } },
+  { id: 'thruster', name: 'Bow Thruster', desc: 'Steer 30% faster. Still a very big boat.', max: 2, apply() { G.up.speed *= 1.3; } },
+];
+
+/* =====================  3. AUDIO  ===================== */
+// Everything is synthesized, so there are no files to load.
+
+const Audio = {
+  ac: null, master: null, music: null, sfx: null, noiseBuf: null,
+  muted: store.get('muted', '0') === '1',
+
+  /** Browsers only allow audio after a tap, so this runs on the first one. */
+  init() {
+    if (this.ac) { if (this.ac.state === 'suspended') this.ac.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    this.ac = new AC();
+    this.master = this.ac.createGain();
+    this.master.gain.value = this.muted ? 0 : 0.8;
+    this.master.connect(this.ac.destination);
+    this.music = this.ac.createGain(); this.music.gain.value = 0.2; this.music.connect(this.master);
+    this.sfx = this.ac.createGain(); this.sfx.gain.value = 0.55; this.sfx.connect(this.master);
+    const len = this.ac.sampleRate * 1.5;
+    this.noiseBuf = this.ac.createBuffer(1, len, this.ac.sampleRate);
+    const d = this.noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  },
+  setMuted(m) {
+    this.muted = m;
+    store.set('muted', m ? '1' : '0');
+    if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.8, this.ac.currentTime, 0.05);
+  },
+  now() { return this.ac ? this.ac.currentTime : 0; },
+
+  /** One synth note. `slide` bends the pitch to that frequency. */
+  tone(freq, dur, o = {}) {
+    if (!this.ac) return;
+    const t = (o.when || this.now());
+    const osc = this.ac.createOscillator();
+    const g = this.ac.createGain();
+    osc.type = o.type || 'square';
+    osc.frequency.setValueAtTime(freq, t);
+    if (o.slide) osc.frequency.exponentialRampToValueAtTime(Math.max(20, o.slide), t + dur);
+    if (o.detune) osc.detune.value = o.detune;
+    const vol = o.vol == null ? 0.25 : o.vol;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + (o.attack || 0.005));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    let node = osc;
+    if (o.lowpass) {
+      const f = this.ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = o.lowpass;
+      osc.connect(f); node = f;
+    }
+    node.connect(g);
+    g.connect(o.dest || this.sfx);
+    osc.start(t); osc.stop(t + dur + 0.05);
+  },
+  /** A burst of filtered noise: splashes, pops, hisses. */
+  noise(dur, o = {}) {
+    if (!this.ac) return;
+    const t = (o.when || this.now());
+    const src = this.ac.createBufferSource(); src.buffer = this.noiseBuf;
+    const f = this.ac.createBiquadFilter(); f.type = o.filter || 'bandpass';
+    f.frequency.setValueAtTime(o.freq || 1000, t);
+    if (o.sweep) f.frequency.exponentialRampToValueAtTime(o.sweep, t + dur);
+    f.Q.value = o.q || 1;
+    const g = this.ac.createGain();
+    g.gain.setValueAtTime(o.vol == null ? 0.3 : o.vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(o.dest || this.sfx);
+    src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.05);
+  },
+};
+
+// ----- Sound effects -----
+const SFX = {
+  fire() {
+    // Up to three cannons fire many times a second; cap the clicks.
+    const t = Audio.now();
+    if (t - (this.lastFire || 0) < 0.07) return;
+    this.lastFire = t;
+    Audio.noise(0.05, { freq: 2600, q: 0.7, vol: 0.06 });
+  },
+  pop() {
+    const f = rand(520, 900);
+    Audio.tone(f, 0.09, { type: 'sine', vol: 0.3, slide: f * 0.4 });
+    Audio.noise(0.06, { freq: 3000, vol: 0.08 });
+  },
+  deflate() {
+    Audio.tone(340, 0.8, { type: 'sawtooth', vol: 0.12, slide: 70, lowpass: 1400 });
+    Audio.noise(0.8, { freq: 4000, sweep: 600, vol: 0.12 });
+  },
+  hit() {
+    Audio.noise(0.25, { filter: 'lowpass', freq: 500, vol: 0.5 });
+    Audio.tone(110, 0.25, { type: 'square', vol: 0.15, slide: 50, lowpass: 600 });
+  },
+  splash() { Audio.noise(0.35, { freq: 900, sweep: 300, vol: 0.18 }); },
+  pickup() { [660, 880, 1320].forEach((f, i) => Audio.tone(f, 0.12, { type: 'triangle', vol: 0.2, when: Audio.now() + i * 0.06 })); },
+  ope() { Audio.tone(500, 0.12, { type: 'triangle', vol: 0.25, slide: 700 }); },
+  creep() { [523, 494, 440].forEach((f, i) => Audio.tone(f, 0.14, { type: 'triangle', vol: 0.15, when: Audio.now() + i * 0.08 })); },
+  /** The master salute: one long blast, two short. */
+  horn() {
+    const t = Audio.now();
+    [[0, 1.0], [1.15, 0.28], [1.55, 0.28]].forEach(([at, len]) => {
+      [87, 131, 174].forEach((f, i) => Audio.tone(f, len, {
+        type: 'sawtooth', vol: i ? 0.11 : 0.17, when: t + at, attack: 0.06, lowpass: 700, detune: i * 4,
+      }));
+    });
+  },
+  chime() { [784, 659, 523].forEach((f, i) => Audio.tone(f, 0.6, { type: 'sine', vol: 0.2, when: Audio.now() + i * 0.25 })); },
+  /** A single soft church bell, for the November 10 card. */
+  bell() {
+    const t = Audio.now();
+    [[196, 0.22], [392, 0.1], [587, 0.06], [784, 0.04]].forEach(([f, v]) =>
+      Audio.tone(f, 5, { type: 'sine', vol: v, when: t, attack: 0.01 }));
+  },
+};
+
+// "Jingle Bells" (1857, public domain). Each Mall Music note you pop plays
+// the next note, so popping enough of them plays the tune at you.
+const JINGLE = [64, 64, 64, 64, 64, 64, 64, 67, 60, 62, 64, 65, 65, 65, 65, 65, 64, 64, 64, 64, 62, 62, 64, 62, 67];
+let jingleIdx = 0;
+const midi = m => 440 * Math.pow(2, (m - 69) / 12);
+function playJingleNote() {
+  const f = midi(JINGLE[jingleIdx++ % JINGLE.length]);
+  Audio.tone(f, 0.3, { type: 'triangle', vol: 0.28 });
+  Audio.tone(f * 2, 0.2, { type: 'sine', vol: 0.08 });
+  Audio.noise(0.12, { freq: 7000, q: 2, vol: 0.06 }); // sleigh-bell shimmer
+}
+
+// ----- Music: an original sea-shanty-ish jig in D dorian, 6/8 -----
+// Each bar is six eighth notes: [midi note, length in eighths].
+const SHANTY = [
+  [[62, 2], [65, 1], [69, 2], [69, 1]], [[67, 1], [65, 1], [64, 1], [62, 3]],
+  [[60, 2], [64, 1], [67, 2], [67, 1]], [[65, 1], [64, 1], [62, 1], [60, 3]],
+  [[62, 2], [65, 1], [69, 2], [74, 1]], [[72, 1], [69, 1], [67, 1], [65, 2], [64, 1]],
+  [[62, 1], [65, 1], [64, 1], [60, 2], [64, 1]], [[62, 6]],
+  [[69, 2], [72, 1], [74, 2], [72, 1]], [[69, 1], [67, 1], [65, 1], [67, 3]],
+  [[69, 2], [72, 1], [74, 2], [76, 1]], [[74, 1], [72, 1], [69, 1], [72, 3]],
+  [[74, 2], [72, 1], [69, 2], [67, 1]], [[65, 1], [67, 1], [69, 1], [67, 2], [65, 1]],
+  [[64, 1], [62, 1], [64, 1], [65, 2], [64, 1]], [[62, 6]],
+];
+// Two bass notes per bar (each three eighths long).
+const BASS = [
+  [50, 45], [43, 50], [48, 43], [41, 48], [50, 45], [41, 48], [50, 48], [50, 50],
+  [41, 48], [48, 43], [41, 48], [48, 43], [50, 45], [41, 48], [48, 45], [50, 50],
+];
+// The mall speaker's version of Jingle Bells, for the boss's middle phase.
+const MALL = [[64, 1], [64, 1], [64, 2], [64, 1], [64, 1], [64, 2], [64, 1], [67, 1], [60, 1.5], [62, 0.5], [64, 4]];
+
+const Music = {
+  on: false, bar: 0, next: 0, mall: false, mallNext: 0, mallIdx: 0, eighth: 0.19,
+  start() { if (!Audio.ac) return; this.on = true; this.bar = 0; this.next = Audio.now() + 0.1; },
+  stop() { this.on = false; this.mall = false; },
+  /** Called every frame; schedules notes a little ahead so timing is steady. */
+  tick() {
+    if (!this.on || !Audio.ac) return;
+    const ahead = Audio.now() + 0.2;
+    while (this.next < ahead) {
+      const b = this.bar % SHANTY.length;
+      let t = this.next, e = this.eighth;
+      for (const [note, len] of SHANTY[b]) {
+        Audio.tone(midi(note), len * e * 0.95, { type: 'square', vol: 0.16, when: t, dest: Audio.music, lowpass: 2400 });
+        t += len * e;
+      }
+      BASS[b].forEach((n, i) => Audio.tone(midi(n), 3 * e * 0.9, { type: 'triangle', vol: 0.32, when: this.next + i * 3 * e, dest: Audio.music }));
+      for (let i = 0; i < 6; i++) { // a stompy little beat
+        Audio.noise(0.05, { freq: i % 3 === 0 ? 180 : 5000, filter: i % 3 === 0 ? 'lowpass' : 'highpass',
+          vol: i % 3 === 0 ? 0.35 : 0.05, when: this.next + i * e, dest: Audio.music });
+      }
+      this.next += 6 * e;
+      this.bar++;
+    }
+    if (this.mall) {
+      if (this.mallNext < Audio.now()) this.mallNext = Audio.now() + 0.05;
+      while (this.mallNext < ahead) {
+        const [n, len] = MALL[this.mallIdx++ % MALL.length];
+        // Tinny, like a mall ceiling speaker.
+        Audio.tone(midi(n + 12), len * 0.2 * 0.9, { type: 'sawtooth', vol: 0.07, when: this.mallNext, dest: Audio.music, lowpass: 1800 });
+        this.mallNext += len * 0.2;
+      }
+    }
+  },
+};
+
+/* =====================  4. WORLD  ===================== */
+
+// Everything about the current run lives here.
+const G = {
+  state: 'title',
+  day: 1, t: 0, dayT: 0, score: 0, dayStartScore: 0,
+  hull: 100, maxHull: 100, creep: 0, horn: 0.3, combo: 0, comboT: 0,
+  enemies: [], pellets: [], parts: [], pickups: [], floaters: [], swells: [], rings: [], flakes: [],
+  spawnAcc: 0, swellT: 2, calm: 0, shake: 0, gale: 0.15, wind: 0,
+  boss: null, midnight: false, midnightT: 0,
+  up: null, picked: {}, thermosT: 0, ope: false, iframes: 0,
+  dad: 3, radioT: 6, stats: null, lastDay: null,
+};
+
+function freshUpgrades() {
+  return { cannons: 1, dmg: 1, rate: 1, hornMul: 1, hornR: 380, armor: 1, drop: 0, speed: 1 };
+}
+
+const ship = { x: 320, y: 400, vx: 0, ang: 0, L: 300, flash: 0, fireT: [0, 0, 0], aims: [0, 0, 0] };
+
+// ----- Waves -----
+// The surface is a few rolling sine waves plus "swells": big humps that
+// travel toward shore. The horn calms everything for a moment.
+
+/** Water surface height (screen y) at world x. */
+function surf(x) {
+  const g = G.gale, quiet = 1 - G.calm * 0.85, t = G.t;
+  let y = waterY
+    + Math.sin(x * 0.011 + t * 1.25) * (3 + 6 * g) * quiet
+    + Math.sin(x * 0.026 - t * 2.0) * (1.5 + 3 * g) * quiet
+    + Math.sin(x * 0.0045 + t * 0.55) * (2 + 6 * g) * quiet;
+  for (const s of G.swells) {
+    const d = (x - s.x) / s.w;
+    if (d > -4 && d < 4) y -= s.a * Math.exp(-d * d) * quiet;
+  }
+  return y;
+}
+
+function updateWaves(dt) {
+  G.calm = Math.max(0, G.calm - dt / 3);
+  G.swellT -= dt;
+  if (G.swellT <= 0) {
+    const g = G.gale;
+    G.swells.push({ x: W + 260, w: rand(70, 120), a: rand(8, 16) + g * rand(14, 30), v: rand(110, 150) + g * 50 });
+    G.swellT = rand(3.5, 6.5) - g * 2.2;
+  }
+  for (const s of G.swells) s.x -= s.v * dt;
+  G.swells = G.swells.filter(s => s.x > -400);
+}
+
+// ----- Ship -----
+const keys = { left: false, right: false };
+const pointer = { active: false, x: 0 };
+
+function shipBounds() {
+  const min = SHORE_X + ship.L / 2 + 10;
+  let max = W - 24 - ship.L / 2;
+  if (G.boss && !G.boss.flying) max = Math.min(max, G.boss.x - 150 - ship.L / 2);
+  return [min, Math.max(min, max)];
+}
+
+function updateShip(dt) {
+  let input = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+  if (pointer.active) input = clamp((pointer.x - ship.x) / 45, -1, 1);
+  const speed = 240 * G.up.speed;
+  ship.vx += input * speed * 4 * dt;
+  ship.vx *= Math.pow(0.12, dt); // big boat, lots of drag
+  ship.vx = clamp(ship.vx, -speed, speed);
+  ship.x += ship.vx * dt;
+  const [min, max] = shipBounds();
+  if (ship.x < min) { ship.x = min; ship.vx = 0; }
+  if (ship.x > max) { ship.x = max; ship.vx = 0; }
+
+  // Sit on the water: height from bow and stern, tilt from the difference.
+  const span = ship.L * 0.42;
+  const yBow = surf(ship.x + span), yStern = surf(ship.x - span), yMid = surf(ship.x);
+  const targetY = (yBow + yStern + yMid * 2) / 4 + 2;
+  const targetAng = Math.atan2(yBow - yStern, span * 2);
+  ship.y = lerp(ship.y, targetY, Math.min(1, dt * 6));
+  ship.ang = lerp(ship.ang, targetAng, Math.min(1, dt * 5));
+  ship.flash = Math.max(0, ship.flash - dt * 4);
+
+  // Smoke from the stack.
+  if (Math.random() < dt * 8) {
+    const p = shipPoint(-ship.L / 2 + 38, -82);
+    G.parts.push({ kind: 'smoke', x: p.x, y: p.y, vx: -20 - G.wind * 0.6, vy: -18, life: 2.4, t: 0, r: rand(5, 9) });
+  }
+}
+
+/** Ship-local point (x toward the bow, y down) to world coordinates. */
+function shipPoint(lx, ly) {
+  const c = Math.cos(ship.ang), s = Math.sin(ship.ang);
+  return { x: ship.x + lx * c - ly * s, y: ship.y + lx * s + ly * c };
+}
+/** World point to ship-local coordinates. */
+function toShip(x, y) {
+  const c = Math.cos(-ship.ang), s = Math.sin(-ship.ang), dx = x - ship.x, dy = y - ship.y;
+  return { x: dx * c - dy * s, y: dx * s + dy * c };
+}
+/** Does a circle at (x, y) with radius r touch the boat? */
+function hitsShip(x, y, r) {
+  const p = toShip(x, y), h = ship.L / 2;
+  if (p.x < -h - r || p.x > h + r) return false;
+  // Taller at the bow pilothouse and the stern engine house.
+  const top = (p.x > h - 60 || p.x < -h + 75) ? -66 : -34;
+  return p.y > top - r && p.y < 18 + r;
+}
+function turretSpots() {
+  const L = ship.L, n = G.up.cannons;
+  return n === 1 ? [0] : n === 2 ? [-L * 0.17, L * 0.17] : [-L * 0.24, 0, L * 0.24];
+}
+
+// ----- Enemies -----
+// Each kind sets up its own fields in spawn(), moves in update(), and draws
+// itself in draw(). Shared fields: x, y, vx, vy, r (hit radius), hp, pts
+// (score), creep (added if it reaches shore), dmg (to the ship on contact).
+
+const KINDS = {
+  candy: {
+    spawn(e) {
+      Object.assign(e, { x: W + 30, y: rand(skyTop() + 40, waterY - 70), vx: -rand(115, 165), r: 13, hp: 1, pts: 10, creep: 5, dmg: 8,
+        rot: rand(0, 6), spin: rand(-5, 5), phase: rand(0, 6) });
+    },
+    update(e, dt) {
+      e.x += (e.vx - G.wind) * dt;
+      e.y += Math.sin(G.t * 3 + e.phase) * 40 * dt;
+      e.y = Math.min(e.y, surf(e.x) - 14);
+      e.rot += e.spin * dt;
+    },
+    draw(e) {
+      ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.rot); ctx.translate(-6, -4);
+      ctx.lineCap = 'round'; ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.moveTo(0, 16); ctx.lineTo(0, -2); ctx.arc(6, -2, 6, Math.PI, 0); ctx.lineTo(12, 2);
+      ctx.strokeStyle = '#fff'; ctx.stroke();
+      ctx.setLineDash([4, 4]); ctx.strokeStyle = '#d62828'; ctx.stroke(); ctx.setLineDash([]);
+      ctx.restore();
+    },
+  },
+
+  santa: {
+    spawn(e) {
+      Object.assign(e, { x: rand(W * 0.55, W + 20), y: skyTop() - 20, vx: -rand(25, 45), vy: rand(30, 42), r: 26,
+        hp: 5 + Math.floor(G.day / 2), pts: 50, creep: 12, dmg: 14, floating: false, wob: 0 });
+    },
+    update(e, dt) {
+      if (!e.floating) {
+        e.x += (e.vx - G.wind * 0.5) * dt; e.y += e.vy * dt;
+        if (e.y >= surf(e.x) - 22) { e.floating = true; e.vx = -rand(40, 60); SFX.splash(); splash(e.x, e.y + 20, 8); }
+      } else {
+        e.x += (e.vx - G.wind) * dt;
+        e.y = surf(e.x) - 22;
+      }
+      e.wob = Math.max(0, e.wob - dt * 4);
+    },
+    draw(e) { drawSanta(e.x, e.y, 1, e.wob, !e.floating); },
+  },
+
+  jingle: {
+    spawn(e) {
+      Object.assign(e, { x: W + 20, y: rand(skyTop() + 40, waterY - 140), vx: -110, vy: 0, r: 13, hp: 1, pts: 15, creep: 3, dmg: 6 });
+    },
+    update(e, dt) {
+      // Drifts toward the boat, turning slowly.
+      const tx = ship.x - e.x, ty = (ship.y - 40) - e.y, d = Math.hypot(tx, ty) || 1;
+      e.vx = lerp(e.vx, (tx / d) * 120, dt * 0.9);
+      e.vy = lerp(e.vy, (ty / d) * 120, dt * 0.9);
+      e.x += (e.vx - G.wind * 0.5) * dt; e.y += e.vy * dt;
+    },
+    draw(e) {
+      ctx.save(); ctx.translate(e.x, e.y + Math.sin(G.t * 8 + e.id) * 2);
+      ctx.shadowColor = '#ffd166'; ctx.shadowBlur = 12;
+      ctx.fillStyle = '#ffd166'; ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(-4, 7, 6.5, 4.8, -0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(2, 6); ctx.lineTo(2, -12); ctx.quadraticCurveTo(12, -8, 9, 0); ctx.stroke();
+      ctx.restore();
+    },
+  },
+
+  reindeer: {
+    spawn(e) {
+      Object.assign(e, { x: W + 60, y: rand(skyTop() + 10, skyTop() + 80), vx: -rand(85, 115), r: 22, hp: 3, pts: 40, creep: 6, dmg: 10,
+        drop: rand(0.6, 1.4) });
+    },
+    update(e, dt) {
+      e.x += (e.vx - G.wind * 0.3) * dt;
+      e.y += Math.sin(G.t * 2 + e.id) * 12 * dt;
+      e.drop -= dt;
+      if (e.drop <= 0 && e.x < W - 40 && e.x > SHORE_X + 60) {
+        spawnEnemy('present', { x: e.x, y: e.y + 16, vx: e.vx * 0.4, vy: 10 });
+        e.drop = rand(1.3, 2.1);
+      }
+    },
+    draw(e) { drawReindeer(e.x, e.y, G.t * 10 + e.id); },
+  },
+
+  present: {
+    spawn(e, o) {
+      Object.assign(e, { x: o.x, y: o.y, vx: o.vx, vy: o.vy, r: 11, hp: o.hp || 1, pts: 5, creep: 0, dmg: 11,
+        color: pick(['#2a9d8f', '#e63946', '#8e44ad', '#f4a261']) });
+    },
+    update(e, dt) {
+      e.vy += 300 * dt; e.x += (e.vx - G.wind * 0.3) * dt; e.y += e.vy * dt;
+      if (e.y > surf(e.x)) { e.dead = true; SFX.splash(); splash(e.x, e.y, 10); } // the lake keeps it
+    },
+    draw(e) {
+      ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.vx * 0.004 + Math.sin(e.id) * 0.3);
+      ctx.fillStyle = e.color; ctx.fillRect(-9, -9, 18, 18);
+      ctx.fillStyle = '#ffd166'; ctx.fillRect(-2, -9, 4, 18); ctx.fillRect(-9, -2, 18, 4);
+      ctx.beginPath(); ctx.ellipse(-4, -11, 4, 3, -0.5, 0, Math.PI * 2); ctx.ellipse(4, -11, 4, 3, 0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    },
+  },
+
+  elfski: {
+    spawn(e) { Object.assign(e, { x: W + 40, y: waterY, vx: -rand(130, 175), r: 17, hp: 3, pts: 30, creep: 8, dmg: 11 }); },
+    update(e, dt) {
+      e.x += (e.vx - G.wind) * dt;
+      e.y = surf(e.x) - 8;
+      if (Math.random() < dt * 30) G.parts.push({ kind: 'spray', x: e.x + 18, y: e.y + 4, vx: rand(30, 90), vy: -rand(30, 80), life: 0.5, t: 0, r: rand(1.5, 3) });
+    },
+    draw(e) { drawElfSki(e.x, e.y, surfSlope(e.x)); },
+  },
+
+  deckelf: {
+    spawn(e) {
+      Object.assign(e, { x: rand(W * 0.3, W * 0.95), y: skyTop() - 10, vx: -rand(10, 30), vy: rand(60, 85), r: 13, hp: 2, pts: 25, creep: 4, dmg: 0,
+        attached: false, lx: 0, swim: false });
+    },
+    update(e, dt) {
+      if (e.attached) { const p = shipPoint(e.lx, -42); e.x = p.x; e.y = p.y; return; }
+      if (e.swim) { e.x += (-55 - G.wind) * dt; e.y = surf(e.x) - 4; return; }
+      e.x += (e.vx - G.wind * 0.3) * dt; e.y += e.vy * dt;
+      if (hitsShip(e.x, e.y, 4)) {
+        // Landed on deck. It is watching now.
+        e.attached = true; e.targetable = false;
+        e.lx = clamp(toShip(e.x, e.y).x, -ship.L / 2 + 85, ship.L / 2 - 70);
+        floater(e.x, e.y - 20, '👀', '#fff');
+        say('Deckhand', 'uh, captain? something is watching us');
+      } else if (e.y > surf(e.x)) { e.swim = true; splash(e.x, e.y, 6); }
+    },
+    draw(e) { drawDeckElf(e.x, e.y, e.attached ? ship.ang : 0, e.swim); },
+  },
+
+  latte: {
+    spawn(e) { Object.assign(e, { x: W + 30, y: rand(skyTop() + 40, waterY - 110), vx: -rand(80, 110), r: 17, hp: 3, pts: 20, creep: 6, dmg: 10 }); },
+    update(e, dt) { e.x += (e.vx - G.wind) * dt; e.y += Math.sin(G.t * 2 + e.id) * 20 * dt; },
+    draw(e) { drawLatte(e.x, e.y); },
+    onPop(e) { for (let i = 0; i < 3; i++) spawnEnemy('mint', { x: e.x, y: e.y, vx: -rand(140, 220), vy: (i - 1) * 90 }); },
+  },
+
+  mint: {
+    spawn(e, o) { Object.assign(e, { x: o.x, y: o.y, vx: o.vx, vy: o.vy, r: 9, hp: 1, pts: 5, creep: 2, dmg: 4 }); },
+    update(e, dt) {
+      e.vy *= Math.pow(0.3, dt); e.x += (e.vx - G.wind) * dt; e.y += e.vy * dt;
+      e.y = Math.min(e.y, surf(e.x) - 10);
+    },
+    draw(e) {
+      ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(G.t * 6 + e.id);
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e63946';
+      for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 8, i * Math.PI / 2, i * Math.PI / 2 + 0.6); ctx.fill(); }
+      ctx.restore();
+    },
+  },
+};
+
+let nextId = 1;
+function spawnEnemy(kind, opts) {
+  const e = { id: nextId++, kind, dead: false, hitT: 0, targetable: true };
+  KINDS[kind].spawn(e, opts || {});
+  G.enemies.push(e);
+  return e;
+}
+
+/** Slope of the water at x, for tilting things that ride it. */
+function surfSlope(x) { return Math.atan2(surf(x + 10) - surf(x - 10), 20); }
+
+// ----- The boss: THE GREAT INFLATABLE -----
+// Phase 1 lobs presents. Phase 2 turns on the mall music and sends elves.
+// Phase 3 springs a leak and flies around the sky spitting candy canes.
+
+const BOSS_HP = 650;
+function spawnBoss() {
+  G.boss = { x: W - 150, y: waterY + 260, hp: BOSS_HP, rise: 0, t: 0, atk: 2, minion: 3, flying: false, hitT: 0, dying: 0, s: 1, said: {} };
+  say('Lake Superior', 'there is a SANTA standing in me');
+}
+
+function bossCenter(b) { return { x: b.x, y: b.y - 150 * b.s, r: 92 * b.s }; }
+
+function updateBoss(dt) {
+  const b = G.boss;
+  b.t += dt; b.hitT = Math.max(0, b.hitT - dt);
+  if (b.dying) { // deflated: zooms off like a let-go balloon
+    b.dying += dt;
+    b.x += Math.cos(b.dying * 9) * 300 * dt + 120 * dt;
+    b.y -= 260 * dt;
+    b.s = Math.max(0.2, b.s - dt * 0.3);
+    if (Math.random() < dt * 30) G.parts.push({ kind: 'glitter', x: b.x, y: b.y - 80 * b.s, vx: rand(-60, 60), vy: rand(-60, 60), life: 1, t: 0, r: 3, c: pick(CONFETTI) });
+    if (b.dying > 2.4) { G.boss = null; finishDay(); }
+    return;
+  }
+  if (b.rise < 1) { // rising out of the lake
+    b.rise = Math.min(1, b.rise + dt / 2.5);
+    b.y = lerp(waterY + 260, surf(b.x) + 10, easeOut(b.rise));
+    if (b.rise >= 1) bossBanner();
+    return;
+  }
+  const p = b.hp / BOSS_HP;
+  if (!b.flying) b.y = surf(b.x) + 10;
+
+  if (p > 0.66) {
+    b.atk -= dt;
+    if (b.atk <= 0) { lobPresents(b, 3); b.atk = 2.0; }
+  } else if (p > 0.33) {
+    if (!b.said.p2) { b.said.p2 = true; Music.mall = true; say('Mall Santa', 'ho ho HOLD ON, music time'); }
+    b.atk -= dt; b.minion -= dt;
+    if (b.atk <= 0) { spawnEnemy('jingle').x = b.x - 60; b.atk = 0.6; }
+    if (b.minion <= 0) { const e = spawnEnemy('elfski'); e.x = b.x - 60; b.minion = 2.6; if (Math.random() < 0.5) lobPresents(b, 2); }
+  } else {
+    if (!b.said.p3) {
+      b.said.p3 = true; b.flying = true; Music.mall = false;
+      say('Deckhand', "it sprang a leak! it's... flying?");
+      SFX.deflate();
+    }
+    // Leaking: flits around the sky and shrinks as it loses air.
+    b.s = lerp(b.s, 0.55 + 0.45 * (p / 0.33), dt * 2);
+    b.x = lerp(b.x, W * 0.7 + Math.sin(b.t * 0.9) * W * 0.17, dt * 2);
+    b.y = lerp(b.y, waterY - 40 + Math.sin(b.t * 1.7) * 50, dt * 2);
+    b.atk -= dt;
+    if (b.atk <= 0) {
+      const c = bossCenter(b), e = spawnEnemy('candy');
+      e.x = c.x - 40; e.y = c.y; e.vx = -rand(170, 230);
+      if (Math.random() < 0.2) lobPresents(b, 2);
+      b.atk = 0.45;
+    }
+    if (Math.random() < dt * 14) G.parts.push({ kind: 'smoke', x: b.x + 30 * b.s, y: b.y - 200 * b.s, vx: 80, vy: -40, life: 0.8, t: 0, r: 5 });
+  }
+}
+
+/** Throw presents on a high arc that lands around the boat. */
+function lobPresents(b, n) {
+  const sx = b.x - 50, sy = b.y - 250 * b.s, T = 1.35, g = 300;
+  for (let k = 0; k < n; k++) {
+    const tx = ship.x + (k - (n - 1) / 2) * 60 + rand(-15, 15), ty = waterY - 30;
+    spawnEnemy('present', { x: sx, y: sy, vx: (tx - sx) / T, vy: (ty - sy - 0.5 * g * T * T) / T, hp: 2 });
+  }
+}
+
+function damageBoss(dmg) {
+  const b = G.boss;
+  if (!b || b.rise < 1 || b.dying) return;
+  b.hp -= dmg; b.hitT = 0.1;
+  if (b.hp <= 0) {
+    b.hp = 0; b.dying = 0.001; Music.mall = false;
+    SFX.deflate(); setTimeout(SFX.deflate, 250);
+    const c = bossCenter(b);
+    confetti(c.x, c.y, 120);
+    addScore(2000, c.x, c.y);
+    G.shake = 14;
+    say('Everyone', 'NOT. YET.');
+  }
+}
+
+// ----- Pickups -----
+const PICKUPS = {
+  pasty: { label: 'PASTY! +25 HULL', apply() { G.hull = Math.min(G.maxHull, G.hull + 25); } },
+  thermos: { label: 'COFFEE! RAPID FIRE', apply() { G.thermosT = 8; } },
+  ope: { label: 'OPE SHIELD', apply() { G.ope = true; } },
+};
+
+function maybeDrop(e) {
+  if (e.kind === 'present' || e.kind === 'mint') return;
+  if (Math.random() > 0.07 + G.up.drop) return;
+  const kind = weighted({ pasty: G.hull < G.maxHull * 0.6 ? 0.6 : 0.4, thermos: 0.35, ope: G.ope ? 0 : 0.25 });
+  G.pickups.push({ kind, x: e.x, y: e.y, vy: -60, floating: false, t: 0 });
+}
+
+function updatePickups(dt) {
+  for (const p of G.pickups) {
+    p.t += dt;
+    if (!p.floating) {
+      p.vy += 280 * dt; p.y += p.vy * dt;
+      if (p.y >= surf(p.x) - 6) { p.floating = true; splash(p.x, p.y, 4); }
+    } else {
+      p.x -= (40 + G.wind) * dt; p.y = surf(p.x) - 6;
+    }
+    if (hitsShip(p.x, p.y, 14)) {
+      p.done = true; PICKUPS[p.kind].apply(); SFX.pickup();
+      floater(p.x, p.y - 30, PICKUPS[p.kind].label, '#6fd3a6');
+    }
+    if (p.x < SHORE_X - 20) p.done = true;
+  }
+  G.pickups = G.pickups.filter(p => !p.done);
+}
+
+// ----- Particles and floating text -----
+const CONFETTI = ['#e63946', '#2a9d8f', '#ffd166', '#ffffff', '#8ac926', '#f4a261'];
+
+function confetti(x, y, n) {
+  for (let i = 0; i < n; i++) {
+    G.parts.push({ kind: 'confetti', x, y, vx: rand(-220, 220), vy: rand(-260, 40), life: rand(0.8, 1.6), t: 0,
+      r: rand(2.5, 4.5), rot: rand(0, 6), spin: rand(-12, 12), c: pick(CONFETTI) });
+  }
+}
+function splash(x, y, n) {
+  for (let i = 0; i < n; i++) G.parts.push({ kind: 'spray', x, y, vx: rand(-70, 70), vy: -rand(60, 170), life: 0.7, t: 0, r: rand(1.5, 3.5) });
+}
+function floater(x, y, text, color) { G.floaters.push({ x, y, text, color, t: 0, life: 1.3 }); }
+
+function updateParticles(dt) {
+  for (const p of G.parts) {
+    p.t += dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.kind === 'confetti') { p.vy += 380 * dt; p.vx *= Math.pow(0.4, dt); p.rot += p.spin * dt; }
+    else if (p.kind === 'spray') p.vy += 420 * dt;
+    else if (p.kind === 'smoke') { p.r += dt * 6; }
+    else if (p.kind === 'glitter') { p.vx *= Math.pow(0.2, dt); p.vy *= Math.pow(0.2, dt); }
+  }
+  G.parts = G.parts.filter(p => p.t < p.life);
+  if (G.parts.length > 900) G.parts.splice(0, G.parts.length - 900);
+  for (const f of G.floaters) { f.t += dt; f.y -= 30 * dt; }
+  G.floaters = G.floaters.filter(f => f.t < f.life);
+
+  // Snow once the weather turns.
+  const snowRate = Math.max(0, G.gale - 0.25) * 60;
+  if (Math.random() < snowRate * dt) G.flakes.push({ x: rand(0, W + 200), y: -10, vy: rand(30, 60), r: rand(1, 2.5), ph: rand(0, 6) });
+  for (const f of G.flakes) { f.y += f.vy * dt; f.x += (-30 - G.wind) * dt + Math.sin(G.t + f.ph) * 10 * dt; }
+  G.flakes = G.flakes.filter(f => f.y < H + 10 && f.x > -20);
+}
+
+// ----- Scoring -----
+function addScore(base, x, y) {
+  const mult = 1 + Math.min(3, Math.floor(G.combo / 5) * 0.5);
+  const pts = Math.round(base * mult);
+  G.score += pts;
+  floater(x, y, '+' + pts + (mult > 1 ? ' ×' + mult : ''), mult > 1 ? '#ffd166' : '#fff');
+}
+
+/** An enemy has been beaten (by a pellet, the horn, or midnight). */
+function popEnemy(e, quiet) {
+  if (e.dead) return;
+  e.dead = true;
+  G.combo++; G.comboT = 1.3;
+  G.stats.pops++;
+  addScore(e.pts, e.x, e.y - 10);
+  G.horn = Math.min(1, G.horn + 0.035 * G.up.hornMul);
+  confetti(e.x, e.y, e.kind === 'santa' ? 26 : 12);
+  if (!quiet) {
+    if (e.kind === 'jingle') playJingleNote();
+    else if (e.kind === 'santa') SFX.deflate();
+    else SFX.pop();
+  }
+  if (KINDS[e.kind].onPop) KINDS[e.kind].onPop(e);
+  maybeDrop(e);
+}
+
+function hurtShip(dmg) {
+  if (G.iframes > 0 || dmg <= 0) return;
+  if (G.ope) {
+    G.ope = false; G.iframes = 0.6; SFX.ope();
+    floater(ship.x, ship.y - 80, 'ope!', '#9ad1ff');
+    return;
+  }
+  G.hull -= dmg * G.up.armor;
+  G.iframes = 0.5; ship.flash = 1; G.shake = Math.max(G.shake, 6);
+  SFX.hit();
+}
+
+// ----- Cannons -----
+// The cannons aim and fire on their own, so their reach is what makes
+// steering matter: park the boat near trouble or it gets past you.
+const CANNON = { rate: 2.4, speed: 640, range: 470, spread: 0.07 };
+/** Choose what turret i shoots: whatever is closest to reaching shore, roughly. */
+function chooseTarget(i, from) {
+  const cands = [];
+  for (const e of G.enemies) {
+    if (e.dead || !e.targetable || e.x > W + 10 || e.y < -20) continue;
+    const d = Math.hypot(e.x - from.x, e.y - from.y);
+    if (d > CANNON.range) continue;
+    let p = e.x * 0.6 + d * 0.4;
+    if (e.kind === 'present') p -= 260; // falling on our heads: urgent
+    if (e.kind === 'jingle' && Math.hypot(e.x - ship.x, e.y - ship.y) < 220) p -= 150;
+    cands.push([p, e]);
+  }
+  const b = G.boss;
+  if (b && b.rise >= 1 && !b.dying) {
+    const c = bossCenter(b);
+    if (Math.hypot(c.x - from.x, c.y - from.y) < CANNON.range + c.r) cands.push([c.x + 260, { x: c.x, y: c.y, vx: 0, vy: 0, boss: true }]);
+  }
+  if (!cands.length) return null;
+  cands.sort((a, b2) => a[0] - b2[0]);
+  return cands[Math.min(i, cands.length - 1)][1];
+}
+
+function updateCannons(dt) {
+  const attached = G.enemies.filter(e => e.kind === 'deckelf' && e.attached && !e.dead).length;
+  const shy = Math.max(0.3, Math.pow(0.6, attached)); // being watched is distracting
+  const rate = CANNON.rate * G.up.rate * (G.thermosT > 0 ? 1.8 : 1) * shy;
+  turretSpots().forEach((lx, i) => {
+    const from = shipPoint(lx, -40);
+    ship.fireT[i] -= dt;
+    const tgt = chooseTarget(i, from);
+    if (!tgt) return;
+    // Lead the target a little.
+    const d = Math.hypot(tgt.x - from.x, tgt.y - from.y), t = d / CANNON.speed;
+    const ax = tgt.x + (tgt.vx || 0) * t - from.x, ay = tgt.y + (tgt.vy || 0) * t - from.y;
+    const ang = Math.atan2(ay, ax);
+    ship.aims[i] = ang;
+    if (ship.fireT[i] > 0) return;
+    ship.fireT[i] = 1 / rate;
+    const a = ang + rand(-CANNON.spread, CANNON.spread);
+    G.pellets.push({ x: from.x, y: from.y, vx: Math.cos(a) * CANNON.speed, vy: Math.sin(a) * CANNON.speed, dmg: G.up.dmg,
+      life: (CANNON.range + 60) / CANNON.speed });
+    SFX.fire();
+  });
+}
+
+function updatePellets(dt) {
+  const b = G.boss, bc = b && b.rise >= 1 && !b.dying ? bossCenter(b) : null;
+  for (const p of G.pellets) {
+    p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+    if (p.x < -20 || p.x > W + 40 || p.y < -40 || p.y > H) { p.life = 0; continue; }
+    for (const e of G.enemies) {
+      if (e.dead || !e.targetable) continue;
+      const dx = e.x - p.x, dy = e.y - p.y;
+      if (dx * dx + dy * dy < (e.r + 4) * (e.r + 4)) {
+        p.life = 0; e.hp -= p.dmg; e.hitT = 0.1;
+        if (e.kind === 'santa') e.wob = 1;
+        if (e.hp <= 0) popEnemy(e);
+        else Audio.tone(rand(300, 380), 0.04, { type: 'square', vol: 0.05 });
+        break;
+      }
+    }
+    if (p.life > 0 && bc && Math.hypot(bc.x - p.x, bc.y - p.y) < bc.r) {
+      p.life = 0; damageBoss(p.dmg);
+      if (Math.random() < 0.5) G.parts.push({ kind: 'spray', x: p.x, y: p.y, vx: rand(-60, 60), vy: rand(-60, 0), life: 0.3, t: 0, r: 2 });
+    }
+  }
+  G.pellets = G.pellets.filter(p => p.life > 0);
+}
+
+// ----- The horn -----
+function blowHorn() {
+  if (G.state !== 'play' || G.horn < 1) return;
+  G.horn = 0; G.calm = 1; G.stats.horns++;
+  SFX.horn();
+  G.rings.push({ x: ship.x, y: ship.y - 30, r: 0, max: G.up.hornR, hitBoss: false });
+  G.shake = 8;
+  floater(ship.x, ship.y - 100, 'HOOONK', '#ffd166');
+}
+
+function updateRings(dt) {
+  for (const ring of G.rings) {
+    ring.r += 950 * dt;
+    for (const e of G.enemies) {
+      if (!e.dead && Math.hypot(e.x - ring.x, e.y - ring.y) < ring.r) popEnemy(e, true);
+    }
+    const b = G.boss;
+    if (b && !ring.hitBoss && b.rise >= 1 && !b.dying) {
+      const c = bossCenter(b);
+      if (Math.hypot(c.x - ring.x, c.y - ring.y) < ring.r + c.r) { ring.hitBoss = true; damageBoss(30); }
+    }
+  }
+  G.rings = G.rings.filter(r => r.r <= r.max);
+}
+
+/* =====================  5. GAME FLOW  ===================== */
+
+function newRun() {
+  Object.assign(G, {
+    day: 1, score: 0, hull: 100, maxHull: 100, up: freshUpgrades(), picked: {}, ope: false, thermosT: 0,
+    dad: 2 + ((Math.random() * 3) | 0), horn: 0.3, lastDay: null,
+    stats: { pops: 0, horns: 0, creepTotal: 0, start: performance.now() },
+  });
+}
+
+/**
+ * Reset the field for a day. Hull carries over with some overnight repairs,
+ * except on a retry after losing, which starts fully patched.
+ */
+function setupDay(retry) {
+  const d = DAYS[G.day];
+  Object.assign(G, {
+    dayT: 0, creep: 0, spawnAcc: 0, enemies: [], pellets: [], pickups: [], rings: [], swells: [],
+    gale: d.gale, wind: d.gale >= 1 ? 45 : 0, boss: null, midnight: false, midnightT: 0,
+    combo: 0, comboT: 0, iframes: 1, dayStartScore: G.score, radioT: 5,
+  });
+  G.hull = retry ? G.maxHull : Math.min(G.maxHull, G.hull + G.maxHull * 0.35);
+  G.horn = Math.max(G.horn, 0.3);
+  Music.mall = false;
+  ship.vx = 0;
+  if (d.boss) spawnBoss();
+  ship.x = clamp(ship.x, ...shipBounds());
+}
+
+function startDay(retry) {
+  setupDay(retry);
+  setState('play');
+  Music.eighth = DAYS[G.day].boss ? 0.16 : 0.19;
+  if (!Music.on) Music.start();
+  SFX.horn();
+}
+
+function updatePlay(dt) {
+  const d = DAYS[G.day];
+  G.iframes = Math.max(0, G.iframes - dt);
+  G.thermosT = Math.max(0, G.thermosT - dt);
+  G.comboT -= dt; if (G.comboT <= 0) G.combo = 0;
+  G.horn = Math.min(1, G.horn + dt * 0.012 * G.up.hornMul);
+
+  updateShip(dt);
+
+  // Spawning, until midnight.
+  if (!G.midnight) {
+    G.dayT += dt;
+    G.spawnAcc += dt * d.rate * (1 + G.dayT / 90);
+    while (G.spawnAcc >= 1) { G.spawnAcc -= 1; spawnEnemy(weighted(d.mix)); }
+    if (!d.boss && G.dayT >= d.len) { G.midnight = true; G.midnightT = 0; SFX.chime(); floater(W / 2, waterY - 220, 'MIDNIGHT', '#ffd166'); }
+  } else if (!d.boss) {
+    // Midnight: November holds. Whatever's left pops on its own.
+    G.midnightT += dt;
+    if (G.midnightT > 2) { G.enemies.forEach(e => popEnemy(e, true)); finishDay(); return; }
+  }
+  if (G.boss) updateBoss(dt);
+  if (G.state !== 'play') return;
+
+  // Enemies: move, hit the boat, or reach shore.
+  for (const e of G.enemies) {
+    if (e.dead) continue;
+    KINDS[e.kind].update(e, dt);
+    if (e.dead) continue; // e.g. a present that fell in the lake
+    e.hitT = Math.max(0, e.hitT - dt);
+    if (e.dmg > 0 && hitsShip(e.x, e.y, e.r * 0.7)) {
+      hurtShip(e.dmg); e.dead = true; confetti(e.x, e.y, 8);
+    } else if (e.x < SHORE_X - 10 && e.creep > 0) {
+      e.dead = true; G.creep += e.creep; G.stats.creepTotal += e.creep;
+      SFX.creep(); floater(SHORE_X + 10, e.y, '🎄 +' + e.creep, '#ff8fa3');
+    } else if (e.x < -60 || e.y > H + 40) e.dead = true;
+  }
+  G.enemies = G.enemies.filter(e => !e.dead);
+
+  updateCannons(dt);
+  updatePellets(dt);
+  updateRings(dt);
+  updatePickups(dt);
+
+  G.radioT -= dt;
+  if (G.radioT <= 0) { const [who, line] = pick(RADIO_LINES); say(who, line); G.radioT = rand(8, 13); }
+
+  if (G.hull <= 0) failDay('hull');
+  else if (G.creep >= 100) failDay('creep');
+}
+
+function finishDay() {
+  if (G.state !== 'play') return;
+  const d = DAYS[G.day];
+  const hullBonus = Math.round((G.hull / G.maxHull) * 300);
+  const creepBonus = Math.round((100 - G.creep) * 4);
+  G.score += hullBonus + creepBonus;
+  G.lastDay = { day: G.day, hullBonus, creepBonus, earned: G.score - G.dayStartScore };
+  bumpDad();
+  if (d.boss) { Music.stop(); showMemorial(); return; }
+  G.day++;
+  showDayCard();
+}
+
+function failDay(reason) {
+  setState('fail');
+  G.score = G.dayStartScore;
+  showFail(reason);
+}
+
+/** Dad's song count goes up every day. (It skips 29 and 30 on purpose.) */
+function bumpDad() {
+  G.dad += 2 + ((Math.random() * 3) | 0);
+  if (G.dad === 29 || G.dad === 30) G.dad = 31;
+}
+
+// ----- UI: cards, HUD, radio -----
+const overlay = $('overlay'), card = $('card');
+
+function setState(s) {
+  G.state = s;
+  const playing = s === 'play';
+  overlay.hidden = playing;
+  $('hud').hidden = !playing && s !== 'paused';
+  $('controls').hidden = !playing;
+  if (!playing) $('radio').classList.remove('show');
+}
+
+function showCard(html, onClick) {
+  card.className = 'card';
+  card.innerHTML = html;
+  card.onclick = ev => {
+    const btn = ev.target.closest('[data-act]');
+    if (!btn) return;
+    Audio.init();
+    onClick(btn.dataset.act, btn);
+  };
+  const first = card.querySelector('[data-act]');
+  if (first && !('ontouchstart' in window)) first.focus({ preventScroll: true });
+}
+
+function chatHtml(lines) {
+  return '<div class="chat">' + lines.map(([who, text]) => `<div><b>${who}</b>${text}</div>`).join('') + '</div>';
+}
+function dadLine() { return pick(DAD_LINES).replace('{n}', G.dad); }
+
+function showTitle() {
+  setState('title');
+  const best = +store.get('best', 0), won = +store.get('won', 0);
+  const portrait = window.innerHeight > window.innerWidth * 1.1;
+  showCard(`
+    <h1>FITZ SEASON</h1>
+    <p class="sub">IT AIN'T CHRISTMAS YET</p>
+    <p class="tag">A six-minute game about a boat.</p>
+    <p>It's November on Lake Superior. Christmas is trying to show up early.
+       You and the S.S. November are the only thing in its way.</p>
+    <button class="btn" data-act="start">Defend November</button><br>
+    <button class="btn ghost" data-act="how">How to play</button>
+    <button class="btn ghost" data-act="mute">${Audio.muted ? '🔇 Sound off' : '🔊 Sound on'}</button>
+    ${portrait ? '<p class="rotate">📱 Turn your phone sideways. It is a very long boat.</p>' : ''}
+    ${best ? `<p class="muted">Best score ${best.toLocaleString()} · Novembers defended: ${won}</p>` : ''}
+    <p class="muted"><a href="../">🎮 All games</a></p>
+  `, act => {
+    if (act === 'start') showStory();
+    else if (act === 'how') showHow(showTitle);
+    else if (act === 'mute') { Audio.setMuted(!Audio.muted); showTitle(); }
+  });
+}
+
+function showHow(back) {
+  showCard(`
+    <h2>HOW TO PLAY</h2>
+    <ul class="how">
+      <li><b>Steer:</b> drag anywhere, or use ← → / A D. The cannons aim and fire by themselves.</li>
+      <li><b>Pop the Christmas stuff</b> before it reaches the town on the left. Too much gets through and it's Christmas. On November whatever.</li>
+      <li><b>Don't get hit.</b> Your hull is the red bar. Grab floating pasties to patch up.</li>
+      <li><b>The horn</b> charges as you pop things. Tap HORN (or Space) to blast everything nearby and calm the waves.</li>
+      <li>Hold out until <b>midnight</b> each day. After each day, pick an upgrade.</li>
+      <li>Pause with II, P or Esc.</li>
+    </ul>
+    <button class="btn" data-act="back">Got it</button>
+  `, () => back());
+}
+
+function showStory() {
+  showCard(`
+    <p class="date">OCTOBER 31 · 11:59 PM</p>
+    <h2>THE MOST SACRED SEASON</h2>
+    <p>Between Halloween and the tenth of November, there's a season. The internet calls it Fitz Season.
+       Dads play a six-minute song about a boat. Everyone gets very into the Great Lakes.</p>
+    <p>And every year, Christmas tries to show up early.</p>
+    <p><b>Not this year.</b> You captain the S.S. November: 729 feet of steel, a hold full of taconite,
+       and one very loud horn.</p>
+    <button class="btn" data-act="go">Cast off</button>
+  `, () => {
+    newRun();
+    const jump = parseInt(params.get('day'), 10); // ?day=N for testing
+    if (DEBUG && jump >= 1 && jump <= LAST_DAY) {
+      G.day = jump;
+      for (let i = 1; i < jump; i++) { const u = upgradeChoices()[0]; G.picked[u.id] = (G.picked[u.id] || 0) + 1; u.apply(); }
+    }
+    showDayCard();
+  });
+}
+
+function showDayCard() {
+  setState('card');
+  const d = DAYS[G.day], [tName, tDesc] = THREATS[d.intro];
+  const choices = G.day > 1 ? upgradeChoices() : [];
+  const last = G.lastDay;
+  const preview = previewImg(d.intro);
+  showCard(`
+    <p class="date">NOVEMBER ${G.day}</p>
+    <h2>${d.title.toUpperCase()}</h2>
+    <p>${d.blurb}</p>
+    <div class="threat">${preview ? `<img src="${preview}" alt="">` : ''}<div><b>${d.boss ? 'BOSS: ' : 'NEW: '}${tName}</b><br>${tDesc}</div></div>
+    ${chatHtml(LAKE_CHATS[G.day])}
+    <p class="fact">${FACTS[G.day]}</p>
+    <p class="muted">📻 Dad: "${dadLine()}"</p>
+    ${last ? `<p class="muted">November ${last.day} held: +${last.earned.toLocaleString()} points (hull bonus ${last.hullBonus}, low-creep bonus ${last.creepBonus}).</p>` : ''}
+    ${choices.length ? `<h3>PICK AN UPGRADE TO CAST OFF</h3><div class="upgrades">${choices.map(u =>
+      `<button class="upgrade" data-act="up:${u.id}"><b>${u.name}</b><span>${u.desc}</span></button>`).join('')}</div>`
+      : '<button class="btn" data-act="go">Cast off</button>'}
+  `, act => {
+    if (act.startsWith('up:')) {
+      const u = UPGRADES.find(x => x.id === act.slice(3));
+      G.picked[u.id] = (G.picked[u.id] || 0) + 1;
+      u.apply();
+    }
+    startDay();
+  });
+}
+
+function upgradeChoices() {
+  const open = UPGRADES.filter(u => (G.picked[u.id] || 0) < u.max);
+  const out = [];
+  while (out.length < 3 && open.length) out.push(open.splice((Math.random() * open.length) | 0, 1)[0]);
+  return out;
+}
+
+function showFail(reason) {
+  const n = G.day;
+  const html = reason === 'creep'
+    ? `<h2>🎄 IT'S CHRISTMAS NOW</h2>
+       <p>Too much got through. Every store in Duluth is playing the music. Someone put up a tree.</p>
+       <p><b>It is November ${n}.</b></p>
+       <p class="muted">📻 Dad: "I'm not mad. I'm just disappointed. And playing the song."</p>
+       <button class="btn" data-act="retry">Take back November ${n}</button>`
+    : `<h2>⚓ HEADING BACK TO PORT</h2>
+       <p>The S.S. November is too banged up to stay out. The crew heads in for pasties and a nap.</p>
+       <p>Honestly? Good call, Captain. Nobody needs to be out on Superior in that.</p>
+       <button class="btn" data-act="retry">Try November ${n} again</button>`;
+  showCard(html + '<br><button class="link" data-act="quit">Quit to title</button>', act => {
+    if (act === 'retry') startDay(true); else { Music.stop(); showTitle(); }
+  });
+}
+
+function pause() {
+  if (G.state !== 'play') return;
+  setState('paused');
+  showCard(`
+    <h2>PAUSED</h2>
+    <p class="muted">November ${G.day}. The lake will wait. (It won't, but the game will.)</p>
+    <button class="btn" data-act="resume">Resume</button><br>
+    <button class="btn ghost" data-act="mute">${Audio.muted ? '🔇 Sound off' : '🔊 Sound on'}</button>
+    <button class="btn ghost" data-act="how">How to play</button><br>
+    <button class="link" data-act="quit">Quit to title</button>
+  `, act => {
+    if (act === 'resume') setState('play');
+    else if (act === 'mute') { Audio.setMuted(!Audio.muted); setState('play'); pause(); }
+    else if (act === 'how') showHow(() => { setState('play'); pause(); });
+    else { Music.stop(); showTitle(); }
+  });
+}
+
+// November 10 is the real anniversary, so it gets a real note, not a level.
+function showMemorial() {
+  setState('memorial');
+  SFX.bell();
+  showCard(`
+    <p class="date">NOVEMBER 10</p>
+    <h2>THE LEGEND LIVES ON</h2>
+    <p>On November 10, 1975, the SS Edmund Fitzgerald was lost in a storm on Lake Superior.
+       All 29 of her crew died.</p>
+    <p>Every year, the Mariners' Church of Detroit rings its bell once for each of them,
+       and once more for every sailor lost on the Great Lakes.</p>
+    <p>The memes are silly. The sailors were real. Hug your dad, and listen to
+       Gordon Lightfoot's song tonight. All six minutes.</p>
+    <button class="btn" data-act="go">Continue</button>
+  `, () => showEnd());
+  card.classList.add('memorial');
+}
+
+function showEnd() {
+  setState('end');
+  const best = Math.max(+store.get('best', 0), G.score);
+  store.set('best', best);
+  store.set('won', +store.get('won', 0) + 1);
+  const mins = Math.max(1, Math.round((performance.now() - G.stats.start) / 60000));
+  showCard(`
+    <h1 style="font-size:clamp(30px,7vw,44px)">NOVEMBER DEFENDED</h1>
+    <p class="sub">IT AIN'T CHRISTMAS YET</p>
+    <p>The decorations may now come out. After Thanksgiving. Not one minute sooner.</p>
+    <div class="stats">
+      <span>Score</span><span>${G.score.toLocaleString()}</span>
+      <span>Best</span><span>${best.toLocaleString()}</span>
+      <span>Decorations popped</span><span>${G.stats.pops}</span>
+      <span>Horns blown</span><span>${G.stats.horns}</span>
+      <span>Christmas that got through</span><span>${G.stats.creepTotal}%</span>
+      <span>Times Dad played the song</span><span>${G.dad}</span>
+      <span>Minutes about a boat</span><span>${mins}</span>
+    </div>
+    <p class="muted">📻 Dad: "That's my kid. Okay. NOW we can talk about Thanksgiving."</p>
+    <button class="btn" data-act="again">Defend it again</button><br>
+    <a class="btn ghost" href="../">🎮 All games</a>
+    <p class="muted" style="font-size:12px">A fan-made joke game. Not affiliated with Gordon Lightfoot's estate,
+       anyone's lawn Santa, or Lake Superior, who did not consent to any of this.</p>
+  `, () => showStory());
+}
+
+function bossBanner() {
+  floater(W / 2, waterY - 260, 'THE GREAT INFLATABLE', '#ff8fa3');
+  SFX.deflate();
+  G.shake = 10;
+}
+
+let radioTimer = 0;
+function say(who, text) {
+  const el = $('radio');
+  el.innerHTML = `<b>${who}</b>${text.replace('{n}', G.dad)}`;
+  el.classList.add('show');
+  clearTimeout(radioTimer);
+  radioTimer = setTimeout(() => el.classList.remove('show'), 4200);
+}
+
+function updateHud() {
+  const d = DAYS[G.day];
+  $('dateText').textContent = 'NOV ' + G.day + (G.midnight ? ' · MIDNIGHT' : '');
+  $('datePill').style.setProperty('--p', (d.boss ? 0 : clamp(G.dayT / d.len, 0, 1) * 100) + '%');
+  $('hullBar').style.width = clamp(G.hull / G.maxHull, 0, 1) * 100 + '%';
+  $('creepBar').style.width = clamp(G.creep, 0, 100) + '%';
+  const showBoss = !!(G.boss && G.boss.rise >= 1);
+  $('bossMeter').hidden = !showBoss;
+  if (showBoss) $('bossBar').style.width = (G.boss.hp / BOSS_HP) * 100 + '%';
+  $('scorePill').textContent = G.score.toLocaleString();
+  $('dadPill').textContent = '📻 Dad played the song ' + G.dad + '×';
+  const hb = $('hornBtn');
+  hb.style.setProperty('--charge', G.horn.toFixed(3));
+  hb.classList.toggle('ready', G.horn >= 1);
+}
+
+/* =====================  6. DRAWING  ===================== */
+
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+
+function draw() {
+  ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
+  let sx = 0, sy = 0;
+  if (G.shake > 0 && !REDUCED_MOTION) { sx = rand(-G.shake, G.shake); sy = rand(-G.shake, G.shake); }
+  ctx.translate(sx, sy);
+
+  drawSky();
+  drawShore();
+  if (G.boss) drawBoss(G.boss);
+  for (const e of G.enemies) if (!(e.kind === 'deckelf' && e.attached)) drawEnemy(e);
+  for (const p of G.pickups) drawPickup(p);
+  drawShip();
+  for (const e of G.enemies) if (e.kind === 'deckelf' && e.attached) drawEnemy(e);
+  drawWater();
+  for (const p of G.pellets) {
+    ctx.fillStyle = '#4a3f3a'; ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#9b8b80'; ctx.beginPath(); ctx.arc(p.x - 1.2, p.y - 1.2, 1.4, 0, Math.PI * 2); ctx.fill();
+  }
+  drawParticles();
+  for (const ring of G.rings) {
+    ctx.strokeStyle = `rgba(255, 209, 102, ${1 - ring.r / ring.max})`;
+    ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(ring.x, ring.y, ring.r, 0, Math.PI * 2); ctx.stroke();
+  }
+  for (const f of G.floaters) {
+    ctx.globalAlpha = 1 - f.t / f.life;
+    ctx.font = "16px Bungee, sans-serif"; ctx.textAlign = 'center';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.strokeText(f.text, f.x, f.y);
+    ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// Clouds are fixed shapes that drift; generated once.
+const CLOUDS = Array.from({ length: 9 }, () => ({ x: rand(0, 1400), y: rand(0, 0.45), w: rand(120, 260), s: rand(6, 16) }));
+
+function drawSky() {
+  const g = G.gale;
+  const sky = ctx.createLinearGradient(0, 0, 0, waterY);
+  sky.addColorStop(0, `rgb(${lerp(86, 50, g)}, ${lerp(103, 60, g)}, ${lerp(122, 74, g)})`);
+  sky.addColorStop(1, `rgb(${lerp(170, 120, g)}, ${lerp(180, 130, g)}, ${lerp(186, 140, g)})`);
+  ctx.fillStyle = sky; ctx.fillRect(-20, -20, W + 40, waterY + 40);
+  for (const c of CLOUDS) {
+    const x = ((c.x - G.t * (c.s + G.wind * 0.5)) % (W + 400) + W + 400) % (W + 400) - 200;
+    const y = 30 + c.y * (waterY - 60);
+    ctx.fillStyle = `rgba(${lerp(220, 120, g)}, ${lerp(225, 128, g)}, ${lerp(230, 138, g)}, .55)`;
+    ctx.beginPath();
+    ctx.ellipse(x, y, c.w * 0.5, 18, 0, 0, Math.PI * 2);
+    ctx.ellipse(x - c.w * 0.2, y - 10, c.w * 0.25, 16, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + c.w * 0.18, y - 8, c.w * 0.22, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Far horizon: the distant Canadian shore.
+  ctx.fillStyle = 'rgba(60, 76, 88, .55)';
+  ctx.beginPath(); ctx.moveTo(W * 0.35, waterY - 4);
+  for (let x = W * 0.35; x <= W + 20; x += 40) ctx.lineTo(x, waterY - 10 - Math.sin(x * 0.013) * 5 - Math.sin(x * 0.041) * 3);
+  ctx.lineTo(W + 20, waterY); ctx.lineTo(W * 0.35, waterY); ctx.fill();
+  for (const f of G.flakes) { ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill(); }
+}
+
+// The town Christmas is trying to reach. Its houses light up as creep rises.
+function drawShore() {
+  const base = waterY + 6;
+  ctx.fillStyle = '#3a3f36';
+  ctx.beginPath(); ctx.moveTo(-20, H); ctx.lineTo(-20, base - 40); ctx.lineTo(SHORE_X - 20, base - 34);
+  ctx.quadraticCurveTo(SHORE_X + 12, base - 20, SHORE_X + 18, base + 30); ctx.lineTo(SHORE_X + 18, H); ctx.fill();
+  // Pines
+  ctx.fillStyle = '#23302a';
+  for (let i = 0; i < 5; i++) {
+    const x = 4 + i * 14, h = 34 + (i % 2) * 10;
+    ctx.beginPath(); ctx.moveTo(x, base - 36 - h); ctx.lineTo(x - 9, base - 36); ctx.lineTo(x + 9, base - 36); ctx.fill();
+  }
+  // Houses
+  const lit = G.creep / 100;
+  [[6, 22, '#6b5847'], [34, 18, '#7d6b5a'], [52, 24, '#5e5148']].forEach(([x, h, c], i) => {
+    const y = base - 36 - h;
+    ctx.fillStyle = c; ctx.fillRect(x, y, 20, h);
+    ctx.fillStyle = '#2f2a28'; ctx.beginPath(); ctx.moveTo(x - 3, y); ctx.lineTo(x + 10, y - 10); ctx.lineTo(x + 23, y); ctx.fill();
+    ctx.fillStyle = '#ffd98a'; ctx.fillRect(x + 6, y + 6, 6, 5);
+    if (lit > (i + 0.5) / 3.5) { // Christmas lights. Too early. Ugh.
+      for (let k = 0; k < 6; k++) {
+        ctx.fillStyle = CONFETTI[(k + Math.floor(G.t * 3)) % 4];
+        ctx.beginPath(); ctx.arc(x - 1 + k * 4.4, y - 8 + Math.abs(k - 2.5) * 2.6, 1.6, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+  });
+  // Lighthouse with a sweeping beam.
+  const lx = SHORE_X - 6, ly = base - 40;
+  const beam = Math.sin(G.t * 1.4);
+  ctx.fillStyle = `rgba(255, 240, 180, ${0.05 + 0.06 * Math.abs(beam)})`;
+  ctx.beginPath(); ctx.moveTo(lx, ly - 46); ctx.lineTo(lx + 240, ly - 46 - 28 + beam * 24); ctx.lineTo(lx + 240, ly - 46 + 28 + beam * 24); ctx.fill();
+  ctx.fillStyle = '#efe9dc'; ctx.beginPath(); ctx.moveTo(lx - 8, ly); ctx.lineTo(lx - 5, ly - 40); ctx.lineTo(lx + 5, ly - 40); ctx.lineTo(lx + 8, ly); ctx.fill();
+  ctx.fillStyle = '#b3261e'; ctx.fillRect(lx - 6, ly - 28, 12, 6); ctx.fillRect(lx - 6, ly - 52, 12, 6);
+  ctx.fillStyle = '#ffe9a6'; ctx.fillRect(lx - 4, ly - 46, 8, 6);
+}
+
+function drawWater() {
+  const grad = ctx.createLinearGradient(0, waterY - 30, 0, H);
+  grad.addColorStop(0, 'rgba(44, 92, 108, .93)');
+  grad.addColorStop(1, 'rgba(10, 30, 40, .98)');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.moveTo(SHORE_X + 10, H + 20);
+  const pts = [];
+  for (let x = SHORE_X + 10; x <= W + 10; x += 8) { const y = surf(x); pts.push([x, y]); ctx.lineTo(x, y); }
+  ctx.lineTo(W + 10, H + 20); ctx.fill();
+  // Foam on the surface line and on crests.
+  ctx.strokeStyle = 'rgba(230, 245, 250, .55)'; ctx.lineWidth = 2;
+  ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+  ctx.fillStyle = 'rgba(240, 250, 255, .7)';
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [x, y] = pts[i];
+    if (y < pts[i - 1][1] && y <= pts[i + 1][1] && y < waterY - 5) {
+      ctx.beginPath(); ctx.ellipse(x, y + 1, 9, 3, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+}
+
+function drawShip() {
+  ctx.save();
+  ctx.translate(ship.x, ship.y); ctx.rotate(ship.ang);
+  const L = ship.L, h = L / 2;
+  // Hull: dark red, black at the waterline, raked bow on the right.
+  ctx.fillStyle = '#7d1d1a';
+  ctx.beginPath(); ctx.moveTo(-h, -22); ctx.lineTo(h - 6, -26); ctx.lineTo(h + 8, -26); ctx.lineTo(h - 6, 16); ctx.lineTo(-h + 10, 16);
+  ctx.quadraticCurveTo(-h - 4, 10, -h, -22); ctx.fill();
+  ctx.fillStyle = '#1b1b1b';
+  ctx.beginPath(); ctx.moveTo(-h + 1, 2); ctx.lineTo(h + 1, 2); ctx.lineTo(h - 6, 16); ctx.lineTo(-h + 10, 16); ctx.quadraticCurveTo(-h - 2, 12, -h + 1, 2); ctx.fill();
+  ctx.fillStyle = '#e9e4d8'; ctx.font = "9px Bungee, sans-serif"; ctx.textAlign = 'right';
+  ctx.fillText('S.S. NOVEMBER', h - 14, -9);
+  // Deck and hatch covers.
+  ctx.fillStyle = '#5a5f63'; ctx.fillRect(-h + 4, -27, L - 10, 5);
+  ctx.fillStyle = '#8a9096';
+  for (let x = -h + 82; x < h - 70; x += 17) ctx.fillRect(x, -31, 12, 4);
+  // Stern engine house and stack.
+  ctx.fillStyle = '#efe9dc'; ctx.fillRect(-h + 8, -56, 66, 30);
+  ctx.fillStyle = '#2b3a4a'; for (let x = -h + 14; x < -h + 70; x += 11) ctx.fillRect(x, -50, 7, 6);
+  ctx.fillStyle = '#1b1b1b'; ctx.fillRect(-h + 28, -84, 20, 30);
+  ctx.fillStyle = '#e8b64c'; ctx.fillRect(-h + 28, -76, 20, 6);
+  // Forward pilothouse, stacked up at the bow like a real laker.
+  ctx.fillStyle = '#efe9dc'; ctx.fillRect(h - 58, -52, 46, 26); ctx.fillRect(h - 50, -68, 34, 16);
+  ctx.fillStyle = '#2b3a4a'; ctx.fillRect(h - 48, -64, 30, 6);
+  for (let x = h - 54; x < h - 16; x += 10) ctx.fillRect(x, -46, 6, 5);
+  ctx.strokeStyle = '#efe9dc'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(h - 34, -68); ctx.lineTo(h - 34, -86); ctx.stroke();
+  // Cannons on deck.
+  turretSpots().forEach((lx, i) => {
+    ctx.save(); ctx.translate(lx, -36);
+    ctx.rotate((ship.aims[i] || -1.2) - ship.ang);
+    ctx.fillStyle = '#3d4246'; ctx.fillRect(0, -4, 22, 8);
+    ctx.restore();
+    ctx.fillStyle = '#5c6268'; ctx.beginPath(); ctx.arc(lx, -34, 9, Math.PI, 0); ctx.fill();
+  });
+  if (ship.flash > 0 || (G.iframes > 0 && Math.floor(G.t * 20) % 2)) {
+    // Tint just the boat's own shapes white, not a box around it.
+    ctx.globalAlpha = Math.max(ship.flash, 0.25) * 0.6; ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.moveTo(-h, -22); ctx.lineTo(h + 8, -26); ctx.lineTo(h - 6, 16); ctx.lineTo(-h + 10, 16);
+    ctx.quadraticCurveTo(-h - 4, 10, -h, -22); ctx.fill();
+    ctx.fillRect(-h + 8, -56, 66, 30); ctx.fillRect(-h + 28, -84, 20, 30);
+    ctx.fillRect(h - 58, -52, 46, 26); ctx.fillRect(h - 50, -68, 34, 16);
+    ctx.globalAlpha = 1;
+  }
+  if (G.ope) {
+    ctx.strokeStyle = 'rgba(154, 209, 255, .8)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(0, -30, h + 24, 72, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawEnemy(e) {
+  KINDS[e.kind].draw(e);
+  if (e.hitT > 0) { // white blink when hit
+    ctx.globalAlpha = 0.5; ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+  }
+}
+
+function drawSanta(x, y, s, wob, chute) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.scale(s * (1 + wob * 0.12 * Math.sin(G.t * 40)), s * (1 - wob * 0.1 * Math.sin(G.t * 40)));
+  if (chute) {
+    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(-14, -26); ctx.lineTo(-30, -66); ctx.moveTo(14, -26); ctx.lineTo(30, -66); ctx.stroke();
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = i % 2 ? '#fff' : '#2a9d8f';
+      ctx.beginPath(); ctx.moveTo(0, -66); ctx.arc(0, -66, 34, Math.PI + i * Math.PI / 4, Math.PI + (i + 1) * Math.PI / 4); ctx.fill();
+    }
+  }
+  ctx.fillStyle = '#d62828'; ctx.beginPath(); ctx.ellipse(0, 0, 21, 24, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-22, -4 + Math.sin(G.t * 5 + x) * 3, 7, 12, 0.5, 0, Math.PI * 2); ctx.ellipse(22, -4 - Math.sin(G.t * 5 + x) * 3, 7, 12, -0.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#1b1b1b'; ctx.fillRect(-21, 3, 42, 6);
+  ctx.fillStyle = '#ffd166'; ctx.fillRect(-4, 2, 8, 8);
+  ctx.fillStyle = '#f4c7a1'; ctx.beginPath(); ctx.arc(0, -28, 11, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(0, -20, 12, 9, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#1b1b1b'; ctx.beginPath(); ctx.arc(-4, -30, 1.6, 0, Math.PI * 2); ctx.arc(4, -30, 1.6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#d62828'; ctx.beginPath(); ctx.moveTo(-12, -34); ctx.lineTo(12, -34); ctx.lineTo(15, -50); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.fillRect(-13, -37, 26, 5); ctx.beginPath(); ctx.arc(15, -50, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(-9, -8, 4, 9, 0.4, 0, Math.PI * 2); ctx.fill(); // vinyl shine
+  ctx.restore();
+}
+
+function drawBoss(b) {
+  const s = b.s * 4.2;
+  ctx.save();
+  if (!b.flying && !b.dying) { // guy ropes, like a real lawn inflatable
+    ctx.strokeStyle = 'rgba(240,240,240,.6)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(b.x - 60 * b.s, b.y - 120 * b.s); ctx.lineTo(b.x - 150, surf(b.x - 150));
+    ctx.moveTo(b.x + 60 * b.s, b.y - 120 * b.s); ctx.lineTo(b.x + 140, surf(b.x + 140)); ctx.stroke();
+  }
+  drawSanta(b.x, b.y - 140 * b.s, s, b.hitT > 0 ? 0.6 : 0.15, false);
+  if (b.rise >= 1 && !b.dying && Math.sin(b.t * 1.3) > 0.85) {
+    ctx.font = "18px Bungee, sans-serif"; ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+    ctx.fillText(b.flying ? 'PFFFFFT' : 'HO HO HO', b.x - 20, b.y - 300 * b.s);
+  }
+  if (b.hitT > 0) { const c = bossCenter(b); ctx.globalAlpha = 0.25; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; }
+  ctx.restore();
+}
+
+function drawReindeer(x, y, ph) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = '#8b5a2b';
+  ctx.beginPath(); ctx.ellipse(0, 0, 18, 9, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-19, -9, 7, 5, -0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#8b5a2b'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-13, -4); ctx.lineTo(-17, -9); ctx.stroke();
+  for (let i = 0; i < 4; i++) { // galloping legs
+    const lx = -10 + i * 7, sw = Math.sin(ph + i * 1.6) * 5;
+    ctx.beginPath(); ctx.moveTo(lx, 6); ctx.lineTo(lx + sw, 16); ctx.stroke();
+  }
+  ctx.strokeStyle = '#d9c7a3'; ctx.lineWidth = 2; // antlers
+  ctx.beginPath(); ctx.moveTo(-20, -13); ctx.lineTo(-24, -24); ctx.lineTo(-28, -26); ctx.moveTo(-23, -21); ctx.lineTo(-19, -25);
+  ctx.moveTo(-17, -13); ctx.lineTo(-15, -23); ctx.lineTo(-11, -26); ctx.stroke();
+  ctx.fillStyle = '#3b2412'; ctx.beginPath(); ctx.arc(-25, -9, 2.5, 0, Math.PI * 2); ctx.fill(); // plain brown nose
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(18, -3, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#b3261e'; ctx.fillRect(-6, -10, 12, 5); // tiny saddle
+  ctx.restore();
+}
+
+function drawElfSki(x, y, slope) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(slope);
+  ctx.fillStyle = '#e63946';
+  ctx.beginPath(); ctx.moveTo(-20, 0); ctx.lineTo(18, 0); ctx.quadraticCurveTo(24, 6, 14, 9); ctx.lineTo(-16, 9); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.fillRect(-12, 2, 22, 2);
+  ctx.fillStyle = '#2a9d8f'; ctx.fillRect(-6, -14, 10, 14);
+  ctx.fillStyle = '#f4c7a1'; ctx.beginPath(); ctx.arc(-1, -19, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#2a9d8f'; ctx.beginPath(); ctx.moveTo(-7, -22); ctx.lineTo(5, -22); ctx.lineTo(10, -34); ctx.fill();
+  ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(10, -34, 2.5, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-6, -8); ctx.lineTo(-16, -6); ctx.stroke();
+  ctx.restore();
+}
+
+function drawDeckElf(x, y, ang, swimming) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+  if (!swimming) { ctx.fillStyle = '#2a9d8f'; ctx.fillRect(-6, -2, 12, 12); }
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(0, -3, 8, 3, 0, 0, Math.PI * 2); ctx.fill(); // collar
+  ctx.fillStyle = '#f4c7a1'; ctx.beginPath(); ctx.arc(0, -10, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-2.5, -11, 2.4, 0, Math.PI * 2); ctx.arc(2.5, -11, 2.4, 0, Math.PI * 2); ctx.fill();
+  const look = Math.sin(G.t * 0.7) * 1.2; // shifty, sideways eyes
+  ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(-2.5 + look, -11, 1.2, 0, Math.PI * 2); ctx.arc(2.5 + look, -11, 1.2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#2a9d8f'; ctx.beginPath(); ctx.moveTo(-8, -14); ctx.lineTo(8, -14); ctx.lineTo(0, -28); ctx.fill();
+  ctx.restore();
+}
+
+function drawLatte(x, y) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-11, -12); ctx.lineTo(11, -12); ctx.lineTo(8, 14); ctx.lineTo(-8, 14); ctx.fill();
+  ctx.fillStyle = '#d62828'; ctx.fillRect(-10, -3, 20, 9);
+  ctx.fillStyle = '#fff'; for (let i = -8; i < 10; i += 6) ctx.fillRect(i, -3, 2, 9);
+  ctx.fillStyle = '#6b4226'; ctx.fillRect(-13, -16, 26, 5);
+  ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 2;
+  for (let i = 0; i < 2; i++) {
+    const sx = -4 + i * 8, w = Math.sin(G.t * 4 + i) * 3;
+    ctx.beginPath(); ctx.moveTo(sx, -19); ctx.quadraticCurveTo(sx + w, -25, sx, -31); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawPickup(p) {
+  ctx.save(); ctx.translate(p.x, p.y + Math.sin(p.t * 4) * 1.5);
+  if (p.kind === 'pasty') {
+    ctx.fillStyle = '#d9a556'; ctx.beginPath(); ctx.arc(0, 0, 12, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#b07a35'; for (let a = 0; a <= 6; a++) { ctx.beginPath(); ctx.arc(Math.cos(Math.PI + a * Math.PI / 6) * 11, Math.sin(Math.PI + a * Math.PI / 6) * 11, 2.2, 0, Math.PI * 2); ctx.fill(); }
+  } else if (p.kind === 'thermos') {
+    ctx.fillStyle = '#b3261e'; ctx.fillRect(-6, -16, 12, 22);
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(-6, -10, 12, 3); ctx.fillRect(-6, -2, 12, 3); ctx.fillRect(-2, -16, 3, 22);
+    ctx.fillStyle = '#9aa1a6'; ctx.fillRect(-5, -21, 10, 5);
+  } else {
+    ctx.strokeStyle = '#9ad1ff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, -6, 13, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#9ad1ff'; ctx.font = "10px Bungee, sans-serif"; ctx.textAlign = 'center'; ctx.fillText('OPE', 0, -2);
+  }
+  ctx.restore();
+}
+
+function drawParticles() {
+  for (const p of G.parts) {
+    const a = 1 - p.t / p.life;
+    if (p.kind === 'confetti') {
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.globalAlpha = a; ctx.fillStyle = p.c;
+      ctx.fillRect(-p.r, -p.r * 0.5, p.r * 2, p.r); ctx.restore();
+    } else if (p.kind === 'smoke') {
+      ctx.globalAlpha = a * 0.35; ctx.fillStyle = '#d0d4d8'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    } else {
+      ctx.globalAlpha = a; ctx.fillStyle = p.kind === 'glitter' ? p.c : '#e8f6fb';
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** Draw one enemy kind into a small image for the briefing card. */
+function previewImg(kind) {
+  if (!KINDS[kind] && kind !== 'boss' && kind !== 'gale') return '';
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const pctx = c.getContext('2d');
+  const prev = ctx;
+  ctx = pctx;
+  try {
+    ctx.setTransform(2, 0, 0, 2, 0, 0);
+    if (kind === 'boss' || kind === 'santa') drawSanta(32, 44, 0.78, 0, false);
+    else if (kind === 'gale') {
+      ctx.strokeStyle = '#cfe8f0'; ctx.lineWidth = 3;
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(6, 20 + i * 12); ctx.bezierCurveTo(20, 10 + i * 12, 40, 30 + i * 12, 58, 18 + i * 12); ctx.stroke(); }
+    } else {
+      const e = { id: 1, x: 32, y: kind === 'santa' ? 40 : 34, rot: -0.3, vx: 0, attached: false, swim: false, floating: true, wob: 0 };
+      if (kind === 'elfski') drawElfSki(32, 40, 0);
+      else KINDS[kind].draw(e);
+    }
+  } catch (err) { /* previews are decoration; never block the card */ }
+  ctx = prev;
+  return c.toDataURL();
+}
+
+/* =====================  7. INPUT AND MAIN LOOP  ===================== */
+
+function toWorldX(clientX) { return clientX / scale; }
+
+canvas.addEventListener('pointerdown', e => {
+  Audio.init();
+  if (G.state !== 'play') return;
+  pointer.active = true; pointer.x = toWorldX(e.clientX);
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', e => { if (pointer.active) pointer.x = toWorldX(e.clientX); });
+['pointerup', 'pointercancel'].forEach(t => canvas.addEventListener(t, () => { pointer.active = false; }));
+
+$('hornBtn').addEventListener('pointerdown', e => { e.preventDefault(); Audio.init(); blowHorn(); });
+$('pauseBtn').addEventListener('click', () => pause());
+
+const KEYMAP = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
+window.addEventListener('keydown', e => {
+  if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = true; e.preventDefault(); }
+  else if ((e.code === 'Space' || e.code === 'KeyH' || e.code === 'ArrowUp') && G.state === 'play') { e.preventDefault(); Audio.init(); blowHorn(); }
+  else if (e.code === 'KeyP' || e.code === 'Escape') { if (G.state === 'play') pause(); else if (G.state === 'paused') setState('play'); }
+  else if (e.code === 'KeyM') Audio.setMuted(!Audio.muted);
+});
+window.addEventListener('keyup', e => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false; });
+window.addEventListener('blur', () => { keys.left = keys.right = false; pause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.033, (now - last) / 1000);
+  last = now;
+  // The lake keeps moving behind the cards; the game only runs while playing.
+  const live = G.state === 'play';
+  G.t += dt;
+  G.shake = Math.max(0, G.shake - dt * 30);
+  for (let i = 0; i < SPEED; i++) {
+    if (i) G.t += dt;
+    updateWaves(dt);
+    if (G.state === 'play') updatePlay(dt);
+    else updateShip(dt);
+  }
+  updateParticles(dt);
+  draw();
+  if (live) updateHud();
+  Music.tick();
+}
+
+G.up = freshUpgrades();
+G.stats = { pops: 0, horns: 0, creepTotal: 0, start: performance.now() };
+ship.x = W * 0.42;
+showTitle();
+requestAnimationFrame(frame);
+if (DEBUG) window.__fitz = { G, ship, KINDS, spawnEnemy, finishDay, damageBoss, BOSS_HP };
+</script>
+</body>
+</html>
