@@ -1,0 +1,3531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Unicorn Quest: The Lost Magic</title>
+<meta name="description" content="A gentle platformer for little players. Win back the lost magic across 50 lava lands!">
+<link rel="manifest" href="../manifest.json">
+<meta name="theme-color" content="#2a1040">
+<link rel="icon" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Unicorn Quest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400..600&family=Pacifico&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #2a1040; height: 100%; }
+  /* Pinned so every device matches: bubbly rounded for reading, script for titles.
+     The old system stack stays as an offline fallback. */
+  body {
+    font-family: 'Fredoka', 'Baloo 2', 'Comic Sans MS', 'Chalkboard SE', 'Segoe Print', cursive, sans-serif;
+    font-weight: 500; letter-spacing: .2px;
+    user-select: none;
+  }
+  .card h1, .card h2 {
+    font-family: 'Pacifico', 'Chalkboard SE', 'Comic Sans MS', cursive;
+    font-weight: 400;
+    line-height: 1.3;
+  }
+  ::selection { background: #ffc9e8; color: #7a2f8f; }
+  canvas { display: block; }
+
+  /* ---------- HUD: little frosted candy pills ---------- */
+  #hud {
+    position: fixed; top: 14px; left: 16px; z-index: 5;
+    display: flex; gap: 8px; align-items: center;
+    pointer-events: none;
+  }
+  #hud .pill {
+    font-size: 22px; font-weight: 600; color: #b0299c;
+    background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,222,242,.92));
+    border: 2px solid rgba(255,255,255,.95);
+    border-radius: 999px; padding: 3px 16px 5px;
+    box-shadow: 0 5px 16px rgba(120,0,90,.28);
+  }
+
+  #mute, #pauseBtn {
+    position: fixed; top: 12px; right: 14px; z-index: 5;
+    width: 54px; height: 54px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.85);
+    background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,186,224,.45));
+    font-size: 26px; cursor: pointer;
+    box-shadow: 0 5px 14px rgba(120,0,90,.25);
+  }
+  #pauseBtn { right: 78px; }
+  #mute:active, #pauseBtn:active { transform: scale(.92); }
+
+  @media (max-width: 520px) {
+    #hud { top: 10px; left: 10px; gap: 5px; }
+    #hud .pill { font-size: 15px; padding: 2px 11px 4px; border-width: 1.5px; }
+    #mute, #pauseBtn { width: 44px; height: 44px; font-size: 21px; top: 10px; }
+    #mute { right: 10px; }
+    #pauseBtn { right: 60px; }
+  }
+  @media (max-width: 380px) {
+    #hud .pill { font-size: 13px; padding: 2px 8px 3px; }
+    #mute, #pauseBtn { width: 40px; height: 40px; font-size: 19px; top: 8px; }
+    #mute { right: 8px; }
+    #pauseBtn { right: 54px; }
+  }
+
+  .touchbtn {
+    position: fixed; bottom: 20px; z-index: 5;
+    border: 3px solid rgba(255,255,255,.8); border-radius: 50%;
+    background: linear-gradient(180deg, rgba(255,255,255,.5), rgba(203,163,255,.42));
+    color: #fff; font-size: 34px; text-shadow: 0 2px 4px rgba(60,0,60,.5);
+    width: 78px; height: 78px; cursor: pointer; touch-action: none;
+    box-shadow: 0 6px 16px rgba(80,0,80,.28), inset 0 6px 12px rgba(255,255,255,.45);
+  }
+  .touchbtn:active { background: linear-gradient(180deg, rgba(255,255,255,.7), rgba(203,163,255,.6)); transform: scale(.94); }
+  #btnL { left: 20px; }
+  #btnR { left: 112px; }
+  #btnJ {
+    right: 20px; width: 96px; height: 96px; font-size: 44px;
+    background: linear-gradient(180deg, rgba(255,214,238,.7), rgba(255,143,200,.55));
+    animation: jglow 2.4s ease-in-out infinite;
+  }
+  @keyframes jglow {
+    0%,100% { box-shadow: 0 6px 16px rgba(80,0,80,.28), inset 0 6px 12px rgba(255,255,255,.45), 0 0 0 0 rgba(255,150,215,0); }
+    50%     { box-shadow: 0 6px 16px rgba(80,0,80,.28), inset 0 6px 12px rgba(255,255,255,.45), 0 0 24px 5px rgba(255,150,215,.45); }
+  }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, rgba(150,70,180,.55), rgba(55,12,88,.68));
+  }
+  /* floating hearts + sparkles drifting up behind the card */
+  .sprinkles { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .sprinkles span {
+    position: absolute; bottom: -50px; opacity: 0;
+    animation-name: floatUp; animation-timing-function: linear; animation-iteration-count: infinite;
+  }
+  @keyframes floatUp {
+    0%   { transform: translateY(0) rotate(-12deg) scale(.75); opacity: 0; }
+    12%  { opacity: .85; }
+    85%  { opacity: .85; }
+    100% { transform: translateY(-106vh) rotate(16deg) scale(1.1); opacity: 0; }
+  }
+
+  .card {
+    position: relative;
+    background-image:
+      radial-gradient(rgba(255,180,222,.4) 1.7px, transparent 1.8px),
+      linear-gradient(180deg, #fff7fc, #ffe6f5);
+    background-size: 22px 22px, 100% 100%;
+    border: 4px solid #fff;
+    border-radius: 34px; padding: 26px 40px; text-align: center;
+    box-shadow: 0 0 0 5px rgba(255,178,222,.85),
+                0 18px 60px rgba(30,0,50,.45),
+                0 0 70px rgba(255,150,215,.3);
+    max-width: min(640px, 94vw); max-height: 94vh; overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: #ffb2de transparent;
+    /* fitCards() shrinks --fit when the window is too short for the card,
+       so nobody ever has to scroll a card to find the Play button. */
+    transform: scale(var(--fit, 1)); transform-origin: center center;
+  }
+  .card::-webkit-scrollbar { width: 10px; }
+  .card::-webkit-scrollbar-track { background: transparent; }
+  .card::-webkit-scrollbar-thumb {
+    background: #ffb2de; border-radius: 999px;
+    border: 2px solid transparent; background-clip: padding-box;
+  }
+  .card h1 {
+    margin: 4px 0 0; font-size: 42px;
+    background: linear-gradient(180deg, #ff7ec4 0%, #d02c9e 55%, #a92bb0 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 2px 0 rgba(255,255,255,.9)) drop-shadow(0 5px 10px rgba(200,40,150,.3));
+  }
+  .card h2 { margin: 2px 0 10px; font-size: 22px; color: #8a5fd0; }
+  .card p  { font-size: 19px; line-height: 1.5; color: #6b5385; margin: 8px 0 14px; }
+  .bigmoji {
+    font-size: 66px; display: inline-block; position: relative;
+    animation: bounce 1.6s ease-in-out infinite;
+    filter: drop-shadow(0 6px 10px rgba(190,60,150,.3));
+  }
+  .bigmoji::before, .bigmoji::after {
+    content: '✨'; position: absolute; font-size: 22px; filter: none;
+    animation: twinkle 1.9s ease-in-out infinite;
+  }
+  .bigmoji::before { left: -28px; top: 8px; }
+  .bigmoji::after  { right: -28px; top: 22px; animation-delay: .95s; }
+  @keyframes twinkle { 0%,100% { transform: scale(.6) rotate(-12deg); opacity: .35; }
+                       50%     { transform: scale(1.1) rotate(12deg);  opacity: 1; } }
+  @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
+  .playbtn {
+    position: relative; overflow: hidden;
+    font-family: inherit; font-weight: 600; font-size: 26px; color: #fff; cursor: pointer;
+    background: linear-gradient(180deg, #ffa3d6, #f453a4);
+    border: 3px solid #fff; border-radius: 999px; padding: 14px 40px;
+    text-shadow: 0 2px 3px rgba(160,20,100,.35);
+    box-shadow: 0 8px 0 #c22c7c, 0 14px 28px rgba(190,40,120,.4);
+  }
+  .playbtn::after {   /* candy shine sweeping across */
+    content: ''; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+    animation: shine 3.6s ease-in-out infinite;
+  }
+  @keyframes shine { 0% { left: -60%; } 45%, 100% { left: 130%; } }
+  .playbtn:active { transform: translateY(6px); box-shadow: 0 2px 0 #c22c7c; }
+  .smallbtn {
+    font-family: inherit; font-weight: 500; font-size: 18px; cursor: pointer;
+    background: #fff; border: 2.5px dashed #ffaed8; color: #c22c7c;
+    border-radius: 999px; padding: 10px 24px; margin: 12px 4px 0;
+    box-shadow: 0 3px 0 rgba(255,174,216,.45);
+  }
+  .smallbtn:active { transform: scale(.95); }
+  a.smallbtn { display: inline-block; text-decoration: none; }
+  .keys { font-size: 15px; color: #9a7fb8; margin-top: 14px; }
+  .hidden { display: none !important; }
+
+  .levelmap {
+    display: flex; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    margin: 18px auto 2px; max-width: 380px; padding: 14px 12px 8px;
+    border-radius: 26px; background: rgba(255,255,255,.55);
+    border: 2.5px dashed #ffc3e6;
+    scrollbar-width: thin; scrollbar-color: #ffb2de transparent;
+  }
+  .levelmap::-webkit-scrollbar { height: 8px; }
+  .levelmap::-webkit-scrollbar-track { background: transparent; }
+  .levelmap::-webkit-scrollbar-thumb {
+    background: #ffb2de; border-radius: 999px;
+    border: 2px solid transparent; background-clip: padding-box;
+  }
+  .lvlwrap {
+    flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    scroll-snap-align: center;
+  }
+  .lvlnum { font-size: 11px; color: #9a7fb8; line-height: 1; }
+  .lvlwrap.here .lvlnum { color: #d02c9e; font-weight: 600; }
+  .lvlbtn {
+    width: 46px; height: 46px; flex: none;
+    border-radius: 50%; border: 3px solid #fff;
+    font-size: 22px; font-family: inherit; font-weight: 600; cursor: pointer;
+    /* buttons come with side padding, which squeezes the content box narrower
+       than the emoji and shoves it off to the right */
+    padding: 0; line-height: 1;
+    box-shadow: 0 4px 0 rgba(200,90,160,.25), 0 6px 12px rgba(190,60,150,.18);
+    position: relative;
+  }
+  .lvlbtn.perfect::after {
+    content: '⭐'; position: absolute; top: -8px; right: -8px; font-size: 15px;
+    filter: drop-shadow(0 1px 2px rgba(180,120,0,.5));
+  }
+  .lvlbtn:active { transform: translateY(3px); box-shadow: none; }
+  .lvlbtn.done   { background: linear-gradient(180deg, #fff0bd, #ffd353); }
+  .lvlbtn.next   { background: linear-gradient(180deg, #ffa3d6, #f453a4); color: #fff; animation: pulse 1.2s ease-in-out infinite; }
+  .lvlbtn.locked {
+    background: linear-gradient(180deg, #f6effc, #e6dcf4); color: #c3b5d6;
+    border-color: rgba(255,255,255,.75); box-shadow: none; cursor: default;
+  }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+  .mapcap { font-size: 15px; color: #9a7fb8; margin-top: 10px; }
+
+  .starbox {
+    display: inline-block; margin: 8px 0 2px;
+    font-size: 17px; font-weight: 500; color: #9a6a00;
+    background: linear-gradient(180deg, #fffbe6, #ffeaa8);
+    border: 2.5px solid #fff; border-radius: 999px; padding: 6px 18px;
+    box-shadow: 0 3px 0 rgba(214,164,30,.35);
+  }
+  .starbox b { color: #d02c9e; }
+
+  /* ---------- the Decorator ---------- */
+  .dressrow {
+    display: flex; gap: 20px; align-items: flex-start;
+    justify-content: center; flex-wrap: wrap; margin: 6px 0 4px;
+  }
+  #dressPreview {
+    width: 230px; height: 230px; border-radius: 28px;
+    background: linear-gradient(180deg, #8f7fd6 0%, #c39ae0 45%, #ffb9dd 100%);
+    border: 3px dashed #ffc3e6;
+  }
+  .slotlist { display: flex; flex-direction: column; gap: 7px; }
+  .slotrow { display: flex; align-items: center; gap: 9px; }
+  .slotname {
+    font-size: 15px; color: #9a7fb8; width: 74px;
+    text-align: right; flex: none; white-space: nowrap;
+  }
+  .picks { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pick {
+    width: 40px; height: 40px; border-radius: 50%; border: 3px solid #fff;
+    font-size: 19px; font-family: inherit; line-height: 1; cursor: pointer;
+    padding: 0;
+    background: linear-gradient(180deg, #fffdfe, #ffe6f5);
+    box-shadow: 0 3px 0 rgba(200,90,160,.22);
+  }
+  .pick.on {
+    background: linear-gradient(180deg, #ffa3d6, #f453a4);
+    box-shadow: 0 0 0 3px #ffd0ea, 0 3px 0 rgba(200,90,160,.3);
+  }
+  .pick.locked {
+    background: linear-gradient(180deg, #f6effc, #e6dcf4);
+    color: #c3b5d6; box-shadow: none; cursor: default; font-size: 15px;
+  }
+  .pick:not(.locked):active { transform: translateY(2px); box-shadow: none; }
+  #dressCap { min-height: 20px; }
+
+  .card .rainbowtext {
+    background: linear-gradient(90deg, #ff5f5f,#ffb14d,#ffe94d,#6fdc6f,#5fb8ff,#b38fff,#ff5f5f);
+    background-size: 200% auto;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: rbslide 2s linear infinite;
+  }
+  @keyframes rbslide { to { background-position: 200% center; } }
+  #winDance { font-size: 40px; margin-top: 4px; }
+  #winDance span { display: inline-block; animation: bounce 0.8s ease-in-out infinite; }
+  #winDance span:nth-child(2) { animation-delay: .15s; }
+  #winDance span:nth-child(3) { animation-delay: .3s; }
+  #unlockTip { font-size: 17px; color: #9a7fb8; margin: -4px 0 10px; }
+
+  #unlockBox {
+    font-size: 23px; font-weight: 600; color: #7a2f8f;
+    background: linear-gradient(180deg, #fffbe6, #ffe9a8);
+    border: 3px solid #fff;
+    border-radius: 999px; padding: 12px 28px; display: inline-block;
+    margin: 4px 0 14px; box-shadow: 0 0 26px rgba(255,210,80,.8);
+    animation: sparklebox 2.6s ease-in-out infinite;
+  }
+  @keyframes sparklebox {
+    0%,100% { box-shadow: 0 0 20px rgba(255,210,80,.6); transform: scale(1); }
+    50%     { box-shadow: 0 0 34px rgba(255,190,230,.95); transform: scale(1.03); }
+  }
+  .tiny { margin-top: 12px; font-size: 13px; }
+  .tiny .smallbtn { font-size: 14px; padding: 7px 16px; }
+  .smallbtn.danger { border-color: #f0a8a8; color: #d04545; }
+  #resetConfirm b { color: #d04545; font-size: 16px; }
+
+  #toast {
+    position: fixed; top: 84px; left: 50%; transform: translateX(-50%);
+    z-index: 5; pointer-events: none;
+    background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,229,246,.92));
+    border: 2.5px solid rgba(255,255,255,.95);
+    color: #a13a9c; font-weight: 500;
+    font-size: 20px; padding: 10px 26px; border-radius: 999px;
+    box-shadow: 0 6px 20px rgba(60,0,80,.28);
+    opacity: 0; transition: opacity .6s;
+  }
+
+  /* small phones: let the card breathe instead of overflowing */
+  @media (max-width: 470px) {
+    .card { padding: 20px 16px; border-radius: 28px; }
+    .card h1 { font-size: 34px; }
+    .card h2 { font-size: 19px; }
+    .card p  { font-size: 17px; }
+    .bigmoji { font-size: 54px; }
+    .playbtn { font-size: 23px; padding: 13px 30px; }
+    .levelmap { gap: 8px; padding: 12px 10px 7px; max-width: 100%; }
+    .lvlbtn { width: 42px; height: 42px; font-size: 20px; }
+    .slotname { width: 62px; font-size: 13px; }
+    .pick { width: 34px; height: 34px; font-size: 16px; }
+    #dressPreview { width: 190px; height: 190px; }
+  }
+
+  /* short windows — a phone held sideways is wide but only ~360px tall, so
+     squeeze the spacing and type before fitCards() has to scale anything */
+  @media (max-height: 600px) {
+    .card { padding: 14px 26px; border-radius: 24px; }
+    .card h1 { font-size: 30px; }
+    .card h2 { font-size: 17px; margin: 0 0 6px; }
+    .card p  { font-size: 16px; line-height: 1.4; margin: 5px 0 9px; }
+    .bigmoji { font-size: 40px; }
+    .bigmoji::before, .bigmoji::after { font-size: 15px; }
+    .bigmoji::before { left: -20px; top: 4px; }
+    .bigmoji::after  { right: -20px; top: 14px; }
+    .playbtn { font-size: 21px; padding: 10px 30px;
+               box-shadow: 0 6px 0 #c22c7c, 0 10px 20px rgba(190,40,120,.4); }
+    .smallbtn { font-size: 15px; padding: 7px 18px; margin-top: 8px; }
+    .keys { font-size: 13px; margin-top: 8px; }
+    .levelmap { gap: 7px; padding: 10px 8px 6px; margin: 10px auto 2px; max-width: 340px; }
+    .lvlbtn { width: 38px; height: 38px; font-size: 18px; border-width: 2px; }
+    .lvlnum { font-size: 10px; }
+    /* short window: keep Lily beside her choices instead of stacking, so the
+       whole card needs far less shrinking to fit */
+    #dressPreview { width: 158px; height: 158px; }
+    .pick { width: 31px; height: 31px; font-size: 15px; }
+    .slotname { width: 58px; font-size: 12px; }
+    .slotlist { gap: 5px; }
+    .dressrow { gap: 14px; }
+    #dressScreen .card { max-width: min(720px, 96vw); }
+    .mapcap { font-size: 13px; margin-top: 6px; }
+    .starbox { font-size: 15px; padding: 5px 14px; margin: 5px 0 2px; }
+    .tiny { margin-top: 8px; }
+    #unlockBox { font-size: 18px; padding: 8px 20px; margin: 2px 0 8px; border-width: 2px; }
+    #unlockTip { font-size: 14px; margin: -2px 0 6px; }
+    #winDance { font-size: 28px; }
+  }
+
+  @media (max-height: 600px) and (min-width: 560px) {
+    #title .card {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0 26px; align-items: center;
+      max-width: min(880px, 96vw);
+    }
+    #title .levelmap { margin-top: 0; }
+  }
+
+  /* while a card is up, the play controls politely fade back */
+  #hud, .touchbtn { transition: opacity .35s ease; }
+  body:has(.overlay:not(.hidden)) #hud,
+  body:has(.overlay:not(.hidden)) .touchbtn { opacity: 0; pointer-events: none; }
+  body:has(.overlay:not(.hidden)) #toast { visibility: hidden; }
+
+  /* be kind to anyone who asked for less motion */
+  @media (prefers-reduced-motion: reduce) {
+    .sprinkles, .playbtn::after { display: none; }
+    .bigmoji, .bigmoji::before, .bigmoji::after, #btnJ, #unlockBox, .lvlbtn.next { animation: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <span class="pill">🦄 Level <span id="levelNum">1</span></span>
+  <span class="pill">⭐ <span id="starCount">0 / 0</span></span>
+</div>
+<button id="mute" title="Sound on/off">🔊</button>
+<button id="pauseBtn" title="Pause (Esc)">⏸️</button>
+
+<button class="touchbtn" id="btnL">◀</button>
+<button class="touchbtn" id="btnR">▶</button>
+<button class="touchbtn" id="btnJ">⬆</button>
+
+<div id="toast">⬅ ➡ run &nbsp;•&nbsp; ⬆ jump &nbsp;•&nbsp; jump again in the air to flutter! ✨</div>
+
+<div id="title" class="overlay">
+  <div class="card">
+    <!-- two halves: side by side on a phone held sideways, stacked elsewhere -->
+    <div class="tcol">
+      <span class="bigmoji">🦄</span>
+      <h1>Unicorn Quest</h1>
+      <h2>✨ The Lost Magic ✨</h2>
+      <p>Lily's magic is scattered across <b>50 lava lands</b>!<br>
+         Win each level to get a piece of her magic back!</p>
+      <button class="playbtn" id="startBtn">▶ Play!</button><br>
+      <button class="smallbtn" id="dressBtn">🎀 Decorate Lily</button>
+      <a class="smallbtn" id="menuLink" href="../">🎮 All games</a>
+    </div>
+    <div class="tcol">
+      <div class="levelmap" id="levelMap"></div>
+      <div class="mapcap" id="mapCap">Win a level to unlock new magic!</div>
+      <div class="starbox" id="starCap"></div>
+      <div class="keys">⬅ ➡ run &nbsp;•&nbsp; ⬆ or SPACE to jump &nbsp;•&nbsp; jump again in the air to flutter ✨</div>
+      <div class="tiny">
+        <button class="smallbtn" id="resetLink">↺ Start my magic over</button>
+        <span id="resetConfirm" class="hidden">
+          <b>Lose ALL your magic?</b><br>
+          <button class="smallbtn danger" id="resetYes">Yes, start over</button>
+          <button class="smallbtn" id="resetNo">No, keep my magic!</button>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="pauseScreen" class="overlay hidden">
+  <div class="card">
+    <span class="bigmoji">🦄</span>
+    <h1>Paused</h1>
+    <p>Lily is taking a little rest…</p>
+    <div class="starbox" id="pauseStars"></div><br>
+    <button class="playbtn" id="resumeBtn">▶ Keep Playing!</button><br>
+    <button class="smallbtn" id="restartBtn">🔁 Restart Level</button>
+    <button class="smallbtn" id="pmapBtn">🗺️ Choose a level</button>
+  </div>
+</div>
+
+<div id="winScreen" class="overlay hidden">
+  <div class="card">
+    <span class="bigmoji" id="winEmoji">🌈</span>
+    <div id="winDance" class="hidden"><span>🦄</span> <span>💖</span> <span>🦄</span></div>
+    <h1 id="winTitle">Level complete!</h1>
+    <p id="winMsg"></p>
+    <div class="starbox" id="winStars"></div>
+    <div id="unlockBox"></div>
+    <div id="unlockTip"></div>
+    <button class="playbtn" id="nextBtn">▶ Next Level!</button><br>
+    <button class="smallbtn" id="winDressBtn">🎀 Decorate Lily</button>
+    <button class="smallbtn" id="mapBtn">🗺️ Choose a level</button>
+    <div class="keys" id="nextHint">(or press SPACE for the next level!)</div>
+  </div>
+</div>
+
+<div id="dressScreen" class="overlay hidden">
+  <div class="card">
+    <h1>Decorate Lily</h1>
+    <div class="starbox" id="dressStars"></div>
+    <div class="dressrow">
+      <div>
+        <canvas id="dressPreview" width="460" height="460"></canvas>
+        <div class="mapcap" id="dressCap">Tap a picture to try it on!</div>
+      </div>
+      <div class="slotlist" id="slotList"></div>
+    </div>
+    <button class="playbtn" id="dressDone">✔ All done!</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ============================================================
+// Unicorn Quest: The Lost Magic — a gentle game for small hands
+// One level per magic unlock; winning a level gives Lily that piece back.
+//
+// This is one of the games on the "Lily's games" menu (../index.html). It is
+// self-contained: everything it draws and plays is generated in this file.
+// ============================================================
+
+const canvas = document.getElementById('game');
+let ctx = canvas.getContext('2d');
+
+// Logical world height is fixed; width follows the window.
+const H = 540;
+let scale = 1, viewW = 960, dpr = 1;
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  canvas.width = innerWidth * dpr;
+  canvas.height = innerHeight * dpr;
+  canvas.style.width = innerWidth + 'px';
+  canvas.style.height = innerHeight + 'px';
+  scale = innerHeight > 0 ? innerHeight / H : 1;   // hidden/minimized windows report 0
+  viewW = innerWidth > 0 ? innerWidth / scale : 960;
+}
+addEventListener('resize', resize);
+resize();
+
+// ---------- constants ----------
+const LAVA_Y = 480;
+const GRAV = 1900, RUN = 310, FLUT_V = 620;
+
+// ---------- palettes ----------
+const PASTELS = ['#ff8fc8','#ffd94d','#8fd8ff','#b28fff','#8fffb0','#ffb28f'];
+const PINKS   = ['#ff8fc8','#ff6fb5','#ffb3dd','#ff9ecf','#ffc2e6'];
+const RAINBOW = ['#ff5f5f','#ffb14d','#ffe94d','#6fdc6f','#5fb8ff','#b38fff'];
+const pinkOne = () => PINKS[(Math.random()*PINKS.length)|0];
+
+// ---------- what Lily wins (exactly one thing per level) ----------
+// Powers are permanent and always on. Cosmetics land in a slot and are chosen in
+// the Decorator, so nothing is ever taken away -- a win only adds another option.
+const LEVELS = 50;
+
+const POWERS = [
+  {lvl:4,  key:'magnet',     icon:'🧲', name:'Star Magnet',    tip:'Stars float right to you!'},
+  {lvl:5,  key:'flutter3',   icon:'💫', name:'Triple Flutter', tip:'Now you can jump three times!'},
+  {lvl:6,  key:'glide',      icon:'🪽', name:'Magic Wings',    tip:'Hold JUMP in the air to glide down slowly!'},
+  {lvl:7,  key:'bounce',     icon:'🦘', name:'Super Bounce',   tip:'Your jumps are extra bouncy now!'},
+  {lvl:10, key:'zoom',       icon:'🌟', name:'Zoom Hooves',    tip:'You gallop super fast now!'},
+  {lvl:16, key:'flutter4',   icon:'💗', name:'Quad Flutter',   tip:'FOUR jumps in a row!'},
+  {lvl:23, key:'magnet2',    icon:'🌀', name:'Super Magnet',   tip:'Stars come to you from way further away!'},
+  {lvl:30, key:'feather',    icon:'🪶', name:'Feather Fall',   tip:'You float down as gently as a feather!'},
+  {lvl:38, key:'megabounce', icon:'🚀', name:'Mega Bounce',    tip:'The biggest, bounciest jumps of all!'},
+];
+const POWER_LVL = {};
+for (const p of POWERS) POWER_LVL[p.key] = p.lvl;
+
+// the dressing-up slots, in the order the Decorator shows them
+const SLOTS = [
+  {key:'mane',  label:'Mane',   icon:'🌈'},
+  {key:'horn',  label:'Horn',   icon:'🦄'},
+  {key:'wings', label:'Wings',  icon:'🪽'},
+  {key:'crown', label:'Hat',    icon:'👑'},
+  {key:'shoes', label:'Shoes',  icon:'👟'},
+  {key:'buddy', label:'Friend', icon:'🦋'},
+  {key:'trail', label:'Trail',  icon:'✨'},
+  {key:'aura',  label:'Glow',   icon:'💫'},
+];
+
+// lvl 0 = Lily has it from the very beginning
+const COSMETICS = [
+  // ---- manes (a palette for the five bouncy blobs, and the matching tail) ----
+  {id:'mane.pastel', slot:'mane', lvl:0,  icon:'🌸', name:'Pastel',     cols:['#ff8fc8','#c98bff','#ff8fc8','#c98bff','#8fb8ff']},
+  {id:'mane.rainbow',slot:'mane', lvl:2,  icon:'🌈', name:'Rainbow',    flow:true},
+  {id:'mane.sunset', slot:'mane', lvl:13, icon:'🌅', name:'Sunset',     cols:['#ff8a5c','#ffb14d','#ffd76b','#ff8fb0','#ff6f91']},
+  {id:'mane.mint',   slot:'mane', lvl:19, icon:'🍃', name:'Minty',      cols:['#7fe0c0','#a8e6b0','#7ad089','#bff0e0','#8fd0ff']},
+  {id:'mane.bubble', slot:'mane', lvl:25, icon:'🍬', name:'Bubblegum',  cols:['#ff9ec7','#ffc2e6','#ff6fb5','#ffd6ee','#ff8fc8']},
+  {id:'mane.galaxy', slot:'mane', lvl:33, icon:'🌌', name:'Galaxy',     cols:['#6f5adf','#a97ff0','#4f3fa8','#c9a6ff','#7a5fd0'], twinkle:true},
+  {id:'mane.gold',   slot:'mane', lvl:41, icon:'🌞', name:'Golden',     cols:['#ffd353','#ffe9a8','#f5bb2e','#fff0c2','#ffc93c']},
+  {id:'mane.candy',  slot:'mane', lvl:47, icon:'🍭', name:'Candy Cane', cols:['#ff5f7e','#ffffff','#ff5f7e','#ffffff','#ff8fb0']},
+
+  // ---- horns ----
+  {id:'horn.gold',  slot:'horn', lvl:0,  icon:'🦄', name:'Golden',    a:'#ffb300', b:'#ffe36b'},
+  {id:'horn.ice',   slot:'horn', lvl:14, icon:'💎', name:'Crystal',   a:'#5fb8ff', b:'#eaf7ff'},
+  {id:'horn.candy', slot:'horn', lvl:21, icon:'🍬', name:'Candy',     a:'#ff5f7e', b:'#ffffff', stripes:true},
+  {id:'horn.star',  slot:'horn', lvl:29, icon:'⭐', name:'Starlight', a:'#b38fff', b:'#f6efff', twinkle:true},
+  {id:'horn.coral', slot:'horn', lvl:37, icon:'🪸', name:'Coral',     a:'#ff7a4d', b:'#ffd6c2'},
+
+  // ---- wings ----
+  {id:'wings.none',   slot:'wings', lvl:0,  icon:'🚫', name:'No wings',  kind:'none'},
+  {id:'wings.fairy',  slot:'wings', lvl:6,  icon:'🪽', name:'Fairy',     kind:'fan',  col:'#ffe1f1', edge:'rgba(240,130,190,0.85)', far:'#f2e6ff', faredge:'rgba(190,150,230,0.9)'},
+  {id:'wings.bfly',   slot:'wings', lvl:17, icon:'🦋', name:'Butterfly', kind:'bfly', col:'#ffb14d', col2:'#ffd76b', edge:'rgba(190,105,15,0.6)'},
+  {id:'wings.feather',slot:'wings', lvl:24, icon:'🕊️', name:'Feathery',  kind:'fan',  col:'#ffffff', edge:'rgba(200,180,240,0.9)', far:'#f0eaff', faredge:'rgba(180,160,220,0.8)', fluffy:true},
+  {id:'wings.dragon', slot:'wings', lvl:31, icon:'🦗', name:'Dragonfly', kind:'bfly', col:'rgba(150,232,255,0.85)', col2:'rgba(215,245,255,0.9)', edge:'rgba(70,160,205,0.7)', slim:true},
+  {id:'wings.star',   slot:'wings', lvl:44, icon:'🌟', name:'Starlight', kind:'fan',  col:'#fff0c2', edge:'rgba(245,187,46,0.9)', far:'#fff7dd', faredge:'rgba(245,187,46,0.6)', sparkle:true},
+  {id:'wings.rbow',   slot:'wings', lvl:49, icon:'🌈', name:'Rainbow',   kind:'fan',  flow:true},
+
+  // ---- hats + crowns ----
+  {id:'crown.none',  slot:'crown', lvl:0,  icon:'🚫', name:'Nothing',      kind:'none'},
+  {id:'crown.stars', slot:'crown', lvl:9,  icon:'👑', name:'Star Crown',   kind:'stars', col:'#ffd94d'},
+  {id:'crown.flower',slot:'crown', lvl:18, icon:'🌼', name:'Flower Crown', kind:'flowers'},
+  {id:'crown.tiara', slot:'crown', lvl:26, icon:'💎', name:'Tiara',        kind:'tiara'},
+  {id:'crown.bow',   slot:'crown', lvl:35, icon:'🎀', name:'Big Bow',      kind:'bow', col:'#ff6fb5'},
+  {id:'crown.party', slot:'crown', lvl:43, icon:'🎉', name:'Party Hat',    kind:'party'},
+
+  // ---- shoes ----
+  {id:'shoes.hoof',    slot:'shoes', lvl:0,  icon:'🐾', name:'Hooves',     kind:'hoof', col:'#d9a7ff'},
+  {id:'shoes.rainbow', slot:'shoes', lvl:7,  icon:'👟', name:'Rainbow',    kind:'sneaker'},
+  {id:'shoes.star',    slot:'shoes', lvl:20, icon:'👢', name:'Star Boots', kind:'boot', col:'#5fb8ff', trim:'#ffd94d'},
+  {id:'shoes.jelly',   slot:'shoes', lvl:27, icon:'🍮', name:'Jelly',      kind:'jelly', col:'rgba(255,150,215,0.8)'},
+  {id:'shoes.gold',    slot:'shoes', lvl:36, icon:'🥇', name:'Golden',     kind:'hoof', col:'#ffd353', shine:true},
+  {id:'shoes.glass',   slot:'shoes', lvl:45, icon:'👠', name:'Slippers',   kind:'jelly', col:'rgba(205,240,255,0.85)', sparkle:true},
+
+  // ---- little friends ----
+  {id:'buddy.none',   slot:'buddy', lvl:0,  icon:'🚫', name:'On my own',   kind:'none'},
+  {id:'buddy.bflies', slot:'buddy', lvl:3,  icon:'🦋', name:'Butterflies', kind:'bflies'},
+  {id:'buddy.cloud',  slot:'buddy', lvl:11, icon:'☁️', name:'Cloud',       kind:'cloud'},
+  {id:'buddy.star',   slot:'buddy', lvl:22, icon:'⭐', name:'Star Sprite', kind:'star'},
+  {id:'buddy.bee',    slot:'buddy', lvl:32, icon:'🐝', name:'Bumblebee',   kind:'bee'},
+  {id:'buddy.bird',   slot:'buddy', lvl:40, icon:'🐤', name:'Birdie',      kind:'bird'},
+  {id:'buddy.bug',    slot:'buddy', lvl:42, icon:'🐞', name:'Ladybug',     kind:'bug'},
+
+  // ---- what she leaves behind when she gallops ----
+  {id:'trail.dust',    slot:'trail', lvl:0,  icon:'💨', name:'Fairy Dust', rate:7,  size:2.5, type:'star', cols:['#ffffff']},
+  {id:'trail.none',    slot:'trail', lvl:0,  icon:'🚫', name:'Nothing'},
+  {id:'trail.sparkle', slot:'trail', lvl:1,  icon:'✨', name:'Sparkles',  rate:16, size:2.2, type:'star', cols:PASTELS, hearts:0.3},
+  {id:'trail.glitter', slot:'trail', lvl:8,  icon:'🌠', name:'Glitter',   rate:34, size:5,   type:'star', cols:RAINBOW, hearts:0.2},
+  {id:'trail.hearts',  slot:'trail', lvl:15, icon:'💕', name:'Hearts',    rate:18, size:4,   type:'heart', cols:PINKS},
+  {id:'trail.bubbles', slot:'trail', lvl:28, icon:'🫧', name:'Bubbles',   rate:14, size:6,   type:'puff', cols:['rgba(205,240,255,0.75)','rgba(255,255,255,0.6)'], rise:true},
+  {id:'trail.confetti',slot:'trail', lvl:39, icon:'🎊', name:'Confetti',  rate:24, size:4,   type:'conf', cols:PASTELS},
+  {id:'trail.gold',    slot:'trail', lvl:46, icon:'🌟', name:'Gold Dust', rate:26, size:3,   type:'star', cols:['#ffd353','#fff0c2','#ffe36b']},
+  {id:'trail.rbow',    slot:'trail', lvl:48, icon:'🌈', name:'Rainbow',   rate:26, size:5,   type:'puff', cols:RAINBOW, rise:true},
+
+  // ---- glow ----
+  {id:'aura.none',   slot:'aura', lvl:0,  icon:'🚫', name:'No glow',       kind:'none'},
+  {id:'aura.shimmer',slot:'aura', lvl:12, icon:'🔮', name:'Shimmer',       kind:'soft', col:'255,220,255'},
+  {id:'aura.rbow',   slot:'aura', lvl:34, icon:'🌈', name:'Rainbow Ring',  kind:'ring'},
+  {id:'aura.all',    slot:'aura', lvl:50, icon:'⭐', name:'ALL the Magic!',kind:'soft', flow:true, horn:true, big:true},
+
+  // ---- star treasures: earned by collecting stars, not by reaching a level.
+  // They sit last in their slot so they never become the default outfit.
+  {id:'crown.halo',  slot:'crown', lvl:0, stars:50,   icon:'😇', name:'Star Halo',   kind:'halo'},
+  {id:'mane.aurora', slot:'mane',  lvl:0, stars:150,  icon:'🌠', name:'Aurora',      cols:['#7ef0d0','#8fd0ff','#b28fff','#7ee0ff','#a8ffe0'], twinkle:true},
+  {id:'shoes.cloud', slot:'shoes', lvl:0, stars:350,  icon:'☁️', name:'Cloud Shoes', kind:'cloud'},
+  {id:'buddy.fairy', slot:'buddy', lvl:0, stars:650,  icon:'🧚', name:'Star Fairy',  kind:'fairy'},
+  {id:'wings.ice',   slot:'wings', lvl:0, stars:1000, icon:'❄️', name:'Crystal',     kind:'fan', col:'#dff2ff', edge:'rgba(95,184,255,0.9)', far:'#eef8ff', faredge:'rgba(95,184,255,0.6)', sparkle:true},
+  {id:'aura.storm',  slot:'aura',  lvl:0, stars:0,    icon:'💫', name:'Star Storm',  kind:'storm'},
+];
+const TREASURES = COSMETICS.filter(c => 'stars' in c);
+
+const COS = {};
+for (const c of COSMETICS) COS[c.id] = c;
+const slotItems = k => COSMETICS.filter(c => c.slot === k);
+// what a level hands over: a power, a cosmetic, or (levels 6 and 7) both
+const rewardAt = lvl => ({power: POWERS.find(p => p.lvl === lvl), cos: COSMETICS.find(c => c.lvl === lvl)});
+
+let unlockedCount = 0;
+let oldPerfectMask = 0;              // only read, to carry pre-treasure saves across
+let bestStars = [];                  // most stars ever collected in each level
+let seedStars = false;               // true when an older save needs its history filled in
+let look = {};                       // slot -> cosmetic id: what Lily is wearing
+const starTotal = () => bestStars.reduce((a, b) => a + (b || 0), 0);
+// unlocked by reaching a level, or by collecting enough stars
+const owns = c => c.lvl <= unlockedCount && (!c.stars || starTotal() >= c.stars);
+function defaultLook() {
+  const l = {};
+  for (const sl of SLOTS) l[sl.key] = slotItems(sl.key)[0].id;
+  return l;
+}
+function bestLook() {                // wear the newest thing unlocked in each slot
+  const l = defaultLook();
+  for (const sl of SLOTS) {
+    const best = slotItems(sl.key).filter(owns).pop();
+    if (best) l[sl.key] = best.id;
+  }
+  return l;
+}
+function tidyLook() {                // never wear something that is not unlocked
+  const d = defaultLook();
+  for (const sl of SLOTS) {
+    const c = COS[look[sl.key]];
+    if (!c || c.slot !== sl.key || !owns(c)) look[sl.key] = d[sl.key];
+  }
+}
+try {
+  unlockedCount = Math.min(LEVELS, +localStorage.getItem('uq_magic') || 0);
+  oldPerfectMask = +localStorage.getItem('uq_perfect') || 0;
+  const savedStars = localStorage.getItem('uq_stars');
+  bestStars = savedStars ? (JSON.parse(savedStars) || []) : [];
+  seedStars = !savedStars && unlockedCount > 0;   // a save from before stars counted
+  // a save from before the Decorator existed has no outfit -- dress her in
+  // everything she already earned rather than stripping her back to plain
+  const savedLook = localStorage.getItem('uq_look');
+  look = savedLook ? (JSON.parse(savedLook) || {}) : bestLook();
+} catch (e) {}
+tidyLook();
+function saveProgress() {
+  try {
+    localStorage.setItem('uq_magic', unlockedCount);
+    localStorage.setItem('uq_stars', JSON.stringify(bestStars));
+    localStorage.setItem('uq_look', JSON.stringify(look));
+  } catch (e) {}
+}
+const hasPower = k => unlockedCount >= POWER_LVL[k];
+const worn = k => COS[look[k]];      // the item in a slot, right now
+const jumpV = () => hasPower('megabounce') ? 900 : hasPower('bounce') ? 830 : 760;
+const maxFlut = () => hasPower('flutter4') ? 3 : hasPower('flutter3') ? 2 : 1;
+const runSpeed = () => hasPower('zoom') ? 380 : RUN;
+const magnetR = () => hasPower('magnet2') ? 260 : 160;
+const fallCap = () => hasPower('feather') ? 620 : 950;
+
+// ---------- day / night cycle (top -> bottom; the bottom stays warm from the lava) ----------
+const DAY_CYCLE = 170;   // seconds for a full day
+const DAY_KEYS = [
+  { c: ['#7db9ff','#c0a6f7','#ffc9de','#ffb199'], light: 1.00 },  // 0.00  midday
+  { c: ['#8a5fb0','#e0709b','#ffb078','#ff9a72'], light: 0.78 },  // 0.25  sunset
+  { c: ['#141a3d','#2b2560','#5a3f7a','#b8542f'], light: 0.34 },  // 0.50  night
+  { c: ['#f2a6c8','#e6b0dd','#ffd9c9','#ffb199'], light: 0.76 },  // 0.75  dawn
+];
+let nightAmt = 0;        // 0 = broad daylight, 1 = deep night
+
+function hex2rgb(h) {
+  return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+}
+function mixHex(a, b, u) {
+  const A = hex2rgb(a), B = hex2rgb(b);
+  return 'rgb(' + Math.round(lerp(A[0],B[0],u)) + ',' +
+                  Math.round(lerp(A[1],B[1],u)) + ',' +
+                  Math.round(lerp(A[2],B[2],u)) + ')';
+}
+// each level starts at its own time of day, then drifts on from there
+let dayOffset = 0;
+function dayPhase(t) { return (t / DAY_CYCLE + (currentLevel - 1) * 0.13 + dayOffset + 1) % 1; }
+function skyNow(t) {
+  const f = dayPhase(t) * 4;
+  const i = Math.floor(f) % 4, u = f - Math.floor(f);
+  const A = DAY_KEYS[i], B = DAY_KEYS[(i + 1) % 4];
+  return { c: A.c.map((h, j) => mixHex(h, B.c[j], u)), light: lerp(A.light, B.light, u) };
+}
+
+// ---------- level state (rebuilt by loadLevel) ----------
+let currentLevel = 1;
+let plats = [], stars = [], decoBflies = [], flowers = [], sharks = [];
+let crystal = {x: 2000, y: 352};
+let worldW = 3000, maxX = 2900;
+let fish = null, nextFishT = 4;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, u) => a + (b - a) * u;
+const ease = u => u < 0.5 ? 2*u*u : 1 - Math.pow(-2*u + 2, 2) / 2;
+function hash(n) { const s = Math.sin(n * 127.1) * 43758.5453; return s - Math.floor(s); }
+function sharkX(k, t) { return k.cx + Math.sin(t * k.spd + k.ph) * k.range; }
+
+function buildLevel(n) {
+  let seed = n * 1000;                           // every level is its own shape
+  const R = () => hash(seed++);
+  const d = Math.min(n, 14);                     // ...but it stops getting harder here,
+                                                 // so level 50 is fun, not mean
+  const count = 6 + d * 2;                       // 8 platforms on level 1 -> 34 from 14 on
+  const P = [{x:-200, y:430, w:520}];            // start island (sign lives here)
+  const S = [], F = [], K = [];
+  let x = 320, prevY = 430;
+  for (let i = 1; i < count; i++) {
+    const gap = 60 + R() * (40 + d * 7);         // gently wider gaps later
+    const w = Math.max(130, 240 - d * 8 + R() * 80);
+    let y = clamp(prevY + (R() * 2 - 1) * (30 + d * 5), 320, 445);
+    const p = {x: x + gap, y, w};
+    if (n >= 3 && i > 1 && i < count - 1 && R() < 0.08 + d * 0.02) {
+      p.y = clamp(p.y, 330, 415);                // keep movers clear of the lava
+      p.amp = 20 + R() * 20; p.spd = 0.9 + R() * 0.7; p.ph = R() * 6.28;
+    }
+    P.push(p);
+    if (n >= 2 && R() < 0.2 && p.w > 140) {
+      F.push({p, x: p.x + 45 + R() * (p.w - 90),
+              col: PASTELS[Math.floor(R() * PASTELS.length)], bt: -9});
+    }
+    if (R() < 0.85) S.push({x: p.x + p.w/2, y: Math.max(150, p.y - 70 - R() * 30), taken:false, ph: R()*6.28});
+    if (R() < 0.3)  S.push({x: x + gap/2, y: Math.max(150, Math.min(prevY, p.y) - 60), taken:false, ph: R()*6.28});
+    x = p.x + p.w;
+    prevY = p.y;
+  }
+  const endP = {x: x + 70, y: 420, w: 420};
+  P.push(endP);
+  for (const p of P) { p.baseY = p.y; p.prevY = p.y; }
+  const B = [];
+  for (let bx = 500; bx < x - 300; bx += 620) {
+    B.push({x: bx + R()*220, y: 200 + R()*120, c: B.length % 6, ph: B.length * 1.7,
+            ox:0, oy:0, vx:0, vy:0, startled:0});
+  }
+  // friendly lava sharks patrolling between the islands
+  const sharkCount = Math.min(6, 1 + Math.floor(d / 2));
+  for (let i = 0; i < sharkCount; i++) {
+    K.push({
+      cx: 620 + (x - 900) * (i + 0.5) / sharkCount,
+      range: 130 + R() * 130,
+      spd: 0.3 + R() * 0.3,
+      ph: R() * 6.28,
+      leapH: 120 + R() * 60,
+      leapDur: 1.4,
+      leapT: -99,
+      nextLeap: 2 + R() * 7,
+      boopCd: 0,
+      col: i % 2 ? '#6f7fd8' : '#8f6fd0',
+    });
+  }
+  return {
+    plats: P, stars: S, bflies: B, flowers: F, sharks: K,
+    crystal: {x: endP.x + endP.w - 140, y: 352},
+    worldW: endP.x + endP.w + 80,
+    maxX: endP.x + endP.w - 30,
+  };
+}
+
+// How many stars each level holds, counted once at boot. PERFECT is simply
+// "you have them all", which also means it works past level 32 -- the old
+// `1 << (level-1)` bitmask silently wrapped around and lit up level 1 again.
+const STARS_IN = [];
+let STAR_TOTAL = 0;
+for (let n = 1; n <= LEVELS; n++) {
+  const c = buildLevel(n).stars.length;
+  STARS_IN.push(c);
+  STAR_TOTAL += c;
+}
+const isPerfect = n => STARS_IN[n - 1] > 0 && (bestStars[n - 1] || 0) >= STARS_IN[n - 1];
+// The last treasure asks for most of them, but not every single one -- hunting
+// down a final missing star in level 31 is not a fun evening for a five-year-old.
+COS['aura.storm'].stars = Math.round(STAR_TOTAL * 0.85);
+
+// Saves from before star treasures existed never recorded stars, so all that
+// collecting would read as zero. Credit what we can prove -- a PERFECT level
+// really did find every one -- and give the other finished levels a fair share.
+// Guessing low is the safe way round: replaying a level can only raise its best.
+if (seedStars) {
+  for (let n = 1; n <= Math.min(unlockedCount, LEVELS); n++) {
+    const wasPerfect = n <= 32 && (oldPerfectMask & (1 << (n - 1)));
+    bestStars[n - 1] = wasPerfect ? STARS_IN[n - 1] : Math.round(STARS_IN[n - 1] * 0.6);
+  }
+  saveProgress();
+}
+
+// ---------- player ----------
+const player = {
+  x:60, y:410, vx:0, vy:0, hw:20, hh:20,
+  facing:1, onGround:false, prevGround:false, flut:0,
+  anim:0, squash:0, stand:null
+};
+let lastSafePlat = null, lastSafeX = 60;
+
+let state = 'title';      // title | play | rescue | win
+let camX = 0;
+let got = 0;
+let rescueT = 0, rescueX = 0;
+let cloudGone = null;
+let winT = 0, winShown = false, winWasNew = false, rainbow = false;
+let confettiTimer = 0;
+let finale = false, finaleStart = {x:0, y:0}, finaleTrail = [], fwTimer = 0;
+let wonTreasures = [];               // star treasures unlocked by the run just finished
+const buddy = {x: 60, y: 350};    // Cloud Buddy's spot, always drifting after Lily
+function buddyHome() { return {x: player.x - player.facing * 54, y: player.y - 62}; }
+
+function loadLevel(n) {
+  currentLevel = n;
+  const L = buildLevel(n);
+  plats = L.plats; stars = L.stars; decoBflies = L.bflies; flowers = L.flowers;
+  sharks = L.sharks;
+  crystal = L.crystal; worldW = L.worldW; maxX = L.maxX;
+  got = 0;
+  finale = false; finaleTrail.length = 0; fwTimer = 0;
+  fish = null; nextFishT = 4;
+  player.x = 60; player.y = 410; player.vx = 0; player.vy = 0;
+  player.facing = 1; player.onGround = false; player.flut = 0; player.stand = null;
+  lastSafePlat = plats[0]; lastSafeX = 60;
+  camX = 0; rainbow = false; winShown = false; winWasNew = false; cloudGone = null;
+  Object.assign(buddy, buddyHome());   // the cloud starts beside her, not miles away
+  parts.length = 0;
+  updateHud();
+}
+
+// ---------- input ----------
+const keys = {l:false, r:false, j:false};
+let jumpBuf = 0, coyote = 0;
+function pressJump() { jumpBuf = 0.14; }
+
+addEventListener('keydown', e => {
+  if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key)) e.preventDefault();
+  if (e.key === 'Escape') {
+    if (dressing) closeDecorator();
+    else if (state === 'play') pauseGame();
+    else if (state === 'pause') resumeGame();
+    return;
+  }
+  if (state === 'pause') return;
+  if (state === 'title') { startGame(Math.min(unlockedCount + 1, LEVELS)); return; }
+  // on the win card, jump keys go straight to the next level — no mouse needed
+  if (state === 'win' && winShown && !e.repeat &&
+      (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowUp')) {
+    if (currentLevel < LEVELS) startGame(currentLevel + 1);
+    else showTitle();
+    return;
+  }
+  if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') keys.l = true;
+  if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.r = true;
+  if (e.key === 'ArrowUp' || e.key === ' ' || e.key === 'w' || e.key === 'W') {
+    keys.j = true;
+    if (!e.repeat) pressJump();
+  }
+});
+addEventListener('keyup', e => {
+  if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') keys.l = false;
+  if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.r = false;
+  if (e.key === 'ArrowUp' || e.key === ' ' || e.key === 'w' || e.key === 'W') keys.j = false;
+});
+addEventListener('blur', () => { keys.l = keys.r = keys.j = false; });
+
+function bindHold(id, on, off) {
+  const el = document.getElementById(id);
+  el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture(e.pointerId); on(); });
+  el.addEventListener('pointerup',     () => off());
+  el.addEventListener('pointercancel', () => off());
+  el.addEventListener('lostpointercapture', () => off());
+}
+bindHold('btnL', () => keys.l = true,  () => keys.l = false);
+bindHold('btnR', () => keys.r = true,  () => keys.r = false);
+bindHold('btnJ', () => { pressJump(); keys.j = true; }, () => keys.j = false);
+
+// ---------- audio ----------
+let AC = null, master = null, muted = false;
+let nextNote = 0, noteIdx = 0;
+const SCALE_F = [523.25, 587.33, 659.25, 783.99, 880, 1046.5]; // C D E G A C' (pentatonic)
+const BEAT = 0.3;
+// 32 bars x 4 steps (-1 = rest). Eight four-bar phrases: the first half is the
+// tune you know, the second half wanders somewhere new and walks back home, so
+// a full pass takes ~38s (and ~77s before the octave answer comes round again).
+const MELODY = [
+  // --- the first half: A A' B C ---
+  2,3,4,3,  2,1,0,-1,  1,2,3,2,  1,0,1,-1,
+  3,4,5,4,  3,2,3,-1,  4,3,2,1,  0,-1,-1,-1,
+  2,3,4,3,  2,1,0,-1,  0,1,2,3,  2,1,0,-1,
+  4,5,4,3,  2,3,4,-1,  3,2,1,2,  0,-1,-1,-1,
+  // --- D: up high and airy, with room to breathe ---
+  5,-1,4,5, 3,-1,2,3,  4,-1,3,4,  2,-1,1,-1,
+  // --- E: a question, and its answer ---
+  1,2,3,4,  5,-1,4,-1,  3,4,5,4,  3,2,-1,-1,
+  // --- F: skippy little hops ---
+  0,2,1,3,  2,4,3,5,   4,3,2,3,  1,-1,0,-1,
+  // --- G: back down the hill to where we started ---
+  2,3,4,5,  4,3,2,1,   2,1,0,1,  0,-1,-1,-1
+];
+const BASS_ROOTS = [ // one root per bar: C A F G ... and home on C C
+  130.81,110.00,174.61,196.00, 130.81,110.00,174.61,196.00,
+  130.81,110.00,174.61,196.00, 174.61,196.00,130.81,130.81,
+  110.00,174.61,130.81,196.00, 174.61,130.81,196.00,110.00,
+  130.81,196.00,110.00,174.61, 174.61,196.00,130.81,130.81
+];
+
+function initAudio() {
+  if (AC) return;
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    master = AC.createGain();
+    master.gain.value = muted ? 0 : 0.8;
+    master.connect(AC.destination);
+    nextNote = AC.currentTime + 0.2;
+  } catch (e) { AC = null; }
+}
+function tone(f, dur, type = 'sine', vol = 0.15, when = 0, slideTo = 0) {
+  if (!AC) return;
+  const t0 = when || AC.currentTime;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+  g.gain.setValueAtTime(0, t0);
+  g.gain.linearRampToValueAtTime(vol, t0 + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(master);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+function sPick()    { tone(660, 0.09, 'triangle', 0.13, 0, 990); }
+function sJump()    { tone(300, 0.14, 'square', 0.10, 0, 520); }
+function sFlutter() { tone(520, 0.16, 'sine',   0.14, 0, 880); }
+function sLand()    { tone(130, 0.08, 'sine',   0.08); }
+function sStar()    {
+  const f = SCALE_F[got % SCALE_F.length];
+  tone(f, 0.14, 'triangle', 0.18);
+  tone(f * 1.5, 0.18, 'triangle', 0.14, AC ? AC.currentTime + 0.08 : 0);
+}
+function sSplash()  {
+  if (!AC) return;
+  tone(220, 0.35, 'sine', 0.16, 0, 70);
+  const len = AC.sampleRate * 0.35;
+  const buf = AC.createBuffer(1, len, AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random()*2-1) * (1 - i/len);
+  const src = AC.createBufferSource(); src.buffer = buf;
+  const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+  const g = AC.createGain(); g.gain.value = 0.2;
+  src.connect(lp); lp.connect(g); g.connect(master); src.start();
+}
+function sRescue() { tone(440, 0.4, 'sine', 0.10, 0, 720); }
+function sWin() {
+  if (!AC) return;
+  const t0 = AC.currentTime;
+  [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) =>
+    tone(f, 0.22, 'triangle', 0.2, t0 + i * 0.12));
+  [523.25, 659.25, 783.99, 1046.5].forEach(f =>
+    tone(f, 1.1, 'triangle', 0.09, t0 + 0.7));
+}
+function sBoing() { tone(160, 0.3, 'square', 0.10, 0, 820); tone(320, 0.3, 'sine', 0.08, 0, 1200); }
+function sSharkLeap() { tone(180, 0.25, 'sine', 0.07, 0, 90); }
+function sSharkBoop() {
+  tone(420, 0.18, 'sine', 0.13, 0, 900);
+  tone(880, 0.22, 'triangle', 0.10, AC ? AC.currentTime + 0.09 : 0, 1300);
+}
+function sPop()   { tone(700, 0.2, 'triangle', 0.12, 0, 120); }
+function sPerfect() {
+  if (!AC) return;
+  const t0 = AC.currentTime;
+  [1318.5, 1568, 2093, 2637].forEach((f, i) => tone(f, 0.18, 'triangle', 0.15, t0 + i * 0.09));
+}
+function sFinale() {
+  if (!AC) return;
+  const t0 = AC.currentTime;
+  const run = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.7, 1318.5, 1568, 1760, 2093];
+  run.forEach((f, i) => tone(f, 0.16, 'triangle', 0.16, t0 + i * 0.07));
+  [523.25, 659.25, 783.99].forEach(f => tone(f, 2.2, 'sine', 0.05, t0 + 0.8));
+  [2093, 2637, 3136].forEach((f, i) => tone(f, 0.7, 'sine', 0.06, t0 + 1.2 + i * 0.5));
+  [1046.5, 1318.5, 1568, 2093].forEach((f, i) => tone(f, 0.25, 'triangle', 0.15, t0 + 2.8 + i * 0.12));
+}
+function musicTick() {
+  if (!AC || state === 'title') return;
+  // after a pause, skip ahead instead of machine-gunning the missed notes
+  if (nextNote < AC.currentTime - 0.5) nextNote = AC.currentTime + 0.1;
+  while (nextNote < AC.currentTime + 0.35) {
+    const step = noteIdx % MELODY.length;
+    const pass = Math.floor(noteIdx / MELODY.length);
+    const m = MELODY[step];
+    if (m >= 0) {
+      // every other pass plays up an octave, softly, like a music box answer
+      const up = pass % 2 === 1;
+      tone(SCALE_F[m] * (up ? 2 : 1), 0.26, 'triangle', up ? 0.03 : 0.045, nextNote);
+    }
+    if (step % 4 === 0) {
+      const root = BASS_ROOTS[step >> 2];
+      tone(root, 1.0, 'sine', 0.05, nextNote);
+      tone(root * 1.5, 1.0, 'sine', 0.024, nextNote);
+    }
+    if (step % 32 === 0) tone(2093, 0.5, 'sine', 0.02, nextNote); // phrase chime
+    nextNote += BEAT;
+    noteIdx++;
+  }
+}
+document.getElementById('mute').addEventListener('click', () => {
+  muted = !muted;
+  document.getElementById('mute').textContent = muted ? '🔇' : '🔊';
+  if (master) master.gain.value = muted ? 0 : 0.8;
+});
+
+// ---------- particles ----------
+const parts = [];
+function spawn(o) {
+  if (parts.length > 500) parts.shift();
+  parts.push(Object.assign({age:0, life:0.8, vx:0, vy:0, g:0, size:5, color:'#fff', type:'dot', rot:Math.random()*6}, o));
+}
+function burst(x, y, n, mk) { for (let i = 0; i < n; i++) spawn(mk(i)); }
+
+// ---------- floating hearts + sparkles behind the cards (pure decoration) ----------
+const SPRINKLES = ['💖','✨','🌸','⭐','🦄','🎀','💜','🌟','🩷','💫'];
+for (const ov of document.querySelectorAll('.overlay')) {
+  const layer = document.createElement('div');
+  layer.className = 'sprinkles';
+  for (let i = 0; i < 16; i++) {
+    const s = document.createElement('span');
+    s.textContent = SPRINKLES[(Math.random() * SPRINKLES.length) | 0];
+    s.style.left = (Math.random() * 100) + '%';
+    s.style.fontSize = (13 + Math.random() * 20) + 'px';
+    s.style.animationDuration = (9 + Math.random() * 10) + 's';
+    s.style.animationDelay = (-Math.random() * 16) + 's';   // negative = already drifting
+    layer.appendChild(s);
+  }
+  ov.insertBefore(layer, ov.firstChild);
+}
+
+// ---------- flow ----------
+function refreshTitle() {
+  hideResetConfirm();
+  const next = Math.min(unlockedCount + 1, LEVELS);
+  document.getElementById('startBtn').textContent =
+    unlockedCount >= LEVELS ? '▶ Play Level ' + LEVELS + '!' : '▶ Play Level ' + next + '!';
+  document.getElementById('mapCap').textContent =
+    unlockedCount >= LEVELS ? '🎉 You unlocked ALL the magic! Play any level!'
+    : unlockedCount > 0 ? 'Your magic so far — win more levels for more!'
+    : 'Win a level to unlock new magic!';
+  document.getElementById('dressBtn').textContent =
+    unlockedCount > 0 ? '🎀 Decorate Lily' : '🎀 Meet Lily';
+  showStarBoxes();
+  const map = document.getElementById('levelMap');
+  map.innerHTML = '';
+  const here = Math.min(unlockedCount + 1, LEVELS);
+  for (let i = 1; i <= LEVELS; i++) {
+    const wrap = document.createElement('div');
+    wrap.className = 'lvlwrap' + (i === here ? ' here' : '');
+    const b = document.createElement('button');
+    b.className = 'lvlbtn';
+    if (i <= unlockedCount) {
+      b.classList.add('done');
+      const rw = rewardAt(i), win = rw.cos || rw.power;
+      b.textContent = win ? win.icon : '⭐';
+      b.title = 'Level ' + i + (win ? ' — ' + win.name : '');
+      if (isPerfect(i)) b.classList.add('perfect');
+    } else if (i === unlockedCount + 1) {
+      b.classList.add('next');
+      b.textContent = '▶';
+      b.title = 'Level ' + i + ' — play this one next!';
+    } else {
+      b.classList.add('locked');
+      b.textContent = '🔒';
+      b.disabled = true;
+      b.title = 'Level ' + i;
+    }
+    if (!b.disabled) b.addEventListener('click', () => startGame(i));
+    const num = document.createElement('span');
+    num.className = 'lvlnum';
+    num.textContent = i;
+    wrap.appendChild(b);
+    wrap.appendChild(num);
+    map.appendChild(wrap);
+  }
+  centerLevelStrip();
+  fitCards();
+}
+
+// slide the strip so the level you are up to sits in the middle
+function centerLevelStrip() {
+  const map = document.getElementById('levelMap');
+  const here = map.querySelector('.lvlwrap.here') || map.lastElementChild;
+  if (!here || !map.clientWidth) return;
+  const mr = map.getBoundingClientRect(), hr = here.getBoundingClientRect();
+  const scale = mr.width / map.offsetWidth || 1;   // cards can be shrunk to fit
+  map.scrollLeft += ((hr.left + hr.width / 2) - (mr.left + mr.width / 2)) / scale;
+}
+// a mouse wheel over the strip should walk it sideways, not nudge the page
+document.getElementById('levelMap').addEventListener('wheel', e => {
+  const d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+  if (!d) return;
+  e.preventDefault();
+  document.getElementById('levelMap').scrollLeft += d;
+}, {passive: false});
+
+function startGame(n) {
+  initAudio();
+  if (AC && AC.state === 'suspended') AC.resume();
+  loadLevel(n);
+  document.getElementById('title').classList.add('hidden');
+  document.getElementById('winScreen').classList.add('hidden');
+  if (document.activeElement) document.activeElement.blur();
+  state = 'play';
+  if (n === 1) {
+    const toast = document.getElementById('toast');
+    toast.style.opacity = 1;
+    setTimeout(() => toast.style.opacity = 0, 6000);
+  }
+}
+document.getElementById('startBtn').addEventListener('click', () =>
+  startGame(Math.min(unlockedCount + 1, LEVELS)));
+
+function showTitle() {
+  state = 'title';
+  document.getElementById('winScreen').classList.add('hidden');
+  document.getElementById('pauseScreen').classList.add('hidden');
+  document.getElementById('title').classList.remove('hidden');
+  refreshTitle();
+}
+document.getElementById('mapBtn').addEventListener('click', showTitle);
+
+function pauseGame() {
+  if (state !== 'play') return;
+  state = 'pause';
+  keys.l = keys.r = false;
+  showStarBoxes();
+  document.getElementById('pauseScreen').classList.remove('hidden');
+  fitCards();
+}
+function resumeGame() {
+  if (state !== 'pause') return;
+  document.getElementById('pauseScreen').classList.add('hidden');
+  if (document.activeElement) document.activeElement.blur();
+  state = 'play';
+}
+document.getElementById('resumeBtn').addEventListener('click', resumeGame);
+document.getElementById('restartBtn').addEventListener('click', () => startGame(currentLevel));
+document.getElementById('pmapBtn').addEventListener('click', showTitle);
+document.getElementById('pauseBtn').addEventListener('click', () => {
+  if (state === 'play') pauseGame();
+  else if (state === 'pause') resumeGame();
+});
+document.getElementById('nextBtn').addEventListener('click', () =>
+  startGame(Math.min(currentLevel + 1, LEVELS)));
+function hideResetConfirm() {
+  document.getElementById('resetConfirm').classList.add('hidden');
+  document.getElementById('resetLink').classList.remove('hidden');
+  fitCards();
+}
+document.getElementById('resetLink').addEventListener('click', () => {
+  document.getElementById('resetLink').classList.add('hidden');
+  document.getElementById('resetConfirm').classList.remove('hidden');
+  fitCards();
+});
+document.getElementById('resetNo').addEventListener('click', hideResetConfirm);
+document.getElementById('resetYes').addEventListener('click', () => {
+  unlockedCount = 0; bestStars = []; look = defaultLook();
+  try { localStorage.removeItem('uq_perfect'); } catch (e) {}
+  saveProgress();
+  hideResetConfirm();
+  refreshTitle();
+});
+
+// how the star hoard is doing, and what it is working towards
+function starText() {
+  const tot = starTotal();
+  const next = TREASURES.find(c => c.stars > tot);
+  return '⭐ <b>' + tot + '</b> stars' +
+    (next ? ' — <b>' + (next.stars - tot) + '</b> more for a star treasure!'
+          : ' — every star treasure is yours!');
+}
+function showStarBoxes() {
+  for (const id of ['starCap', 'pauseStars', 'winStars', 'dressStars']) {
+    document.getElementById(id).innerHTML = starText();
+  }
+}
+
+// ---------- the Decorator: pick one thing per slot ----------
+let dressing = false, dressFrom = 'title';
+
+function buildDecorator() {
+  const list = document.getElementById('slotList');
+  list.innerHTML = '';
+  for (const sl of SLOTS) {
+    const row = document.createElement('div');
+    row.className = 'slotrow';
+    const name = document.createElement('span');
+    name.className = 'slotname';
+    name.textContent = sl.icon + ' ' + sl.label;
+    const picks = document.createElement('div');
+    picks.className = 'picks';
+    for (const it of slotItems(sl.key)) {
+      const b = document.createElement('button');
+      b.className = 'pick';
+      if (!owns(it)) {
+        b.classList.add('locked');
+        b.textContent = it.stars ? '⭐' : '🔒';
+        const need = it.stars
+          ? it.name + ': collect ' + it.stars + ' stars — ' + (it.stars - starTotal()) + ' to go!'
+          : it.name + ': win level ' + it.lvl + ' to get this!';
+        b.title = need;
+        b.addEventListener('click', () => {      // tapping tells you how to earn it
+          document.getElementById('dressCap').textContent = need;
+          tone(320, 0.1, 'sine', 0.06, 0, 260);
+        });
+      } else {
+        b.textContent = it.icon;
+        b.title = it.name;
+        if (look[sl.key] === it.id) b.classList.add('on');
+        b.addEventListener('click', () => {
+          look[sl.key] = it.id;
+          saveProgress();
+          sPick();
+          document.getElementById('dressCap').textContent = it.name + ' ' + sl.label.toLowerCase() + '!';
+          buildDecorator();
+        });
+      }
+      picks.appendChild(b);
+    }
+    row.appendChild(name);
+    row.appendChild(picks);
+    list.appendChild(row);
+  }
+}
+
+function openDecorator(from) {
+  initAudio();
+  dressFrom = from;
+  dressing = true;
+  document.getElementById(from === 'win' ? 'winScreen' : 'title').classList.add('hidden');
+  showStarBoxes();
+  document.getElementById('dressCap').textContent = 'Tap a picture to try it on!';
+  buildDecorator();
+  document.getElementById('dressScreen').classList.remove('hidden');
+  fitCards();
+}
+function closeDecorator() {
+  if (!dressing) return;
+  dressing = false;
+  document.getElementById('dressScreen').classList.add('hidden');
+  document.getElementById(dressFrom === 'win' ? 'winScreen' : 'title').classList.remove('hidden');
+  if (dressFrom === 'title') refreshTitle();
+  fitCards();
+}
+document.getElementById('dressBtn').addEventListener('click', () => openDecorator('title'));
+document.getElementById('winDressBtn').addEventListener('click', () => openDecorator('win'));
+document.getElementById('dressDone').addEventListener('click', closeDecorator);
+
+// one trail speck, just for the preview (the real ones live in the particles)
+function drawBit(type, x, y, size, col, rot) {
+  ctx.fillStyle = col;
+  if (type === 'heart') { heartPath(x, y, size + 1); ctx.fill(); }
+  else if (type === 'conf') {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.fillRect(-4, -3, 8, 6); ctx.restore();
+  }
+  else if (type === 'puff') { ctx.beginPath(); ctx.arc(x, y, size * 1.7, 0, 7); ctx.fill(); }
+  else if (type === 'star') { starPath(x, y, size + 1.5); ctx.fill(); }
+  else { ctx.beginPath(); ctx.arc(x, y, size, 0, 7); ctx.fill(); }
+}
+
+// Lily posing in the Decorator, wearing exactly what is picked right now
+function drawDressPreview(t) {
+  const c = document.getElementById('dressPreview');
+  const real = ctx;
+  ctx = c.getContext('2d');                  // the drawing helpers all use ctx
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, c.width, c.height);
+  const sc = c.width / 150;
+  ctx.setTransform(sc, 0, 0, sc, c.width * 0.54, c.height * 0.7);
+
+  const tr = worn('trail');                  // her trail, streaming out behind
+  if (tr.cols) {
+    for (let i = 0; i < 6; i++) {
+      ctx.globalAlpha = 0.9 - i * 0.13;
+      drawBit(tr.type, -34 - i * 9, 17 - i * 3 + Math.sin(t * 3 - i) * 2,
+              tr.size, tr.cols[i % tr.cols.length], t * 3 + i);
+    }
+    ctx.globalAlpha = 1;
+  }
+  const b = worn('buddy');                   // and her friend
+  if (b.kind !== 'none') {
+    drawBuddyAt(b, b.kind === 'bflies' ? 0 : -50,
+                b.kind === 'bflies' ? -30 : -56 + Math.sin(t * 1.8) * 4, t, 1);
+  }
+  drawUnicorn(0, 0, t, lookOpts({facing: 1, onGround: true, anim: t * 7, animSpeed: 200,
+                                 flowMane: false}));   // show the mane she actually picked
+  ctx = real;
+}
+
+function updateHud() {
+  document.getElementById('levelNum').textContent = currentLevel;
+  document.getElementById('starCount').textContent = got + ' / ' + stars.length;
+}
+
+function startRescue() {
+  state = 'rescue';
+  rescueT = 0;
+  rescueX = lastSafeX;
+  sSplash();
+  burst(player.x, LAVA_Y, 14, () => ({
+    x: player.x + (Math.random()*40-20), y: LAVA_Y,
+    vx: Math.random()*160-80, vy: -(120 + Math.random()*220), g: 500,
+    size: 3 + Math.random()*4, color: Math.random() < 0.5 ? '#ff7a2e' : '#ffc24d', life: 0.7
+  }));
+  burst(player.x, LAVA_Y - 8, 8, () => ({
+    x: player.x + (Math.random()*50-25), y: LAVA_Y - 8,
+    vx: Math.random()*30-15, vy: -(40 + Math.random()*50),
+    size: 10 + Math.random()*10, color: 'rgba(255,255,255,0.5)', life: 1.1, type:'puff'
+  }));
+  player.vx = 0; player.vy = 0;
+}
+
+function startWin() {
+  if (state === 'win') return;
+  state = 'win';
+  winT = 0; confettiTimer = 0; fwTimer = 0;
+  rainbow = true;
+  winWasNew = currentLevel > unlockedCount;
+  if (winWasNew) {
+    unlockedCount = currentLevel;
+    const c = rewardAt(currentLevel).cos;
+    if (c) look[c.slot] = c.id;        // she puts her new thing on right away
+  }
+  // only her best run in each level counts, so replaying can add stars but never farm them
+  const starsBefore = starTotal();
+  if (got > (bestStars[currentLevel - 1] || 0)) bestStars[currentLevel - 1] = got;
+  const starsNow = starTotal();
+  wonTreasures = TREASURES.filter(c => c.stars > starsBefore && c.stars <= starsNow);
+  for (const c of wonTreasures) look[c.slot] = c.id;   // she wears a treasure straight away
+  saveProgress();
+  finale = currentLevel === LEVELS;
+  if (finale) {
+    finaleStart = {x: player.x, y: player.y};
+    finaleTrail.length = 0;
+    sFinale();
+  } else {
+    sWin();
+  }
+}
+
+function showWinCard() {
+  const r = rewardAt(currentLevel);
+  const slot = r.cos && SLOTS.find(sl => sl.key === r.cos.slot);
+  const perfect = stars.length > 0 && got >= stars.length;
+  document.getElementById('winEmoji').textContent = finale ? '🔮' : '🌈';
+  const wt = document.getElementById('winTitle');
+  wt.textContent = finale ? 'ALL the magic is back!' : 'Level ' + currentLevel + ' complete!';
+  wt.classList.toggle('rainbowtext', finale);
+  document.getElementById('winDance').classList.toggle('hidden', !finale);
+  document.getElementById('winMsg').innerHTML =
+    (finale ? 'Lily is the most magical unicorn ever! 🦄<br>' : '') +
+    'You collected <b>' + got + '</b> stars! ⭐' +
+    (perfect ? '<br>🌟 <b>PERFECT!</b> You found every star!' : '') +
+    (wonTreasures.length
+      ? '<br>🎁 <b>STAR TREASURE!</b> ' +
+        wonTreasures.map(c => c.icon + ' ' + c.name).join(' and ') + '!'
+      : '');
+  const bits = [];
+  if (r.power) bits.push(r.power.icon + ' ' + r.power.name);
+  if (r.cos) bits.push(r.cos.icon + ' ' + r.cos.name);
+  document.getElementById('unlockBox').textContent =
+    (winWasNew ? 'New magic: ' : 'Your magic: ') + bits.join('  +  ');
+  document.getElementById('unlockTip').textContent =
+    !winWasNew ? ''
+    : r.power ? r.power.tip
+    : 'A new ' + slot.label.toLowerCase() + '! Lily is wearing it — swap it any time in 🎀 Decorate.';
+  document.getElementById('nextBtn').classList.toggle('hidden', finale);
+  document.getElementById('nextHint').classList.toggle('hidden', finale);
+  document.getElementById('mapBtn').textContent = finale ? '🦄 Choose a level' : '🗺️ Choose a level';
+  showStarBoxes();
+  if (perfect) sPerfect();
+  document.getElementById('winScreen').classList.remove('hidden');
+  fitCards();
+}
+
+// ---------- update ----------
+function update(dt, t) {
+  // moving platforms
+  for (const p of plats) {
+    p.prevY = p.y;
+    if (p.amp) p.y = p.baseY + Math.sin(t * p.spd + p.ph) * p.amp;
+  }
+
+  const finaleFly = state === 'win' && finale && winT > 0.8;
+  if (state === 'play' || (state === 'win' && !finaleFly)) {
+    // ride a moving platform
+    if (player.stand && player.onGround) player.y += player.stand.y - player.stand.prevY;
+
+    let move = 0;
+    if (state === 'play') move = (keys.l ? -1 : 0) + (keys.r ? 1 : 0);
+    const target = move * runSpeed();
+    player.vx = lerp(player.vx, target, Math.min(1, dt * 14));
+    if (move) { player.facing = move; }
+    if (Math.abs(player.vx) > 40 && player.onGround) player.anim += dt * 11;
+
+    coyote = player.onGround ? 0.12 : Math.max(0, coyote - dt);
+    jumpBuf = Math.max(0, jumpBuf - dt);
+
+    if (state === 'win') {
+      // happy victory hops
+      if (player.onGround) { player.vy = -380; player.onGround = false; player.facing *= -1; }
+    } else if (jumpBuf > 0) {
+      if (player.onGround || coyote > 0) {
+        player.vy = -jumpV(); player.onGround = false; coyote = 0; jumpBuf = 0;
+        player.squash = -0.45; sJump();
+      } else if (player.flut < maxFlut()) {
+        player.vy = -FLUT_V; player.flut++; jumpBuf = 0;
+        sFlutter();
+        burst(player.x, player.y + 10, 10, () => {
+          const heart = Math.random() < 0.35;
+          return {
+            x: player.x + (Math.random()*40-20), y: player.y + 14,
+            vx: Math.random()*80-40, vy: 40 + Math.random()*80,
+            size: 3 + Math.random()*3,
+            color: heart ? pinkOne() : PASTELS[(Math.random()*PASTELS.length)|0],
+            life: 0.6, type: heart ? 'heart' : 'star'
+          };
+        });
+      }
+    }
+
+    player.vy += GRAV * dt;
+    if (player.vy > fallCap()) player.vy = fallCap();   // Feather Fall softens this
+
+    // Magic Wings: hold jump while falling to glide gently down
+    player.gliding = false;
+    if (hasPower('glide') && state === 'play' && !player.onGround && player.vy > 0 && keys.j) {
+      player.gliding = true;
+      player.vy = Math.min(player.vy, 130);
+      if (Math.random() < dt * 14) {
+        spawn({x: player.x - player.facing * 8, y: player.y - 6,
+               vx: -player.facing * 40, vy: 20 + Math.random() * 30,
+               size: 2.5, color: '#ffd6ee', life: 0.6, type: 'star'});
+      }
+    }
+
+    const prevFeet = player.y + player.hh;
+    player.x += player.vx * dt;
+    player.y += player.vy * dt;
+    player.x = clamp(player.x, -140, maxX);
+
+    // land on platforms (one-way, from above)
+    player.prevGround = player.onGround;
+    player.onGround = false; player.stand = null;
+    if (player.vy >= 0) {
+      for (const p of plats) {
+        if (player.x > p.x - 14 && player.x < p.x + p.w + 14) {
+          if (prevFeet <= p.prevY + 10 && player.y + player.hh >= p.y) {
+            player.y = p.y - player.hh;
+            player.vy = 0;
+            player.onGround = true;
+            player.flut = 0;
+            player.stand = p;
+            lastSafePlat = p;
+            lastSafeX = clamp(player.x, p.x + 24, p.x + p.w - 24);
+            if (!player.prevGround) {
+              player.squash = 0.5; sLand();
+              const tr = worn('trail');              // landing puff matches her trail
+              burst(player.x, p.y, tr.cols ? 12 : 6, () => ({
+                x: player.x + (Math.random()*36-18), y: p.y,
+                vx: Math.random()*70-35, vy: -(20 + Math.random()*40), g: 300,
+                size: 2.5 + Math.random()*2.5,
+                color: tr.cols ? tr.cols[(Math.random()*tr.cols.length)|0] : '#e8d6ff',
+                life: 0.4, type: tr.type || 'dot'
+              }));
+            }
+            // trampoline flowers: land on one and BOING!
+            for (const f of flowers) {
+              if (f.p === p && Math.abs(player.x - f.x) < 26) {
+                player.vy = -1050; player.onGround = false; player.stand = null;
+                player.squash = -0.5; player.flut = 0;
+                f.bt = t; sBoing();
+                burst(f.x, p.y - 26, 8, () => ({
+                  x: f.x + Math.random()*24-12, y: p.y - 26,
+                  vx: Math.random()*160-80, vy: -(60 + Math.random()*120), g: 400,
+                  size: 3, color: f.col, life: 0.8
+                }));
+                break;
+              }
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    // whatever she is trailing behind her while she gallops (the Trail slot)
+    if (player.onGround && Math.abs(player.vx) > 120) {
+      const tr = worn('trail');
+      if (tr.rate && Math.random() < dt * tr.rate) {
+        const heart = tr.hearts && Math.random() < tr.hearts;
+        spawn({x: player.x - player.facing*20, y: player.y + 16,
+               vx: -player.facing*30,
+               vy: tr.rise ? -(50 + Math.random()*45) : -20 - Math.random()*30,
+               size: tr.size,
+               color: heart ? pinkOne() : tr.cols[(Math.random()*tr.cols.length)|0],
+               life: tr.rise ? 0.9 : 0.5, type: heart ? 'heart' : tr.type});
+      }
+    }
+
+    // stars
+    if (state === 'play') {
+      for (const s of stars) {
+        if (s.taken) continue;
+        const dx = player.x - s.x, dy = player.y - s.y;
+        const d2 = dx*dx + dy*dy;
+        const mr = magnetR();                        // Star Magnet, then Super Magnet
+        if (hasPower('magnet') && d2 < mr*mr && d2 > 4) {
+          s.x += dx * dt * 4; s.y += dy * dt * 4;
+        }
+        if (d2 < 46*46) {
+          s.taken = true; got++; updateHud(); sStar();
+          burst(s.x, s.y, 12, () => {
+            const heart = Math.random() < 0.25;
+            return {
+              x: s.x, y: s.y,
+              vx: Math.random()*220-110, vy: Math.random()*220-110,
+              size: 3 + Math.random()*3,
+              color: heart ? pinkOne() : Math.random() < 0.5 ? '#ffd94d' : '#fff3b0',
+              life: 0.7, type: heart ? 'heart' : 'star'
+            };
+          });
+        }
+      }
+      // reach the crystal!
+      if (Math.abs(player.x - crystal.x) < 60 && Math.abs(player.y - crystal.y) < 140) startWin();
+      // whoops — lava dip
+      if (player.y + player.hh > LAVA_Y + 6) startRescue();
+    }
+
+    player.squash = lerp(player.squash, 0, Math.min(1, dt * 9));
+  }
+  else if (state === 'rescue') {
+    rescueT += dt;
+    const p = lastSafePlat;
+    const targetY = p.y - player.hh;
+    if (rescueT < 0.4) {
+      // steam settles; unicorn hidden
+    } else if (rescueT < 1.7) {
+      const u = ease(clamp((rescueT - 0.4) / 1.3, 0, 1));
+      player.x = rescueX;
+      player.y = lerp(-90, targetY, u);
+      if (rescueT - dt < 0.4) sRescue();
+    } else {
+      player.y = targetY;
+      player.onGround = true; player.flut = 0;
+      player.stand = p;
+      cloudGone = {x: rescueX, y: targetY + 26, t: 0};
+      state = 'play';
+    }
+  }
+
+  if (state === 'win') {
+    winT += dt;
+    confettiTimer -= dt;
+    if (winT < (finale ? 6 : 3.5) && confettiTimer <= 0) {
+      confettiTimer = finale ? 0.15 : 0.25;
+      burst(crystal.x, crystal.y - 40, finale ? 16 : 10, () => {
+        const heart = Math.random() < 0.35;
+        return {
+          x: crystal.x + Math.random()*340-170, y: crystal.y - 140 - Math.random()*120,
+          vx: Math.random()*120-60, vy: Math.random()*40, g: heart ? 130 : 260,
+          size: heart ? 5 : 4,
+          color: heart ? pinkOne() : PASTELS[(Math.random()*PASTELS.length)|0],
+          life: 2.4, type: heart ? 'heart' : 'conf'
+        };
+      });
+    }
+    if (finale) {
+      // fireworks!
+      fwTimer -= dt;
+      if (winT > 0.6 && winT < 6 && fwTimer <= 0) {
+        fwTimer = 0.5;
+        const fx = camX + 60 + Math.random() * Math.max(100, viewW - 120);
+        const fy = 60 + Math.random() * 180;
+        const col = PASTELS[(Math.random()*PASTELS.length)|0];
+        sPop();
+        burst(fx, fy, 22, i => {
+          const a = i / 22 * Math.PI * 2, sp = 90 + Math.random() * 130;
+          return {x: fx, y: fy, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
+                  g: 110, size: 3, color: col, life: 1.3, type: 'star'};
+        });
+      }
+      // gentle star rain
+      if (winT > 1 && winT < 6 && Math.random() < dt * 8) {
+        spawn({x: camX + Math.random() * viewW, y: -20,
+               vy: 90 + Math.random() * 80, vx: Math.random()*30-15, g: 60,
+               size: 3 + Math.random()*2, color: Math.random() < 0.5 ? '#ffd94d' : '#fff',
+               life: 3, type: 'star'});
+      }
+      // Lily's victory flight: rise, loop-the-loop, then hover
+      if (winT > 0.8) {
+        const u = winT - 0.8;
+        const cx = crystal.x - 80, cy = 220;
+        let nx, ny;
+        if (u < 1) {
+          nx = lerp(finaleStart.x, cx, ease(u));
+          ny = lerp(finaleStart.y, cy + 105, ease(u));
+        } else if (u < 3) {
+          const a = Math.PI / 2 + (u - 1) * Math.PI;
+          nx = cx + Math.cos(a) * 140;
+          ny = cy + Math.sin(a) * 105;
+        } else {
+          nx = cx + Math.sin((u - 3) * 1.6) * 36;
+          ny = cy - 30 + Math.sin((u - 3) * 2.3) * 14;
+        }
+        player.facing = nx >= player.x ? 1 : -1;
+        player.x = nx; player.y = ny;
+        player.gliding = true;
+        finaleTrail.push({x: nx, y: ny + 10});
+        if (finaleTrail.length > 80) finaleTrail.shift();
+      }
+    }
+    if (winT > (finale ? 6.5 : 2.2) && !winShown) {
+      winShown = true;
+      showWinCard();
+    }
+  }
+
+  // butterflies scoot out of Lily's way
+  if (state === 'play' || state === 'win') {
+    for (const b of decoBflies) {
+      const bx = b.x + Math.sin(t * 0.9 + b.ph) * 34 + b.ox;
+      const by = b.y + Math.sin(t * 1.6 + b.ph * 2) * 20 + b.oy;
+      const dx = bx - player.x, dy = by - (player.y - 12);
+      const d2 = dx*dx + dy*dy;
+      if (d2 < 52*52) {
+        const d = Math.sqrt(d2) || 1;
+        b.vx = (dx / d) * 240 + player.vx * 0.5;
+        b.vy = (dy / d) * 160 - 130;   // prefer fluttering upward
+        if (b.startled <= 0) {
+          tone(1300, 0.09, 'sine', 0.05, 0, 1800);
+          burst(bx, by, 4, () => ({
+            x: bx + Math.random()*16-8, y: by + Math.random()*16-8,
+            vx: Math.random()*60-30, vy: -(20 + Math.random()*50),
+            size: 2, color: BFLY_COLS[b.c % BFLY_COLS.length][0], life: 0.5, type:'star'
+          }));
+        }
+        b.startled = 0.9;
+      }
+      b.startled = Math.max(0, b.startled - dt);
+      b.ox += b.vx * dt; b.oy += b.vy * dt;
+      const damp = Math.pow(0.15, dt);
+      b.vx *= damp; b.vy *= damp;
+      const home = Math.min(1, dt * 0.9);   // drift gently back home
+      b.ox = clamp(lerp(b.ox, 0, home), -170, 170);
+      b.oy = clamp(lerp(b.oy, 0, home), -170, 60);
+    }
+  }
+
+  updateBirds(t, dt);
+
+  if (worn('buddy').kind !== 'none') {  // her little friend paddles along after her
+    const h = buddyHome();
+    buddy.x = lerp(buddy.x, h.x, Math.min(1, dt * 2.4));
+    buddy.y = lerp(buddy.y, h.y, Math.min(1, dt * 3));
+  }
+
+  if (cloudGone) {
+    cloudGone.t += dt;
+    cloudGone.y -= dt * 60;
+    cloudGone.x -= dt * 40;
+    if (cloudGone.t > 1) cloudGone = null;
+  }
+
+  // friendly lava sharks: patrol, leap, and boop Lily upward for fun
+  for (const k of sharks) {
+    const kx = sharkX(k, t);
+    const onScreen = kx > camX - 80 && kx < camX + viewW + 80;
+    const u = (t - k.leapT) / k.leapDur;
+    if (u > 1) {
+      k.nextLeap -= dt;
+      if (k.nextLeap <= 0) {
+        k.leapT = t;
+        k.nextLeap = 5 + Math.random() * 8;
+        if (onScreen) {
+          sSharkLeap();
+          burst(kx, LAVA_Y, 10, () => ({
+            x: kx + Math.random()*50-25, y: LAVA_Y,
+            vx: Math.random()*140-70, vy: -(80 + Math.random()*160), g: 480,
+            size: 2.5 + Math.random()*3.5,
+            color: Math.random() < 0.5 ? '#ffc24d' : '#ff7a2e', life: 0.6
+          }));
+        }
+      }
+    } else if (u >= 0) {
+      const ky = LAVA_Y + 10 - Math.sin(u * Math.PI) * k.leapH;
+      if (state === 'play' && k.boopCd <= 0 &&
+          Math.abs(player.x - kx) < 48 && Math.abs(player.y + player.hh - ky) < 42) {
+        player.vy = -880;
+        player.onGround = false; player.stand = null; player.flut = 0;
+        player.squash = -0.4;
+        k.boopCd = 1.4;
+        sSharkBoop();
+        burst(kx, ky - 20, 10, () => ({
+          x: kx + Math.random()*40-20, y: ky - 20,
+          vx: Math.random()*160-80, vy: -(40 + Math.random()*110), g: 380,
+          size: 3, color: PASTELS[(Math.random()*PASTELS.length)|0], life: 0.8, type:'star'
+        }));
+      }
+    }
+    k.boopCd = Math.max(0, k.boopCd - dt);
+  }
+
+  // a friendly lava fish leaps now and then
+  nextFishT -= dt;
+  if (!fish && nextFishT <= 0 && state !== 'title') {
+    fish = {x0: camX + 80 + Math.random() * Math.max(100, viewW - 160),
+            t0: t, dur: 1.15, dir: Math.random() < 0.5 ? -1 : 1};
+    tone(300, 0.12, 'sine', 0.05, 0, 520);
+  }
+  if (fish && t - fish.t0 > fish.dur) {
+    fish = null;
+    nextFishT = 3 + Math.random() * 5;
+  }
+
+  // embers over the lava
+  if (Math.random() < dt * 14) {
+    spawn({x: camX + Math.random() * viewW, y: LAVA_Y + Math.random()*20,
+           vy: -(25 + Math.random()*55), vx: Math.random()*20-10,
+           size: 1.5 + Math.random()*2.5,
+           color: Math.random() < 0.5 ? '#ffb14d' : '#ff7a2e', life: 1.6});
+  }
+
+  // particles
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const q = parts[i];
+    q.age += dt;
+    if (q.age > q.life) { parts.splice(i, 1); continue; }
+    q.vy += (q.g || 0) * dt;
+    q.x += q.vx * dt; q.y += q.vy * dt;
+  }
+
+  // camera
+  const focus = clamp(player.x - viewW * 0.42, 0, Math.max(0, worldW - viewW));
+  camX = lerp(camX, focus, Math.min(1, dt * 6));
+
+  musicTick();
+}
+
+// ---------- drawing ----------
+function setLayer(par) {
+  const s = scale * dpr;
+  ctx.setTransform(s, 0, 0, s, -camX * par * s, 0);
+}
+
+function drawSky(t) {
+  const sky = skyNow(t);
+  nightAmt = clamp((1 - sky.light) / 0.62, 0, 1);
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  g.addColorStop(0, sky.c[0]);
+  g.addColorStop(0.5, sky.c[1]);
+  g.addColorStop(0.8, sky.c[2]);
+  g.addColorStop(1, sky.c[3]);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  drawStarField(t);
+
+  // sun by day, moon by night — each arcs across the sky
+  const p = dayPhase(t);
+  const sunUp = p < 0.25 || p > 0.75;
+  const u = sunUp ? ((p + 0.25) % 1) / 0.5 : (p - 0.25) / 0.5;
+  setLayer(0.1);
+  const bx = camX * 0.1 + viewW * (0.1 + u * 0.8);
+  const by = 215 - Math.sin(u * Math.PI) * 158;
+  ctx.globalAlpha = clamp(Math.min(u, 1 - u) / 0.07, 0, 1);   // fade in/out at the horizon
+  if (sunUp) drawSun(bx, by, t);
+  else drawMoon(bx, by, t);
+  ctx.globalAlpha = 1;
+}
+
+function drawSun(sx, sy, t) {
+  // soft shimmering rays
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(t * 0.08);
+  for (let i = 0; i < 12; i++) {
+    ctx.rotate(Math.PI / 6);
+    const len = 52 + Math.sin(t * 1.3 + i) * 9;
+    const rg = ctx.createLinearGradient(0, -30, 0, -len);
+    rg.addColorStop(0, 'rgba(255,240,170,0.34)');
+    rg.addColorStop(1, 'rgba(255,240,170,0)');
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.moveTo(-7, -30); ctx.lineTo(0, -len); ctx.lineTo(7, -30);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+  // layered corona
+  const halo = ctx.createRadialGradient(sx, sy, 8, sx, sy, 78);
+  halo.addColorStop(0,    'rgba(255,250,210,0.95)');
+  halo.addColorStop(0.28, 'rgba(255,235,150,0.55)');
+  halo.addColorStop(0.62, 'rgba(255,205,120,0.22)');
+  halo.addColorStop(1,    'rgba(255,200,120,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(sx, sy, 78, 0, 7); ctx.fill();
+  // disc
+  const disc = ctx.createRadialGradient(sx - 7, sy - 8, 3, sx, sy, 27);
+  disc.addColorStop(0, '#fffdf0');
+  disc.addColorStop(0.55, '#fff2b8');
+  disc.addColorStop(1, '#ffd875');
+  ctx.fillStyle = disc;
+  ctx.beginPath(); ctx.arc(sx, sy, 26, 0, 7); ctx.fill();
+  // a gentle smile, like the clouds and flowers have
+  ctx.fillStyle = 'rgba(230,150,60,0.5)';
+  ctx.beginPath(); ctx.arc(sx - 9, sy - 4, 2.3, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(sx + 9, sy - 4, 2.3, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(230,150,60,0.5)'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(sx, sy + 1, 9, 0.45, Math.PI - 0.45); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,170,120,0.25)';
+  ctx.beginPath(); ctx.arc(sx - 16, sy + 4, 4, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(sx + 16, sy + 4, 4, 0, 7); ctx.fill();
+}
+
+function drawMoon(mx, my, t) {
+  const halo = ctx.createRadialGradient(mx, my, 6, mx, my, 66);
+  halo.addColorStop(0, 'rgba(226,236,255,0.55)');
+  halo.addColorStop(0.4, 'rgba(190,206,255,0.22)');
+  halo.addColorStop(1, 'rgba(190,206,255,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(mx, my, 66, 0, 7); ctx.fill();
+  // disc
+  const disc = ctx.createRadialGradient(mx - 6, my - 7, 3, mx, my, 25);
+  disc.addColorStop(0, '#ffffff');
+  disc.addColorStop(1, '#dfe4fb');
+  ctx.fillStyle = disc;
+  ctx.beginPath(); ctx.arc(mx, my, 24, 0, 7); ctx.fill();
+  // craters
+  ctx.fillStyle = 'rgba(186,194,232,0.55)';
+  ctx.beginPath(); ctx.arc(mx + 8, my - 8, 4.5, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(mx - 9, my + 6, 3.4, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(mx + 5, my + 10, 2.6, 0, 7); ctx.fill();
+  // sleepy face
+  ctx.strokeStyle = 'rgba(120,130,190,0.75)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(mx - 8, my - 1, 3.4, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+  ctx.beginPath(); ctx.arc(mx + 6, my - 1, 3.4, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+  ctx.beginPath(); ctx.arc(mx - 1, my + 8, 3.6, 0.3, Math.PI - 0.3); ctx.stroke();
+}
+
+function drawStarField(t) {
+  if (nightAmt <= 0.02) return;
+  setLayer(0.06);
+  const off = camX * 0.06;
+  const k0 = Math.floor(off / 160) - 1;
+  const n = Math.ceil(viewW / 160) + 2;
+  for (let i = 0; i < n; i++) {
+    const k = k0 + i;
+    for (let s = 0; s < 3; s++) {
+      const h1 = hash(k * 13.7 + s * 4.1);
+      const sx = k * 160 + h1 * 150;
+      const sy = 18 + hash(k * 7.3 + s * 9.7) * 300;
+      const tw = 0.55 + 0.45 * Math.sin(t * (1.4 + h1 * 2.2) + k + s * 2.3);
+      const big = hash(k * 3.3 + s) > 0.82;
+      ctx.globalAlpha = nightAmt * (0.35 + tw * 0.65);
+      ctx.fillStyle = h1 > 0.7 ? '#ffe9c9' : '#ffffff';
+      if (big) { starPath(sx, sy, 2.4 + tw * 2.2); ctx.fill(); }
+      else { ctx.beginPath(); ctx.arc(sx, sy, 0.9 + tw * 0.9, 0, 7); ctx.fill(); }
+    }
+  }
+  // a wish upon a shooting star every so often
+  const period = 13;
+  const sh = (t % period) / period;
+  if (sh < 0.11) {
+    const idx = Math.floor(t / period);
+    const su = sh / 0.11;
+    const startX = camX * 0.06 + viewW * (0.15 + hash(idx * 5.5) * 0.6);
+    const startY = 40 + hash(idx * 2.7) * 110;
+    const sx = startX + su * 210, sy = startY + su * 110;
+    ctx.globalAlpha = nightAmt * Math.sin(su * Math.PI);
+    const tg = ctx.createLinearGradient(sx - 70, sy - 36, sx, sy);
+    tg.addColorStop(0, 'rgba(255,255,255,0)');
+    tg.addColorStop(1, 'rgba(255,255,255,0.9)');
+    ctx.strokeStyle = tg; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(sx - 70, sy - 36); ctx.lineTo(sx, sy); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    starPath(sx, sy, 4.5); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// one volcano, drawn in world space
+function drawVolcano(mx, peak, halfW, base, k, t, far) {
+  const craterW = halfW * 0.13 + 7;
+  // eruption cycle — each volcano puffs off on its own rhythm
+  const period = 11 + hash(k + 21) * 9;
+  const phase = ((t + hash(k + 33) * period) % period) / period;
+  const eu = phase < 0.2 ? phase / 0.2 : 0;              // 0..1 while erupting
+  const boil = 0.5 + 0.5 * Math.sin(t * 1.7 + k);
+
+  // silhouette with flared, concave slopes
+  const body = ctx.createLinearGradient(0, peak, 0, base);
+  if (far) {
+    body.addColorStop(0, 'rgba(120,95,165,0.42)');
+    body.addColorStop(1, 'rgba(96,72,140,0.30)');
+  } else {
+    body.addColorStop(0, 'rgba(104,74,148,0.85)');
+    body.addColorStop(0.6, 'rgba(84,57,126,0.8)');
+    body.addColorStop(1, 'rgba(70,44,108,0.72)');
+  }
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.moveTo(mx - halfW, base);
+  ctx.quadraticCurveTo(mx - halfW * 0.72, peak + (base - peak) * 0.5, mx - craterW, peak);
+  ctx.lineTo(mx + craterW, peak + 2);
+  ctx.quadraticCurveTo(mx + halfW * 0.72, peak + (base - peak) * 0.5, mx + halfW, base);
+  ctx.closePath();
+  ctx.fill();
+  if (nightAmt > 0.02) {                    // sink into shadow after dark
+    ctx.fillStyle = 'rgba(12,16,44,' + (nightAmt * (far ? 0.34 : 0.48)).toFixed(2) + ')';
+    ctx.fill();
+  }
+
+  // sunlit left face for a bit of dimension
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = far ? 'rgba(255,255,255,0.05)' : 'rgba(255,225,255,0.09)';
+  ctx.beginPath();
+  ctx.moveTo(mx - halfW, base);
+  ctx.quadraticCurveTo(mx - halfW * 0.72, peak + (base - peak) * 0.5, mx - craterW, peak);
+  ctx.lineTo(mx - craterW * 0.2, peak);
+  ctx.lineTo(mx - halfW * 0.36, base);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  if (far) return;   // distant ones stay simple and hazy
+
+  // lava running down the slopes — kept inside the mountain by clipping
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(mx - halfW, base);
+  ctx.quadraticCurveTo(mx - halfW * 0.72, peak + (base - peak) * 0.5, mx - craterW, peak);
+  ctx.lineTo(mx + craterW, peak + 2);
+  ctx.quadraticCurveTo(mx + halfW * 0.72, peak + (base - peak) * 0.5, mx + halfW, base);
+  ctx.closePath();
+  ctx.clip();
+  const H2 = base - peak;
+  const flows = [[1, 0.5, 0.62], [-1, 0.38, 0.48]];
+  for (let f = 0; f < flows.length; f++) {
+    const dir = flows[f][0], spread = halfW * flows[f][1], len = H2 * flows[f][2];
+    const p0 = [mx + dir * craterW * 0.45, peak + 5];
+    const p1 = [mx + dir * spread * 0.55, peak + len * 0.45];
+    const p2 = [mx + dir * spread, peak + len];
+    const at = u => [
+      (1-u)*(1-u)*p0[0] + 2*(1-u)*u*p1[0] + u*u*p2[0],
+      (1-u)*(1-u)*p0[1] + 2*(1-u)*u*p1[1] + u*u*p2[1]
+    ];
+    // molten stream, thick at the crater and tapering as it cools
+    for (let s = 0; s <= 44; s++) {
+      const u = s / 44, q = at(u);
+      const heat = 1 - u;
+      ctx.fillStyle = 'rgba(255,' + Math.round(90 + heat * 110) + ',' + Math.round(30 + heat * 50) +
+                      ',' + (0.30 + heat * 0.45).toFixed(2) + ')';
+      ctx.beginPath(); ctx.arc(q[0], q[1], 5.5 * (1 - u * 0.62), 0, 7); ctx.fill();
+    }
+    // bright globs creeping down
+    for (let d = 0; d < 3; d++) {
+      const u = (t * 0.1 + hash(k * 5 + f * 3 + d) + d * 0.33) % 1;
+      const q = at(u);
+      ctx.fillStyle = 'rgba(255,231,150,' + (0.85 * (1 - u)).toFixed(2) + ')';
+      ctx.beginPath(); ctx.arc(q[0], q[1], 3.4 * (1 - u * 0.5), 0, 7); ctx.fill();
+    }
+  }
+  ctx.restore();
+
+  // crater glow
+  const glowR = (26 + boil * 6) * (1 + eu * 1.5);
+  const cg = ctx.createRadialGradient(mx, peak + 2, 2, mx, peak + 2, glowR);
+  cg.addColorStop(0, 'rgba(255,225,140,' + (0.85 + eu * 0.15).toFixed(2) + ')');
+  cg.addColorStop(0.45, 'rgba(255,140,50,' + (0.5 + eu * 0.3).toFixed(2) + ')');
+  cg.addColorStop(1, 'rgba(255,120,40,0)');
+  ctx.fillStyle = cg;
+  ctx.beginPath(); ctx.arc(mx, peak + 2, glowR, 0, 7); ctx.fill();
+  // molten crater lip
+  ctx.fillStyle = 'rgba(255,170,70,0.95)';
+  ctx.beginPath();
+  ctx.ellipse(mx, peak + 2, craterW * 0.85, 3.2 + boil, 0, 0, 7);
+  ctx.fill();
+
+  // smoke puffs rising and drifting
+  for (let s = 0; s < 5; s++) {
+    const sp = (t * 0.13 + hash(k * 11 + s * 7)) % 1;
+    const drift = (hash(k * 3 + s) - 0.5) * 60;
+    const sx = mx + drift * sp + Math.sin(sp * 4 + s) * 10;
+    const sy = peak - 6 - sp * 150;
+    const r = 9 + sp * 26;
+    ctx.fillStyle = 'rgba(214,198,228,' + (0.32 * (1 - sp) * (1 - sp * 0.3)).toFixed(3) + ')';
+    ctx.beginPath(); ctx.arc(sx, sy, r, 0, 7); ctx.fill();
+  }
+
+  // eruption: glowing lava arcs out of the crater
+  if (eu > 0) {
+    for (let b = 0; b < 9; b++) {
+      const bu = clamp(eu * 1.35 - b * 0.045, 0, 1);
+      if (bu <= 0 || bu >= 1) continue;
+      const dir = b % 2 ? 1 : -1;
+      const spd = 34 + hash(k * 13 + b) * 46;
+      const bx = mx + dir * spd * bu * 1.5;
+      const by = peak + 2 - (110 + hash(k + b) * 55) * Math.sin(bu * Math.PI * 0.92);
+      ctx.fillStyle = 'rgba(255,' + (150 + Math.floor(hash(b) * 80)) + ',70,' + (1 - bu).toFixed(2) + ')';
+      ctx.beginPath(); ctx.arc(bx, by, 4.5 - bu * 2.2, 0, 7); ctx.fill();
+    }
+    // ash burst at the mouth
+    ctx.fillStyle = 'rgba(230,215,240,' + (0.3 * (1 - eu)).toFixed(2) + ')';
+    ctx.beginPath(); ctx.arc(mx, peak - 22 - eu * 46, 16 + eu * 34, 0, 7); ctx.fill();
+  }
+}
+
+function drawMountains(t) {
+  // far, hazy range
+  setLayer(0.14);
+  const offF = camX * 0.14;
+  const kF0 = Math.floor(offF / 430) - 1;
+  const nF = Math.ceil(viewW / 430) + 3;
+  for (let i = 0; i < nF; i++) {
+    const k = kF0 + i;
+    const mx = k * 430 + hash(k * 17) * 200;
+    drawVolcano(mx, 330 + hash(k * 29) * 70, 120 + hash(k * 7) * 60, LAVA_Y + 20, k, t, true);
+  }
+  // near, detailed range
+  setLayer(0.25);
+  const off = camX * 0.25;
+  const k0 = Math.floor(off / 520) - 1;
+  const n = Math.ceil(viewW / 520) + 3;
+  for (let i = 0; i < n; i++) {
+    const k = k0 + i;
+    const mx = k * 520 + hash(k) * 220;
+    drawVolcano(mx, 258 + hash(k + 9) * 92, 150 + hash(k + 4) * 55, LAVA_Y + 20, k, t, false);
+  }
+  // warm haze above the lava
+  setLayer(1);
+  const hz = ctx.createLinearGradient(0, LAVA_Y - 75, 0, LAVA_Y);
+  hz.addColorStop(0, 'rgba(255,150,100,0)');
+  hz.addColorStop(1, 'rgba(255,140,80,0.35)');
+  ctx.fillStyle = hz;
+  ctx.fillRect(camX - 20, LAVA_Y - 75, viewW + 40, 75);
+}
+
+function blob(x, y, r) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, 7); }
+// one path, moveTo before each circle -> clean union, no seams.
+// Lobe count and sizes come from the seed, so every cloud has its own silhouette.
+function cloudPath(cx, cy, s, seed) {
+  const n = 5 + Math.floor(hash(seed * 3.1) * 3);   // 5..7 lobes
+  const span = 32;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const u = i / (n - 1);
+    const bump = Math.sin(u * Math.PI);             // taller through the middle
+    const r  = (8 + bump * 14 + hash(seed * 7.7 + i) * 7) * s;
+    const dy = (-bump * 11 + (hash(seed * 11.3 + i) - 0.5) * 8) * s;
+    blob(cx + (u - 0.5) * 2 * span * s, cy + dy, r);
+  }
+  ctx.moveTo(cx + span * 1.12 * s, cy + 7 * s);     // flat-ish base
+  ctx.ellipse(cx, cy + 7 * s, span * 1.12 * s, 10 * s, 0, 0, 7);
+}
+function drawClouds(t) {
+  setLayer(0.5);
+  const drift = t * 10;
+  const off = camX * 0.5 - drift;
+  const k0 = Math.floor(off / 420) - 1;
+  const n = Math.ceil(viewW / 420) + 3;
+  const dim = nightAmt * 0.72;
+  const top = mixHex('#ffffff', '#98a0d6', dim);
+  const bot = mixHex('#e6eaff', '#6a72a8', dim);
+  for (let i = 0; i < n; i++) {
+    const k = k0 + i;
+    const cx = k * 420 + hash(k * 3) * 200 + drift;
+    const cy = 60 + hash(k * 7) * 120;
+    const s = 0.7 + hash(k * 13) * 0.7;
+    const g = ctx.createLinearGradient(0, cy - 26 * s, 0, cy + 18 * s);
+    g.addColorStop(0, top);
+    g.addColorStop(1, bot);
+    ctx.fillStyle = g;
+    ctx.globalAlpha = 0.94;
+    cloudPath(cx, cy, s, k); ctx.fill();
+    // soft shading under the belly for volume
+    ctx.save();
+    cloudPath(cx, cy, s, k); ctx.clip();
+    ctx.fillStyle = 'rgba(146,156,212,' + (0.3 + dim * 0.2).toFixed(2) + ')';
+    ctx.beginPath(); ctx.ellipse(cx, cy + 21 * s, 42 * s, 13 * s, 0, 0, 7); ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawBalloons(t) {
+  setLayer(0.35);
+  const off = camX * 0.35;
+  const k0 = Math.floor(off / 900) - 1;
+  const n = Math.ceil(viewW / 900) + 2;
+  for (let i = 0; i < n; i++) {
+    const k = k0 + i;
+    if (hash(k * 17) < 0.25) continue; // leave some sky empty
+    const bx = k * 900 + hash(k * 5) * 500 + 150;
+    const by = 110 + hash(k * 11) * 110 + Math.sin(t * 0.6 + k) * 9;
+    const s = 0.75 + hash(k * 23) * 0.5;
+    const cA = PASTELS[Math.floor(hash(k * 29) * PASTELS.length)];
+    ctx.save();
+    ctx.translate(bx, by);
+    ctx.scale(s, s);
+    ctx.strokeStyle = 'rgba(120,90,60,0.8)'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-12, 20); ctx.lineTo(-7, 40);
+    ctx.moveTo(12, 20); ctx.lineTo(7, 40);
+    ctx.stroke();
+    ctx.fillStyle = cA;
+    ctx.beginPath(); ctx.ellipse(0, 0, 24, 26, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.ellipse(0, 0, 15, 26, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = cA;
+    ctx.beginPath(); ctx.ellipse(0, 0, 6, 26, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#a06a3c';
+    rounded(-9, 38, 18, 12, 3); ctx.fill();
+    if (nightAmt > 0.05) {          // burner lit against the dark
+      const bg = ctx.createRadialGradient(0, 30, 1, 0, 30, 26);
+      bg.addColorStop(0, 'rgba(255,210,120,' + (0.75 * nightAmt).toFixed(2) + ')');
+      bg.addColorStop(1, 'rgba(255,190,90,0)');
+      ctx.fillStyle = bg;
+      ctx.beginPath(); ctx.arc(0, 30, 26, 0, 7); ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+const BIRD_COLS = [
+  ['#ff9ec7','#f978ac','#ffd2e6'],  // pink
+  ['#8fd0ff','#63b4f0','#d4ecff'],  // blue
+  ['#ffd76b','#f5bb2e','#fff0c2'],  // sunny
+  ['#a8e6b0','#7ad089','#dcf7e0'],  // mint
+  ['#c9a6ff','#a97ff0','#e9dcff'],  // lavender
+];
+
+// one little bird, flying leftward (panic 0..1 = someone just flew through us!)
+function drawBird(t, bx, by, s, col, ph, sparkly, panic = 0) {
+  const flap = Math.sin(t * (7 + panic * 13) + ph);   // startled wings beat like crazy
+  ctx.save();
+  ctx.translate(bx, by);
+  ctx.rotate(Math.sin(t * 17 + ph) * 0.28 * panic);   // and the whole bird wobbles
+  ctx.scale(-s, s);
+  // tail
+  ctx.fillStyle = col[1];
+  ctx.beginPath();
+  ctx.moveTo(-6, 0); ctx.lineTo(-16, -6); ctx.lineTo(-15, 4);
+  ctx.closePath(); ctx.fill();
+  // far wing
+  ctx.save();
+  ctx.rotate(-flap * 0.45 - 0.25);
+  ctx.fillStyle = col[1];
+  ctx.beginPath(); ctx.ellipse(-1, -7, 4.2, 9.5, 0, 0, 7); ctx.fill();
+  ctx.restore();
+  // body + head
+  ctx.fillStyle = col[0];
+  ctx.beginPath(); ctx.ellipse(0, 0, 9.5, 7.2, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(7.5, -4.8, 5.2, 0, 7); ctx.fill();
+  // pale tummy
+  ctx.fillStyle = col[2];
+  ctx.beginPath(); ctx.ellipse(1, 3, 6.5, 3.6, 0, 0, 7); ctx.fill();
+  // beak
+  ctx.fillStyle = '#ffb443';
+  ctx.beginPath();
+  ctx.moveTo(11.6, -5.4); ctx.lineTo(17.5, -3.4); ctx.lineTo(11.6, -1.6);
+  ctx.closePath(); ctx.fill();
+  // near wing, flapping
+  ctx.save();
+  ctx.rotate(flap * 0.75);
+  ctx.fillStyle = col[1];
+  ctx.beginPath(); ctx.ellipse(0, -4, 5.4, 12, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = col[2];
+  ctx.beginPath(); ctx.ellipse(0, -8, 2.6, 5.5, 0, 0, 7); ctx.fill();
+  ctx.restore();
+  // eye + cheek (eyes go wide when startled)
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(9.2, -5.8, 2.4 + panic * 1.2, 0, 7); ctx.fill();
+  ctx.fillStyle = '#3a2b4d';
+  ctx.beginPath(); ctx.arc(9.8, -5.8, 1.3, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,140,180,0.4)';
+  ctx.beginPath(); ctx.arc(6, -2.4, 2.2, 0, 7); ctx.fill();
+  ctx.restore();
+  // magic birds trail fairy dust (drawn in this same parallax layer so it tracks them)
+  if (sparkly) {
+    const base = ctx.globalAlpha;
+    for (let d = 1; d <= 4; d++) {
+      const fade = 1 - d / 5;
+      ctx.globalAlpha = base * fade * (0.55 + 0.45 * Math.sin(t * 6 - d + ph));
+      ctx.fillStyle = d % 2 ? col[0] : col[2];
+      starPath(bx + d * 13 * s, by + 3 * s + Math.sin(t * 3 - d * 0.9 + ph) * 3 * s,
+               (3.2 - d * 0.5) * s);
+      ctx.fill();
+    }
+    ctx.globalAlpha = base;
+  }
+}
+
+// birds come from a formula instead of a list, so each flock's "eek!" is kept here
+const birdFlocks = new Map();
+function flockState(k) {
+  let f = birdFlocks.get(k);
+  if (!f) { f = {ox:0, oy:0, vx:0, vy:0, startled:0, puff:0, seen:0}; birdFlocks.set(k, f); }
+  return f;
+}
+
+// visit every bird in the sky right now -- shared by the drawing and the bumping
+function forEachBird(t, fn) {
+  const drift = t * 22;
+  const off = camX * 0.55 + drift;
+  const k0 = Math.floor(off / 650) - 1;
+  const n = Math.ceil(viewW / 650) + 3;
+  for (let i = 0; i < n; i++) {
+    const k = k0 + i;
+    if (hash(k * 7) < 0.3) continue;
+    const f = flockState(k);
+    f.seen = t;
+    const gx = k * 650 + hash(k * 3) * 280 - drift + f.ox;
+    const gy = 64 + hash(k * 9) * 140 + f.oy;
+    const col = BIRD_COLS[Math.floor(hash(k * 19) * BIRD_COLS.length)];
+    const size = 0.85 + hash(k * 23) * 0.5;
+    const sparkly = hash(k * 31) > 0.75;    // a few leave fairy dust
+    const m = 1 + Math.floor(hash(k * 13) * 5);
+    const spread = 1 + f.puff * 1.7;        // a spooked flock breaks formation
+    for (let j = 0; j < m; j++) {
+      // tidy V formation trailing behind the leader
+      const side = j % 2 ? 1 : -1;
+      const rank = Math.ceil(j / 2);
+      const bob = Math.sin(t * 1.5 + k + j * 0.7) * 5;
+      const scatter = f.puff * Math.sin(k * 2.7 + j * 2.3) * 24;
+      fn(gx + rank * 30 * spread,
+         gy + side * rank * 13 * spread + bob + scatter,
+         size * (j === 0 ? 1.12 : 0.94),
+         col, k + j * 1.3, sparkly && j === 0, f);
+    }
+  }
+}
+
+function drawBirds(t) {
+  setLayer(0.55);
+  ctx.globalAlpha = 1 - nightAmt * 0.9;     // the birds go home at night
+  forEachBird(t, (bx, by, s, col, ph, sparkly, f) =>
+    drawBird(t, bx, by, s, col, ph, sparkly, f.puff));
+  ctx.globalAlpha = 1;
+}
+
+// Lily jumped straight through a flock: scatter them, then let them regroup
+function updateBirds(t, dt) {
+  if ((state === 'play' || state === 'win') && nightAmt < 0.85) {
+    const px = player.x - camX, py = player.y - 14;        // birds fly in a far-off layer,
+    forEachBird(t, (bx, by, s, col, ph, sparkly, f) => {   // so bump them where they LOOK
+      const dx = (bx - camX * 0.55) - px, dy = by - py;
+      const d2 = dx*dx + dy*dy;
+      if (d2 > 56*56) return;
+      const d = Math.sqrt(d2) || 1;
+      f.vx = (dx / d) * 210 + player.vx * 0.3;
+      f.vy = (dy / d) * 150 - 110;          // mostly they shoot upward
+      if (f.startled <= 0) {
+        tone(1750, 0.07, 'sine', 0.05, 0, 2500);           // a squeaky little chirp
+        tone(2300, 0.06, 'sine', 0.04, AC ? AC.currentTime + 0.09 : 0, 3000);
+        const wx = bx + camX * 0.45;        // sparkles live in Lily's layer
+        burst(wx, by, 5, () => ({
+          x: wx + Math.random()*18-9, y: by + Math.random()*18-9,
+          vx: Math.random()*70-35, vy: -(20 + Math.random()*60),
+          size: 2, color: Math.random() < 0.5 ? col[0] : col[2], life: 0.55, type:'star'
+        }));
+      }
+      f.startled = 1;
+    });
+  }
+  for (const [k, f] of birdFlocks) {
+    f.startled = Math.max(0, f.startled - dt * 1.4);
+    f.puff = lerp(f.puff, f.startled, Math.min(1, dt * 14));
+    f.ox += f.vx * dt; f.oy += f.vy * dt;
+    const damp = Math.pow(0.12, dt);
+    f.vx *= damp; f.vy *= damp;
+    const home = Math.min(1, dt * 0.7);     // then drift calmly back into line
+    f.ox = clamp(lerp(f.ox, 0, home), -260, 260);
+    f.oy = clamp(lerp(f.oy, 0, home), -170, 170);
+    if (t - f.seen > 4) birdFlocks.delete(k);   // flocks left far behind are forgotten
+  }
+}
+
+function drawSkySparkles(t) {
+  setLayer(0.7);
+  const off = camX * 0.7;
+  const k0 = Math.floor(off / 240) - 1;
+  const n = Math.ceil(viewW / 240) + 2;
+  for (let i = 0; i < n; i++) {
+    const k = k0 + i;
+    const sx = k * 240 + hash(k * 31) * 180;
+    const sy = 40 + hash(k * 37) * 250;
+    const tw = 0.5 + 0.5 * Math.sin(t * 2.5 + k * 2.7);
+    ctx.globalAlpha = 0.25 + 0.45 * tw;
+    if (hash(k * 41) < 0.34) {                       // a heart drifting in the sky
+      ctx.fillStyle = '#ffd6ee';
+      heartPath(sx, sy + Math.sin(t * 1.2 + k) * 3, 2.6 + 1.8 * tw); ctx.fill();
+    } else {
+      ctx.fillStyle = '#fff';
+      starPath(sx, sy, 2.5 + 2 * tw); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+const BFLY_COLS = [['#ff8fc8','#ffc9e8'],['#8fd8ff','#d3efff'],['#ffd94d','#fff3b0'],['#b28fff','#e3d3ff'],['#8fffb0','#d6ffe3'],['#ffb28f','#ffe0d0']];
+
+function drawButterfly(bx, by, flap, cols) {
+  ctx.save();
+  ctx.translate(bx, by);
+  ctx.fillStyle = cols[0];
+  ctx.beginPath(); ctx.ellipse(-6 * flap, -3, 7 * flap, 8, 0.4, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(6 * flap, -3, 7 * flap, 8, -0.4, 0, 7); ctx.fill();
+  ctx.fillStyle = cols[1];
+  ctx.beginPath(); ctx.ellipse(-4 * flap, 4, 4 * flap, 5, 0.3, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(4 * flap, 4, 4 * flap, 5, -0.3, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#5a4670'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(0, 7); ctx.stroke();
+  ctx.restore();
+}
+
+function drawButterflies(t) {
+  setLayer(1);
+  for (const b of decoBflies) {
+    const bx = b.x + Math.sin(t * 0.9 + b.ph) * 34 + b.ox;
+    const by = b.y + Math.sin(t * 1.6 + b.ph * 2) * 20 + b.oy;
+    if (bx < camX - 40 || bx > camX + viewW + 40) continue;
+    const flap = 0.25 + Math.abs(Math.sin(t * (b.startled > 0 ? 18 : 9) + b.ph)) * 0.75;
+    drawButterfly(bx, by, flap, BFLY_COLS[b.c % BFLY_COLS.length]);
+  }
+}
+
+function drawRainbow() {
+  setLayer(1);
+  ctx.lineWidth = 12;
+  ctx.globalAlpha = 0.75;
+  for (let i = 0; i < RAINBOW.length; i++) {
+    ctx.strokeStyle = RAINBOW[i];
+    ctx.beginPath();
+    ctx.arc(crystal.x, 560, 330 - i * 12, Math.PI, 2 * Math.PI);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// touched the diamond! its magic streams into Lily as a rainbow of sparkles
+function drawMagicFlow(t) {
+  if (state !== 'win') return;
+  const fade = clamp(winT / 0.25, 0, 1) * clamp((2.7 - winT) / 0.6, 0, 1);
+  if (fade <= 0) return;
+  setLayer(1);
+  const cx = crystal.x, cy = crystalY(t);
+  const px = player.x, py = player.y - 30;          // about Lily's heart
+  const dx = px - cx, dy = py - cy;
+  const len = Math.hypot(dx, dy) || 1;
+  let nx = -dy / len, ny = dx / len;                // sideways from the stream...
+  if (ny > 0) { nx = -nx; ny = -ny; }               // ...so the bow always curves upward
+  const bow = 45 + Math.max(0, 150 - len) * 0.5;    // stand close and it arcs higher
+  const point = (u, band) => {
+    const arc = Math.sin(u * Math.PI);              // pinched at the diamond and at Lily
+    const w = band * arc + Math.sin(u * 7 - t * 9 + band) * 7 * arc;
+    return [cx + dx * u + nx * w, cy + dy * u + ny * w - arc * bow];
+  };
+  // a rainbow river of sparkles: each one sets off from the diamond, curves through
+  // the air and shrinks away as Lily drinks it in
+  const LANES = RAINBOW.length, PER = 8;
+  for (let i = 0; i < LANES; i++) {
+    const band = (i - (LANES - 1) / 2) * 13;
+    for (let j = 0; j < PER; j++) {
+      const u = (t * 0.5 + j / PER + i * 0.037) % 1;
+      const tw = 0.55 + 0.45 * Math.sin(t * 9 + i * 2.1 + j * 1.7);   // twinkle
+      const sz = (2.2 + 5 * (1 - u)) * tw;                            // smaller the closer it gets
+      const a = fade * clamp(u * 9, 0, 1) * clamp((1 - u) * 9, 0, 1);
+      const wob = band + Math.sin(t * 2.5 + i * 2 + j) * 4;
+      ctx.fillStyle = (i + j) % 4 === 0 ? '#fff' : RAINBOW[i];
+      for (let g = 0; g < 2; g++) {              // a faint twin just behind = comet tail
+        const uu = u - g * 0.022;
+        if (uu <= 0) continue;
+        ctx.globalAlpha = a * (g ? 0.3 : 1);
+        const [x, y] = point(uu, wob);
+        starPath(x, y, sz * (g ? 0.6 : 1));
+        ctx.fill();
+      }
+    }
+  }
+  // rings closing in on Lily -- the magic sinking in
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 3; i++) {
+    const u = (t * 1.1 + i / 3) % 1;
+    ctx.globalAlpha = fade * 0.3 * u;
+    ctx.strokeStyle = '#fff';
+    ctx.beginPath(); ctx.arc(px, py + 4, 80 * (1 - u) + 14, 0, 7); ctx.stroke();
+  }
+  // and a soft glow all around her
+  const hue = (t * 120) % 360;
+  const gl = ctx.createRadialGradient(px, py + 4, 4, px, py + 4, 76);
+  gl.addColorStop(0, 'hsla(' + hue + ',100%,85%,' + (0.5 * fade).toFixed(2) + ')');
+  gl.addColorStop(1, 'hsla(' + hue + ',100%,85%,0)');
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = gl;
+  ctx.beginPath(); ctx.arc(px, py + 4, 76, 0, 7); ctx.fill();
+}
+
+function drawPlatforms(t) {
+  setLayer(1);
+  for (const p of plats) {
+    if (p.x + p.w < camX - 60 || p.x > camX + viewW + 60) continue;
+    // rocky body down into the lava
+    const g = ctx.createLinearGradient(0, p.y, 0, LAVA_Y + 40);
+    g.addColorStop(0, '#8d6cc0');
+    g.addColorStop(0.55, '#5a3f7e');
+    g.addColorStop(1, '#c2452e');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(p.x + 8, p.y + 6);
+    ctx.lineTo(p.x + p.w - 8, p.y + 6);
+    ctx.lineTo(p.x + p.w - 30, LAVA_Y + 40);
+    ctx.lineTo(p.x + 30, LAVA_Y + 40);
+    ctx.closePath(); ctx.fill();
+    // top slab
+    ctx.fillStyle = '#b48ae0';
+    rounded(p.x, p.y - 8, p.w, 20, 10);
+    ctx.fill();
+    ctx.fillStyle = '#d9bdf5';
+    rounded(p.x + 4, p.y - 8, p.w - 8, 8, 6);
+    ctx.fill();
+    // tiny crystals on the edge
+    ctx.fillStyle = '#e8d3ff';
+    for (let i = 0; i < p.w / 60; i++) {
+      const cx = p.x + 20 + (i * 137) % (p.w - 40);
+      ctx.beginPath();
+      ctx.moveTo(cx - 5, p.y - 8);
+      ctx.lineTo(cx, p.y - 18 - (i % 3) * 3);
+      ctx.lineTo(cx + 5, p.y - 8);
+      ctx.closePath(); ctx.fill();
+    }
+    if (p.amp) { // sparkle under moving islands
+      ctx.fillStyle = 'rgba(255,240,150,' + (0.5 + 0.3 * Math.sin(t * 6)) + ')';
+      ctx.beginPath(); ctx.arc(p.x + p.w/2, LAVA_Y + 20, 6, 0, 7); ctx.fill();
+    }
+  }
+}
+function rounded(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function drawSign() {
+  setLayer(1);
+  ctx.fillStyle = '#a06a3c';
+  ctx.fillRect(178, 388, 9, 42);
+  ctx.fillStyle = '#ffe6b3';
+  rounded(138, 356, 90, 34, 8); ctx.fill();
+  ctx.strokeStyle = '#c98a4b'; ctx.lineWidth = 3;
+  rounded(138, 356, 90, 34, 8); ctx.stroke();
+  ctx.fillStyle = '#a05a2c';
+  ctx.font = '600 20px "Fredoka", "Baloo 2", "Comic Sans MS", sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('✨ ➜', 183, 374);
+}
+
+function drawStars(t) {
+  setLayer(1);
+  for (const s of stars) {
+    if (s.taken) continue;
+    if (s.x < camX - 60 || s.x > camX + viewW + 60) continue;
+    const y = s.y + Math.sin(t * 2 + s.ph) * 6;
+    const pulse = 1 + 0.08 * Math.sin(t * 4 + s.ph);
+    const gl = ctx.createRadialGradient(s.x, y, 2, s.x, y, 30);
+    gl.addColorStop(0, 'rgba(255,235,130,0.8)');
+    gl.addColorStop(1, 'rgba(255,235,130,0)');
+    ctx.fillStyle = gl;
+    ctx.beginPath(); ctx.arc(s.x, y, 30, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffd94d';
+    starPath(s.x, y, 13 * pulse); ctx.fill();
+    ctx.strokeStyle = '#fff3b0'; ctx.lineWidth = 2;
+    starPath(s.x, y, 13 * pulse); ctx.stroke();
+  }
+}
+function heartPath(x, y, r) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + r);
+  ctx.bezierCurveTo(x - r * 1.4, y - r * 0.3, x - r * 0.55, y - r * 1.25, x, y - r * 0.35);
+  ctx.bezierCurveTo(x + r * 0.55, y - r * 1.25, x + r * 1.4, y - r * 0.3, x, y + r);
+  ctx.closePath();
+}
+function starPath(x, y, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI/2 + i * Math.PI/5;
+    const rr = i % 2 ? r * 0.45 : r;
+    const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  ctx.closePath();
+}
+
+// where the diamond is floating right now (it rises once the level is won)
+const crystalY = t => crystal.y + (rainbow ? -30 - Math.min(30, winT * 20) : 0) + Math.sin(t * 2) * 5;
+
+function drawCrystal(t) {
+  setLayer(1);
+  const px = crystal.x, py = plats[plats.length-1].y;
+  // pedestal
+  ctx.fillStyle = '#7c5aa8';
+  rounded(px - 36, py - 34, 72, 30, 8); ctx.fill();
+  ctx.fillStyle = '#9d7ac9';
+  rounded(px - 46, py - 10, 92, 12, 6); ctx.fill();
+
+  const cy = crystalY(t);
+  const pulse = 1 + 0.06 * Math.sin(t * 3);
+  const hue = (t * 60) % 360;
+
+  // glow
+  const gl = ctx.createRadialGradient(px, cy, 5, px, cy, 90 * pulse);
+  gl.addColorStop(0, 'hsla(' + hue + ',100%,80%,0.9)');
+  gl.addColorStop(1, 'hsla(' + hue + ',100%,80%,0)');
+  ctx.fillStyle = gl;
+  ctx.beginPath(); ctx.arc(px, cy, 90 * pulse, 0, 7); ctx.fill();
+
+  // rays
+  ctx.strokeStyle = 'hsla(' + hue + ',100%,85%,0.55)';
+  ctx.lineWidth = 3;
+  for (let i = 0; i < 8; i++) {
+    const a = t * 0.8 + i * Math.PI / 4;
+    ctx.beginPath();
+    ctx.moveTo(px + Math.cos(a) * 34, cy + Math.sin(a) * 34);
+    ctx.lineTo(px + Math.cos(a) * (52 + 8 * Math.sin(t*5+i)), cy + Math.sin(a) * (52 + 8 * Math.sin(t*5+i)));
+    ctx.stroke();
+  }
+
+  // diamond
+  const r = 26 * pulse;
+  const dg = ctx.createLinearGradient(px - r, cy - r, px + r, cy + r);
+  dg.addColorStop(0, 'hsl(' + hue + ',95%,75%)');
+  dg.addColorStop(0.5, '#ffffff');
+  dg.addColorStop(1, 'hsl(' + ((hue + 120) % 360) + ',95%,70%)');
+  ctx.fillStyle = dg;
+  ctx.beginPath();
+  ctx.moveTo(px, cy - r * 1.25);
+  ctx.lineTo(px + r * 0.85, cy);
+  ctx.lineTo(px, cy + r * 1.25);
+  ctx.lineTo(px - r * 0.85, cy);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2.5;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(px - r * 0.85, cy); ctx.lineTo(px + r * 0.85, cy);
+  ctx.moveTo(px, cy - r * 1.25); ctx.lineTo(px, cy + r * 1.25);
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // orbiting sparkles
+  for (let i = 0; i < 3; i++) {
+    const a = t * 2 + i * 2.1;
+    ctx.fillStyle = '#fff';
+    starPath(px + Math.cos(a) * 46, cy + Math.sin(a) * 40, 4);
+    ctx.fill();
+  }
+}
+
+function drawFlowers(t) {
+  setLayer(1);
+  for (const f of flowers) {
+    if (f.x < camX - 40 || f.x > camX + viewW + 40) continue;
+    const p = f.p;
+    const sq = clamp(1 - (t - f.bt) / 0.4, 0, 1);   // squish right after a bounce
+    ctx.save();
+    ctx.translate(f.x, p.y - 6);
+    ctx.scale(1 + sq * 0.3, 1 - sq * 0.45);
+    ctx.strokeStyle = '#4fae5f'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(2, -10, 0, -18); ctx.stroke();
+    ctx.fillStyle = '#5fc06f';
+    ctx.beginPath(); ctx.ellipse(-6, -7, 6, 2.6, -0.5, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(6, -5, 6, 2.6, 0.5, 0, 7); ctx.fill();
+    const wob = Math.sin(t * 2 + f.x) * 0.08;
+    ctx.rotate(wob);
+    ctx.fillStyle = f.col;
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3;
+      ctx.beginPath();
+      ctx.ellipse(Math.cos(a) * 9, -25 + Math.sin(a) * 9, 6.5, 4.5, a, 0, 7);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#ffdf6b';
+    ctx.beginPath(); ctx.arc(0, -25, 6.5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#c98a2b';
+    ctx.beginPath(); ctx.arc(-2, -26, 1, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(2, -26, 1, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#c98a2b'; ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.arc(0, -24, 2.6, 0.3, Math.PI - 0.3); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawSharkBody(k, t, leaping) {
+  // drawn in the shark's own frame, nose pointing +x
+  ctx.fillStyle = k.col;
+  ctx.beginPath(); ctx.ellipse(0, 0, 30, 13, 0, 0, 7); ctx.fill();
+  // tail
+  ctx.beginPath();
+  ctx.moveTo(-24, 0);
+  ctx.lineTo(-44, -15);
+  ctx.lineTo(-38, 0);
+  ctx.lineTo(-44, 15);
+  ctx.closePath(); ctx.fill();
+  // dorsal fin
+  ctx.beginPath();
+  ctx.moveTo(-6, -10); ctx.lineTo(2, -30); ctx.lineTo(12, -9);
+  ctx.closePath(); ctx.fill();
+  // pale belly
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.beginPath(); ctx.ellipse(2, 5, 23, 7, 0, 0, 7); ctx.fill();
+  // side fin
+  ctx.fillStyle = k.col;
+  ctx.beginPath();
+  ctx.moveTo(4, 6); ctx.lineTo(-6, 20); ctx.lineTo(12, 9);
+  ctx.closePath(); ctx.fill();
+  // big friendly smile
+  ctx.strokeStyle = '#3a2b4d'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(19, 1, 8, 0.15, 1.5); ctx.stroke();
+  if (leaping) { // little teeth when he's whooping mid-air
+    ctx.fillStyle = '#fff';
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(20 + i * 4, 3.5);
+      ctx.lineTo(22 + i * 4, 7.5);
+      ctx.lineTo(24 + i * 4, 3.5);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+  // eye
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(17, -5, 5, 0, 7); ctx.fill();
+  ctx.fillStyle = '#3a2b4d';
+  ctx.beginPath(); ctx.arc(18.5, -5, 2.6, 0, 7); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(19.5, -6, 1, 0, 7); ctx.fill();
+  // blush
+  ctx.fillStyle = 'rgba(255,150,190,0.45)';
+  ctx.beginPath(); ctx.arc(12, 3, 3.2, 0, 7); ctx.fill();
+}
+
+function drawSharks(t) {
+  setLayer(1);
+  for (const k of sharks) {
+    const kx = sharkX(k, t);
+    if (kx < camX - 120 || kx > camX + viewW + 120) continue;
+    const dir = Math.cos(t * k.spd + k.ph) >= 0 ? 1 : -1;
+    const u = (t - k.leapT) / k.leapDur;
+    const leaping = u >= 0 && u <= 1;
+    const ky = leaping ? LAVA_Y + 10 - Math.sin(u * Math.PI) * k.leapH : LAVA_Y + 14;
+    ctx.save();
+    ctx.translate(kx, ky);
+    ctx.scale(dir, 1);
+    if (leaping) ctx.rotate((u - 0.5) * 1.5);
+    else ctx.translate(0, Math.sin(t * 1.6 + k.ph) * 2.5);
+    drawSharkBody(k, t, leaping);
+    ctx.restore();
+    if (!leaping) {
+      // wake ripples around the fin
+      ctx.strokeStyle = 'rgba(255,240,170,0.55)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 2; i++) {
+        const w = 16 + i * 13 + Math.sin(t * 4 + i + k.ph) * 3;
+        ctx.beginPath();
+        ctx.arc(kx - dir * (10 + i * 12), LAVA_Y - 1, w, Math.PI * 1.15, Math.PI * 1.85);
+        ctx.stroke();
+      }
+    }
+  }
+}
+
+function drawFish(t) {
+  if (!fish) return;
+  const u = (t - fish.t0) / fish.dur;
+  if (u < 0 || u > 1) return;
+  setLayer(1);
+  const fx = fish.x0 + (u - 0.5) * 90 * fish.dir;
+  const fy = LAVA_Y + 12 - Math.sin(u * Math.PI) * 95;
+  ctx.save();
+  ctx.translate(fx, fy);
+  ctx.scale(fish.dir, 1);
+  ctx.rotate((u - 0.5) * 1.6);
+  ctx.fillStyle = '#ff8a3c';
+  ctx.beginPath(); ctx.ellipse(0, 0, 14, 8, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(-20, -7); ctx.lineTo(-20, 7); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#ffc24d';
+  ctx.beginPath(); ctx.ellipse(2, -7, 5, 3, 0.6, 0, 7); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(7, -2, 3, 0, 7); ctx.fill();
+  ctx.fillStyle = '#3a2b4d';
+  ctx.beginPath(); ctx.arc(8, -2, 1.5, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#d95f1f'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(10, 2, 2.5, 0.4, 1.8); ctx.stroke();
+  ctx.restore();
+  if (Math.random() < 0.4) {
+    spawn({x: fx, y: fy + 6, vy: 120, vx: 0, g: 300, size: 2, color: '#ff8a3c', life: 0.5});
+  }
+}
+
+function drawFinaleFx() {
+  if (!(state === 'win' && finale)) return;
+  setLayer(1);
+  for (let i = 0; i < 3; i++) {
+    const rt = winT - i * 0.18;
+    if (rt < 0 || rt > 1.4) continue;
+    ctx.globalAlpha = Math.max(0, 0.8 - rt * 0.6);
+    ctx.lineWidth = 10 - i * 2;
+    ctx.strokeStyle = 'hsl(' + ((winT * 200 + i * 60) % 360) + ',95%,70%)';
+    ctx.beginPath(); ctx.arc(crystal.x, crystal.y, rt * 520 + 4, 0, 7); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawFinaleTrail() {
+  if (!(state === 'win' && finale) || finaleTrail.length < 2) return;
+  setLayer(1);
+  const RB = ['#ff5f5f','#ffb14d','#ffe94d','#6fdc6f','#5fb8ff','#b38fff'];
+  ctx.lineCap = 'round';
+  ctx.globalAlpha = 0.65;
+  for (let c = 0; c < 6; c++) {
+    ctx.strokeStyle = RB[c];
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    for (let i = 0; i < finaleTrail.length; i++) {
+      const q = finaleTrail[i], off = (c - 2.5) * 4.5;
+      i ? ctx.lineTo(q.x, q.y + off) : ctx.moveTo(q.x, q.y + off);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawFinaleFlash() {
+  if (!(state === 'win' && finale) || winT > 0.5) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = 'rgba(255,255,255,' + (0.85 * (1 - winT / 0.5)).toFixed(3) + ')';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function drawLava(t) {
+  setLayer(1);
+  const x0 = camX - 20, x1 = camX + viewW + 20;
+  const g = ctx.createLinearGradient(0, LAVA_Y - 6, 0, H);
+  g.addColorStop(0, '#ffcf5e');
+  g.addColorStop(0.18, '#ff8a2e');
+  g.addColorStop(0.6, '#f0480f');
+  g.addColorStop(1, '#b81f04');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(x0, H + 10);
+  ctx.lineTo(x0, LAVA_Y);
+  for (let x = x0; x <= x1; x += 22) {
+    ctx.lineTo(x, LAVA_Y + Math.sin(x * 0.02 + t * 2.2) * 4 + Math.sin(x * 0.045 - t * 1.4) * 2.5);
+  }
+  ctx.lineTo(x1, H + 10);
+  ctx.closePath(); ctx.fill();
+  // bright rim
+  ctx.strokeStyle = 'rgba(255,240,160,0.85)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let x = x0; x <= x1; x += 22) {
+    const y = LAVA_Y + Math.sin(x * 0.02 + t * 2.2) * 4 + Math.sin(x * 0.045 - t * 1.4) * 2.5;
+    x === x0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  // slow blobs
+  for (let i = 0; i < 9; i++) {
+    const bx = x0 + ((i * 977 + t * 30) % (viewW + 40));
+    const by = LAVA_Y + 16 + hash(i) * 34;
+    ctx.fillStyle = 'rgba(255,170,60,0.5)';
+    ctx.beginPath(); ctx.arc(bx, by, 6 + hash(i * 3) * 9, 0, 7); ctx.fill();
+  }
+}
+
+// ---------- Lily herself, wearing whatever the Decorator picked ----------
+
+const hsl = (t, sp, off) => 'hsl(' + (((t * sp + (off || 0)) % 360 + 360) % 360) + ',90%,70%)';
+
+// the five mane colours right now: a flowing rainbow, or a fixed palette
+function maneCols(item, t) {
+  return item.flow
+    ? [0,1,2,3,4].map(i => hsl(t, 120, i * 45))
+    : item.cols;
+}
+
+function drawWingFan(col, edge, fluffy) {
+  const w = fluffy ? 7 : 5.5;
+  for (let i = 0; i < 3; i++) {
+    ctx.save();
+    ctx.rotate(-1.05 + i * 0.38);
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.ellipse(0, -13, w, 17 - i * 2.5, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = edge; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.ellipse(0, -13, w, 17 - i * 2.5, 0, 0, 7); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// two lobes, like a butterfly (or long and slim, like a dragonfly).
+// The outline is what keeps them readable against her mane.
+function drawWingBfly(col, col2, edge, slim) {
+  const w = slim ? 4.6 : 9.5;
+  ctx.strokeStyle = edge || 'rgba(255,255,255,0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.ellipse(0, -17, w, slim ? 16 : 11, 0.12, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = col2;
+  ctx.beginPath(); ctx.ellipse(1, -4, w * 0.82, slim ? 11 : 8, -0.16, 0, 7); ctx.fill(); ctx.stroke();
+}
+
+// one wing in whatever style is equipped; `near` is the one on our side of her
+function drawWing(item, t, near) {
+  if (item.kind === 'bfly') {
+    drawWingBfly(item.flow ? hsl(t, 150, near ? 0 : 60) : item.col,
+                 item.flow ? hsl(t, 150, near ? 70 : 130) : item.col2, item.edge, item.slim);
+    return;
+  }
+  const col  = item.flow ? hsl(t, 150, near ? 0 : 40) : (near ? item.col : item.far);
+  const edge = item.flow ? hsl(t, 150, near ? 90 : 130) : (near ? item.edge : item.faredge);
+  drawWingFan(col, edge, item.fluffy);
+  if (item.sparkle) {
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    starPath(-2, -22, 2.4 + Math.sin(t * 5 + (near ? 0 : 2)) * 1.2); ctx.fill();
+  }
+}
+
+// a little flower, five petals round a sunny middle
+function petalFlower(x, y, r, col, mid) {
+  ctx.fillStyle = col;
+  for (let i = 0; i < 5; i++) {
+    const a = i * 1.2566;
+    ctx.beginPath(); ctx.arc(x + Math.cos(a) * r, y + Math.sin(a) * r, r * 0.72, 0, 7); ctx.fill();
+  }
+  ctx.fillStyle = mid;
+  ctx.beginPath(); ctx.arc(x, y, r * 0.62, 0, 7); ctx.fill();
+}
+
+// whatever she has on her head (the Hat slot)
+function drawHat(item, t) {
+  if (item.kind === 'stars') {
+    for (let i = 0; i < 3; i++) {
+      const a = t * 2.2 + i * 2.094;
+      ctx.fillStyle = item.col;
+      starPath(17 + Math.cos(a) * 9, -41 + Math.sin(a) * 2.5, 3.4); ctx.fill();
+    }
+  } else if (item.kind === 'flowers') {
+    const cols = ['#ff8fc8', '#fff0c2', '#b28fff', '#8fffb0'];
+    for (let i = 0; i < 4; i++) {
+      const x = 6 + i * 5, y = -33 - Math.sin(i * 0.9) * 2.4;
+      petalFlower(x, y, 3, cols[i], '#ffd353');
+    }
+  } else if (item.kind === 'tiara') {
+    ctx.save();
+    ctx.translate(11, -35);
+    ctx.rotate(-0.12);
+    ctx.strokeStyle = '#f5bb2e'; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(0, 2.5, 7.5, Math.PI * 1.06, Math.PI * 1.94); ctx.stroke();
+    ctx.fillStyle = '#ffe36b';
+    ctx.strokeStyle = '#f5bb2e'; ctx.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {                 // three little points
+      const x = -5.2 + i * 5.2, y = -4.6 - (i === 1 ? 2.6 : 0);
+      ctx.beginPath();
+      ctx.moveTo(x - 2.6, y + 2.2); ctx.lineTo(x, y - 4.2); ctx.lineTo(x + 2.6, y + 2.2);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    ctx.fillStyle = '#8fd8ff';                    // the gem
+    ctx.beginPath(); ctx.arc(0, -6.2, 2.1, 0, 7); ctx.fill();
+    ctx.restore();
+  } else if (item.kind === 'bow') {
+    ctx.save();
+    ctx.translate(9, -37);
+    ctx.rotate(Math.sin(t * 2.4) * 0.08);         // a happy little wobble
+    ctx.fillStyle = item.col;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.ellipse(-5.5, -1, 5.2, 4, -0.5, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(5.5, -1, 5.2, 4, 0.5, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath(); ctx.ellipse(-5.5, -2, 2.4, 1.6, -0.5, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(5.5, -2, 2.4, 1.6, 0.5, 0, 7); ctx.fill();
+    ctx.fillStyle = item.col;
+    ctx.beginPath(); ctx.arc(0, 0, 2.8, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  } else if (item.kind === 'halo') {
+    const hy = -42 + Math.sin(t * 2) * 1.6;
+    ctx.strokeStyle = 'rgba(255,232,140,0.95)'; ctx.lineWidth = 3.2;
+    ctx.beginPath(); ctx.ellipse(15, hy, 11, 3.4, 0, 0, 7); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.1;
+    ctx.beginPath(); ctx.ellipse(15, hy, 11, 3.4, 0, 0, 7); ctx.stroke();
+    for (let i = 0; i < 3; i++) {                 // sparkles riding the ring
+      const a = t * 1.6 + i * 2.094;
+      ctx.globalAlpha = 0.45 + 0.55 * Math.sin(t * 4 + i * 2);
+      ctx.fillStyle = '#fff';
+      starPath(15 + Math.cos(a) * 11, hy + Math.sin(a) * 3.4, 1.9); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  } else if (item.kind === 'party') {
+    ctx.save();
+    ctx.translate(12, -30);
+    ctx.rotate(-0.25);
+    ctx.fillStyle = '#ff6fb5';
+    ctx.beginPath();
+    ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.lineTo(0, -20);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff0c2';                    // stripes
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.lineTo(0, -20);
+    ctx.closePath(); ctx.clip();
+    ctx.fillRect(-8, -6, 16, 2.6);
+    ctx.fillRect(-8, -13, 16, 2.6);
+    ctx.restore();
+    ctx.fillStyle = '#ffd353';                    // pom pom on top
+    ctx.beginPath(); ctx.arc(0, -21.5, 3, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+}
+
+// what Lily is wearing right now, ready to hand to drawUnicorn
+function lookOpts(extra) {
+  return Object.assign({
+    mane: worn('mane'), horn: worn('horn'), wings: worn('wings'),
+    hat: worn('crown'), shoes: worn('shoes'), aura: worn('aura'),
+    flowMane: rainbow,          // winning a level flushes her mane rainbow
+  }, extra);
+}
+
+function drawUnicorn(x, y, t, opts) {
+  const o = Object.assign({facing:1, anim:0, onGround:true, vy:0, squash:0, sitting:false,
+                           gliding:false, flowMane:false,
+                           mane:COS['mane.pastel'], horn:COS['horn.gold'], wings:COS['wings.none'],
+                           hat:COS['crown.none'], shoes:COS['shoes.hoof'], aura:COS['aura.none']}, opts);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(o.facing, 1);
+  const sq = o.squash;
+  ctx.scale(1 + sq * 0.28, 1 - sq * 0.28);
+
+  const moving = Math.abs(o.animSpeed || 0) > 40;
+
+  // her glow, behind everything (the Glow slot)
+  if (o.aura.kind === 'soft') {
+    const r = (o.aura.big ? 52 : 42) * (1 + 0.07 * Math.sin(t * 2.2));
+    const c = o.aura.flow ? 'hsla(' + ((t * 90) % 360) + ',95%,80%,' : 'rgba(' + o.aura.col + ',';
+    const gl = ctx.createRadialGradient(0, -8, 4, 0, -8, r);
+    gl.addColorStop(0, c + (o.aura.big ? '0.46)' : '0.40)'));
+    gl.addColorStop(1, c + '0)');
+    ctx.fillStyle = gl;
+    ctx.beginPath(); ctx.arc(0, -8, r, 0, 7); ctx.fill();
+    for (let i = 0; i < 4; i++) {          // twinkling motes, so the glow reads anywhere
+      const a = t * 1.1 + i * 1.571;
+      const tw = 0.45 + 0.55 * Math.sin(t * 3 + i * 2);
+      ctx.globalAlpha = 0.5 + 0.5 * tw;
+      ctx.fillStyle = o.aura.flow ? hsl(t, 90, i * 60) : '#ffffff';
+      starPath(Math.cos(a) * (r * 0.85), -8 + Math.sin(a) * (r * 0.55), 2.2 + tw * 2.2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  } else if (o.aura.kind === 'storm') {
+    const c = 'hsla(' + ((t * 70) % 360) + ',95%,82%,';
+    const gl = ctx.createRadialGradient(0, -8, 4, 0, -8, 58);
+    gl.addColorStop(0, c + '0.34)');
+    gl.addColorStop(1, c + '0)');
+    ctx.fillStyle = gl;
+    ctx.beginPath(); ctx.arc(0, -8, 58, 0, 7); ctx.fill();
+    for (let i = 0; i < 9; i++) {                 // a whole sky of stars, wheeling round
+      const a = t * 0.9 + i * 0.698;
+      const rr = 30 + (i % 3) * 12;
+      ctx.globalAlpha = 0.4 + 0.6 * Math.sin(t * 3 + i * 1.7);
+      ctx.fillStyle = hsl(t, 120, i * 40);
+      starPath(Math.cos(a) * rr, -8 + Math.sin(a) * rr * 0.62, 2.2 + (i % 3));
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  } else if (o.aura.kind === 'ring') {
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 3; i++) {
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = hsl(t, 160, i * 120);
+      ctx.beginPath();
+      ctx.ellipse(0, -6, 34 + i * 3, 26 + i * 2.5, Math.sin(t * 0.8 + i) * 0.25, 0, 7);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // shadow
+  if (o.onGround && !o.sitting) {
+    ctx.fillStyle = 'rgba(60,20,80,0.18)';
+    ctx.beginPath(); ctx.ellipse(0, 21, 24, 5, 0, 0, 7); ctx.fill();
+  }
+
+  // tail (same colours as the mane)
+  const mCols = maneCols(o.flowMane ? {flow:true} : o.mane, t);
+  const tw = Math.sin(t * 3) * 3;
+  for (let i = 0; i < 3; i++) {
+    ctx.fillStyle = mCols[i];
+    ctx.beginPath();
+    ctx.arc(-22 - i * 4, -4 + i * 5 + tw * (i + 1) * 0.3, 7 - i, 0, 7);
+    ctx.fill();
+  }
+
+  // ---- shoes (the Shoes slot) ----
+  function shoe(fx, fy, ang, near) {
+    const sh = o.shoes;
+    if (sh.kind === 'hoof') {
+      ctx.fillStyle = sh.col;
+      ctx.beginPath(); ctx.arc(fx, fy + 1, 3.6, 0, 7); ctx.fill();
+      if (sh.shine) {
+        ctx.fillStyle = 'rgba(255,255,255,0.75)';
+        ctx.beginPath(); ctx.arc(fx - 1.2, fy - 0.2, 1.2, 0, 7); ctx.fill();
+      }
+      return;
+    }
+    ctx.save();
+    ctx.translate(fx, fy);
+    ctx.rotate(ang);
+    ctx.globalAlpha = near ? 1 : 0.85;      // the far pair sits back in the shade
+    if (sh.kind === 'sneaker') {
+      const h = (t * 200) % 360;
+      const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 13);   // extra glow mid-bounce
+      g.addColorStop(0, 'hsla(' + h + ',100%,75%,' + (o.onGround ? 0.22 : 0.45) + ')');
+      g.addColorStop(1, 'hsla(' + h + ',100%,75%,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(0, 0, 13, 0, 7); ctx.fill();
+      ctx.save();                           // rainbow stripes, trimmed to the shoe
+      rounded(-6, -3.6, 12, 6.6, 2.6); ctx.clip();
+      for (let i = 0; i < RAINBOW.length; i++) {
+        ctx.fillStyle = RAINBOW[i];
+        ctx.fillRect(-6 + i * 2, -3.6, 2.05, 6.6);
+      }
+      ctx.restore();
+      ctx.fillStyle = '#fff';               // bouncy white sole
+      rounded(-6.6, 1.8, 13.2, 3, 1.5); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.beginPath(); ctx.ellipse(-2.4, -1.6, 2.2, 1.1, -0.3, 0, 7); ctx.fill();
+    } else if (sh.kind === 'boot') {
+      ctx.fillStyle = sh.col;
+      rounded(-6, -5.5, 12, 8.5, 3); ctx.fill();
+      ctx.fillStyle = sh.trim;
+      rounded(-6.6, 1.6, 13.2, 3.2, 1.6); ctx.fill();
+      starPath(0, -1.4, 3.2); ctx.fill();
+    } else if (sh.kind === 'cloud') {
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.beginPath();
+      ctx.arc(-3.4, -0.4, 4.2, 0, 7);
+      ctx.arc(2.6, -1, 3.6, 0, 7);
+      ctx.arc(0.4, 1.8, 4, 0, 7);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(180,200,255,0.45)';   // a little shade underneath
+      ctx.beginPath(); ctx.ellipse(0, 3.4, 5.2, 1.7, 0, 0, 7); ctx.fill();
+    } else if (sh.kind === 'jelly') {
+      ctx.fillStyle = sh.col;
+      rounded(-6, -3.6, 12, 7.6, 3.4); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      ctx.beginPath(); ctx.ellipse(-2, -1.4, 2.4, 1.3, -0.3, 0, 7); ctx.fill();
+      if (sh.sparkle) {
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        starPath(2.6, -2.4, 1.6 + Math.sin(t * 6 + fx) * 0.8); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  // legs
+  function leg(hx, hy, phase, color) {
+    let ang;
+    if (o.sitting) ang = 0.9;
+    else if (!o.onGround) ang = o.vy < 0 ? -0.45 : 0.25;
+    else if (moving) ang = Math.sin(o.anim + phase) * 0.55;
+    else ang = 0;
+    const fx = hx + Math.sin(ang) * 15, fy = hy + Math.cos(ang) * (o.sitting ? 8 : 15);
+    ctx.strokeStyle = color; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(fx, fy); ctx.stroke();
+    shoe(fx, fy, ang, color === '#ffffff');
+  }
+  leg(-12, 7, Math.PI, '#efe2ff');      // far back
+  leg(10, 7, Math.PI * 0.5, '#efe2ff'); // far front
+
+  // wings: spread wide when gliding, flap in the air
+  const hasWings = o.wings.kind !== 'none';
+  let wingA, wingS;
+  if (o.gliding) { wingA = -1.3 + Math.sin(t * 5) * 0.07; wingS = 1.35; }
+  else if (!o.onGround && !o.sitting) { wingA = -0.6 + Math.sin(t * 11) * 0.5; wingS = 1.1; }
+  else { wingA = -0.05 + Math.sin(t * 2) * 0.05; wingS = 0.95; }
+  const wingX = o.wings.kind === 'bfly' ? -10 : 0;   // sit these further back, clear of the mane
+  if (hasWings) {
+    ctx.save(); ctx.translate(-4 + wingX, -9); ctx.rotate(wingA + 0.35); ctx.scale(wingS * 0.9, wingS * 0.9);
+    drawWing(o.wings, t, false);
+    ctx.restore();
+  }
+
+  // body
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.ellipse(0, 0, 21, 14, 0, 0, 7); ctx.fill();
+  leg(-15, 8, 0, '#ffffff');            // near back
+  leg(13, 8, Math.PI * 1.5, '#ffffff'); // near front
+
+  // near wing
+  if (hasWings) {
+    ctx.save(); ctx.translate(2 + wingX, -8); ctx.rotate(wingA); ctx.scale(wingS, wingS);
+    drawWing(o.wings, t, true);
+    ctx.restore();
+  }
+
+  // neck + head
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.ellipse(13, -12, 8, 12, -0.5, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(20, -22, 9.5, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(28, -19, 6, 4.5, 0, 0, 7); ctx.fill();
+  // nostril + smile
+  ctx.fillStyle = '#d9a7ff';
+  ctx.beginPath(); ctx.arc(31, -18, 1.1, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#c98bdf'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(28, -16.5, 3.4, 0.3, 1.6); ctx.stroke();
+  // ear
+  ctx.beginPath();
+  ctx.moveTo(13, -28); ctx.lineTo(17, -36); ctx.lineTo(20, -28);
+  ctx.closePath();
+  ctx.fillStyle = '#ffffff'; ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(15, -29); ctx.lineTo(17, -33.5); ctx.lineTo(18.6, -29);
+  ctx.closePath();
+  ctx.fillStyle = '#ffc9e8'; ctx.fill();
+
+  // horn (the Horn slot)
+  const hg = ctx.createLinearGradient(21, -30, 30, -44);
+  hg.addColorStop(0, o.horn.a); hg.addColorStop(1, o.horn.b);
+  ctx.fillStyle = hg;
+  ctx.beginPath();
+  ctx.moveTo(20.5, -29.5); ctx.lineTo(26, -28); ctx.lineTo(30, -44);
+  ctx.closePath(); ctx.fill();
+  if (o.horn.stripes) {                  // candy swirl
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(20.5, -29.5); ctx.lineTo(26, -28); ctx.lineTo(30, -44);
+    ctx.closePath(); ctx.clip();
+    ctx.strokeStyle = o.horn.b; ctx.lineWidth = 1.8;
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(19 + i * 2.6, -30 + i * 0.4); ctx.lineTo(24 + i * 2.6, -40 + i * 0.4);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  if (o.horn.twinkle || o.aura.horn) {   // a star on the tip
+    ctx.fillStyle = o.aura.horn ? 'hsla(' + ((t * 140) % 360) + ',100%,75%,0.9)'
+                                : 'rgba(255,255,255,0.9)';
+    starPath(31, -47, (o.aura.horn ? 5 : 3.4) + Math.sin(t * 6) * 1.4); ctx.fill();
+  }
+
+  // mane (the Mane slot)
+  const manePts = [[13,-30],[8,-27],[4,-21],[1,-14],[-1,-7]];
+  for (let i = 0; i < manePts.length; i++) {
+    ctx.fillStyle = mCols[i];
+    ctx.beginPath();
+    ctx.arc(manePts[i][0], manePts[i][1] + Math.sin(t*4+i)*1.2, 6.5 - i*0.5, 0, 7);
+    ctx.fill();
+  }
+  if (o.mane.twinkle && !o.flowMane) {   // little stars caught in a galaxy mane
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    for (let i = 0; i < 3; i++) {
+      const q = manePts[i * 2];
+      ctx.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(t * 2.4 + i * 2));
+      starPath(q[0] + 2, q[1] + 1, 1.9); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  drawHat(o.hat, t);
+
+  // eye + blush
+  ctx.fillStyle = '#3a2b4d';
+  ctx.beginPath(); ctx.arc(22.5, -22.5, 2.4, 0, 7); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(23.3, -23.3, 0.9, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,150,190,0.55)';
+  ctx.beginPath(); ctx.arc(25.5, -16, 2.6, 0, 7); ctx.fill();
+
+  ctx.restore();
+}
+
+function drawCloud(x, y, s, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  blob(0, 0, 26);
+  blob(-24, 6, 18);
+  blob(24, 6, 18);
+  blob(-8, -12, 16);
+  blob(12, -10, 15);
+  ctx.fill();
+  // sweet face
+  ctx.fillStyle = '#8a76a8';
+  ctx.beginPath(); ctx.arc(-7, -2, 2.2, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(7, -2, 2.2, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#8a76a8'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, 2, 5, 0.4, Math.PI - 0.4); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,150,190,0.5)';
+  ctx.beginPath(); ctx.arc(-13, 2, 3, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(13, 2, 3, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+// a star sprite with a sleepy little face
+function drawStarSprite(x, y, t) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(Math.sin(t * 1.5) * 0.15);
+  ctx.fillStyle = '#ffd353';
+  starPath(0, 0, 15); ctx.fill();
+  ctx.fillStyle = '#fff0c2';
+  starPath(0, 0, 9); ctx.fill();
+  ctx.fillStyle = '#7a5a2a';
+  ctx.beginPath(); ctx.arc(-3.4, -1.5, 1.3, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(3.4, -1.5, 1.3, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#7a5a2a'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.arc(0, 1.2, 2.6, 0.35, Math.PI - 0.35); ctx.stroke();
+  ctx.restore();
+}
+
+// a round little bumblebee
+function drawBee(x, y, t) {
+  ctx.save();
+  ctx.translate(x, y);
+  const flap = Math.sin(t * 22);
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';   // blurry fast wings
+  ctx.beginPath(); ctx.ellipse(-3, -8, 6, 3.5 + flap, -0.5, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(4, -8, 6, 3.5 - flap, 0.5, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffd353';
+  ctx.beginPath(); ctx.ellipse(0, 0, 10, 8, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#4a3a1a';                  // stripes
+  ctx.save();
+  ctx.beginPath(); ctx.ellipse(0, 0, 10, 8, 0, 0, 7); ctx.clip();
+  ctx.fillRect(-2, -9, 3.4, 18);
+  ctx.fillRect(4.5, -9, 3.4, 18);
+  ctx.restore();
+  ctx.strokeStyle = '#4a3a1a'; ctx.lineWidth = 1.2;   // antennae
+  ctx.beginPath(); ctx.moveTo(-6, -6); ctx.lineTo(-9, -11);
+  ctx.moveTo(-3, -7); ctx.lineTo(-4.5, -12); ctx.stroke();
+  ctx.fillStyle = '#4a3a1a';
+  ctx.beginPath(); ctx.arc(-6.5, -1.5, 1.2, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,150,190,0.5)';
+  ctx.beginPath(); ctx.arc(-4, 2, 2, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+// a glowing little star fairy, wings a blur
+function drawStarFairy(x, y, t) {
+  ctx.save();
+  ctx.translate(x, y);
+  const flap = 0.35 + Math.abs(Math.sin(t * 13)) * 0.65;
+  ctx.fillStyle = 'rgba(215,238,255,0.8)';
+  ctx.beginPath(); ctx.ellipse(-7, -4, 4.2 * flap, 8.5, -0.4, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(7, -4, 4.2 * flap, 8.5, 0.4, 0, 7); ctx.fill();
+  const gl = ctx.createRadialGradient(0, 0, 1, 0, 0, 14);
+  gl.addColorStop(0, 'rgba(255,240,185,0.8)');
+  gl.addColorStop(1, 'rgba(255,240,185,0)');
+  ctx.fillStyle = gl;
+  ctx.beginPath(); ctx.arc(0, 0, 14, 0, 7); ctx.fill();
+  ctx.fillStyle = '#fff6d0';
+  starPath(0, 0, 7.5); ctx.fill();
+  ctx.fillStyle = '#3a2b4d';
+  ctx.beginPath(); ctx.arc(-1.9, -0.8, 0.95, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(1.9, -0.8, 0.95, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#3a2b4d'; ctx.lineWidth = 0.9;
+  ctx.beginPath(); ctx.arc(0, 0.5, 1.9, 0.35, Math.PI - 0.35); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,150,190,0.5)';
+  ctx.beginPath(); ctx.arc(-3.4, 1.2, 1.3, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(3.4, 1.2, 1.3, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+// a tiny ladybug, wings twitching
+function drawLadybug(x, y, t) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(Math.sin(t * 2) * 0.12);
+  ctx.fillStyle = '#3a2b2b';
+  ctx.beginPath(); ctx.arc(0, -6, 5, 0, 7); ctx.fill();       // head
+  ctx.fillStyle = '#ff5f5f';
+  ctx.beginPath(); ctx.arc(0, 1, 9.5, 0, 7); ctx.fill();      // shell
+  ctx.fillStyle = '#3a2b2b';
+  ctx.fillRect(-0.9, -8, 1.8, 18);                            // shell split
+  ctx.beginPath(); ctx.arc(-4.5, -1, 1.9, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(4.5, -1, 1.9, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(-3.5, 5, 1.6, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(3.5, 5, 1.6, 0, 7); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(-2, -7, 1.2, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(2, -7, 1.2, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+// one of Lily's friends, drawn wherever it is asked for
+function drawBuddyAt(b, x, y, t, facing) {
+  if (b.kind === 'bflies') {         // this one is a pair, dancing around her
+    for (let i = 0; i < 2; i++) {
+      const a = t * 1.4 + i * Math.PI;
+      const flap = 0.25 + Math.abs(Math.sin(t * 10 + i * 3)) * 0.75;
+      drawButterfly(x + Math.cos(a) * 46, y + Math.sin(t * 2.6 + i * 2) * 12, flap, BFLY_COLS[i]);
+    }
+    return;
+  }
+  if (b.kind === 'cloud') {
+    drawCloud(x, y, 0.5, 0.95);
+  } else if (b.kind === 'star') {
+    drawStarSprite(x, y, t);
+  } else if (b.kind === 'bee') {
+    drawBee(x, y, t);
+  } else if (b.kind === 'bug') {
+    drawLadybug(x, y, t);
+  } else if (b.kind === 'fairy') {
+    drawStarFairy(x, y, t);
+  } else if (b.kind === 'bird') {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(-facing, 1);           // birds are drawn flying leftward
+    drawBird(t, 0, 0, 1.2, BIRD_COLS[2], 0, false);
+    ctx.restore();
+  }
+  ctx.fillStyle = '#fff';            // a twinkle over her friend's head
+  ctx.globalAlpha = 0.3 + 0.35 * Math.sin(t * 3);
+  starPath(x + 15, y - 15, 3); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+// whoever Lily picked to come along (the Friend slot)
+function drawBuddy(t) {
+  const b = worn('buddy');
+  if (b.kind === 'none') return;
+  setLayer(1);
+  if (b.kind === 'bflies') {
+    if (state !== 'title') drawBuddyAt(b, player.x, player.y - 36, t, player.facing);
+    return;
+  }
+  drawBuddyAt(b, buddy.x, buddy.y + Math.sin(t * 1.8) * 4, t, player.facing);
+}
+
+function drawParticles() {
+  setLayer(1);
+  for (const q of parts) {
+    const a = 1 - q.age / q.life;
+    ctx.globalAlpha = Math.max(0, a);
+    if (q.type === 'star') {
+      ctx.fillStyle = q.color;
+      starPath(q.x, q.y, q.size + 1.5); ctx.fill();
+    } else if (q.type === 'heart') {
+      ctx.save();
+      ctx.translate(q.x, q.y);
+      ctx.rotate(Math.sin(q.rot + q.age * 3) * 0.4);
+      ctx.fillStyle = q.color;
+      heartPath(0, 0, q.size + 1); ctx.fill();
+      ctx.restore();
+    } else if (q.type === 'conf') {
+      ctx.save();
+      ctx.translate(q.x, q.y);
+      ctx.rotate(q.rot + q.age * 5);
+      ctx.fillStyle = q.color;
+      ctx.fillRect(-4, -3, 8, 6);
+      ctx.restore();
+    } else if (q.type === 'puff') {
+      ctx.fillStyle = q.color;
+      ctx.beginPath(); ctx.arc(q.x, q.y, q.size * (1 + q.age), 0, 7); ctx.fill();
+    } else {
+      ctx.fillStyle = q.color;
+      ctx.beginPath(); ctx.arc(q.x, q.y, q.size, 0, 7); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function render(t) {
+  drawSky(t);
+  drawMountains(t);
+  drawClouds(t);
+  drawSkySparkles(t);
+  drawBalloons(t);
+  drawBirds(t);
+  if (rainbow) drawRainbow();
+  drawPlatforms(t);
+  drawSign();
+  drawFlowers(t);
+  drawCrystal(t);
+  drawStars(t);
+  drawButterflies(t);
+  drawFinaleFx();
+  drawFinaleTrail();
+  drawMagicFlow(t);
+
+  setLayer(1);
+  const magicOpts = lookOpts({gliding: !!player.gliding && state !== 'rescue'});
+  if (state !== 'rescue') drawBuddy(t);
+  if (state === 'rescue') {
+    if (rescueT >= 0.4) {
+      drawCloud(player.x, player.y + 26, 1, 1);
+      drawUnicorn(player.x, player.y, t, Object.assign({facing:1, sitting:true, onGround:false}, magicOpts));
+    }
+  } else {
+    drawUnicorn(player.x, player.y, t, Object.assign({
+      facing: player.facing, anim: player.anim, animSpeed: player.vx,
+      onGround: player.onGround, vy: player.vy, squash: player.squash,
+    }, magicOpts));
+  }
+  if (cloudGone) drawCloud(cloudGone.x, cloudGone.y, 1, 1 - cloudGone.t);
+
+  drawSharks(t);
+  drawFish(t);
+  drawLava(t);
+  drawParticles();
+  drawFinaleFlash();
+}
+
+// ---------- keep every card fully on screen ----------
+// A phone held sideways is wide but barely 360px tall. The CSS above squeezes
+// the spacing first; if a card still doesn't fit (a long win card, a big
+// system font size), shrink it the rest of the way rather than making a small
+// player scroll around to find the button.
+function fitCard(card) {
+  if (!card.offsetHeight) return;              // that card is hidden right now
+  card.style.maxHeight = 'none';               // we do the fitting ourselves
+  const fit = Math.min(1,
+    (innerHeight - 12) / card.offsetHeight,    // offset sizes ignore the scale
+    (innerWidth - 12) / card.offsetWidth);
+  card.style.setProperty('--fit', fit.toFixed(4));
+}
+function fitCards() { document.querySelectorAll('.card').forEach(fitCard); }
+
+// Cards resize when they are shown, when their text changes and when the font
+// finally loads — watching them catches all of it.
+if (window.ResizeObserver) {
+  const ro = new ResizeObserver(fitCards);
+  document.querySelectorAll('.card').forEach(c => ro.observe(c));
+}
+addEventListener('resize', fitCards);
+addEventListener('orientationchange', fitCards);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitCards);
+
+// ---------- offline play ----------
+// One service worker (../sw.js) covers the whole "Lily's games" site, so the
+// menu and every game keep working with no internet. It is registered from
+// here too, so a bookmark straight to this game still gets the offline copy.
+// The "install as an app" button lives on the game menu (../index.html).
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  addEventListener('load', () => navigator.serviceWorker.register('../sw.js').catch(() => {}));
+}
+
+// ---------- main loop ----------
+let last = performance.now();
+function loop(now) {
+  const t = now / 1000;
+  let dt = (now - last) / 1000;
+  last = now;
+  if (dt > 0.033) dt = 0.033;
+  if (state !== 'title' && state !== 'pause') update(dt, t);
+  render(t);
+  if (dressing) drawDressPreview(t);
+  requestAnimationFrame(loop);
+}
+
+// boot: build level 1 as the backdrop, show the title
+loadLevel(Math.min(unlockedCount + 1, LEVELS));
+refreshTitle();
+requestAnimationFrame(loop);
+
+// little helper for testing from the console
+window.DEV = {
+  player,
+  tp: (x, y) => { player.x = x; player.y = y ?? 300; player.vy = 0; camX = clamp(x - viewW*0.42, 0, worldW - viewW); },
+  state: () => state,
+  win: startWin,
+  level: n => startGame(n),
+  unlockAll: () => { unlockedCount = LEVELS; saveProgress(); refreshTitle(); },
+  info: () => ({level: currentLevel, unlocked: unlockedCount, worldW, plats: plats.length, stars: stars.length}),
+  buildLevel,
+  bfly: i => decoBflies[i],
+  sharks: () => sharks,
+  // jump to a time of day: 0 = midday, .25 = sunset, .5 = night, .75 = dawn
+  time: p => {
+    const t = performance.now() / 1000;
+    dayOffset = 0;
+    dayOffset = (p - dayPhase(t) + 1) % 1;
+    return { phase: +dayPhase(t).toFixed(3), night: +nightAmt.toFixed(2) };
+  },
+  leap: i => { sharks[i].leapT = performance.now() / 1000; sharks[i].nextLeap = 9; },
+  // manually pump n frames (for testing when the tab is hidden and rAF is paused)
+  step: (dt = 0.016, n = 1) => {
+    for (let i = 0; i < n; i++) {
+      if (state !== 'title' && state !== 'pause') update(dt, performance.now() / 1000 + i * dt);
+    }
+    try { render(performance.now() / 1000); } catch (e) {}
+  },
+};
+</script>
+</body>
+</html>
