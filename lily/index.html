@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Lily's games</title>
+<meta name="description" content="Gentle little games for small hands: Unicorn Quest and Walk Me Home.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2a1040">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lily's games">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400..600&family=Pacifico&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     Lily's games — the menu
+     A single card with one big button per game. Each game is its own
+     self-contained page in its own folder; this page only links to them,
+     shows how far along each one is, and offers the "install as an app"
+     button for the whole site. Same candy-card look as the games.
+     ============================================================ */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+  body {
+    font-family: 'Fredoka', 'Baloo 2', 'Comic Sans MS', 'Chalkboard SE', 'Segoe Print', cursive, sans-serif;
+    font-weight: 500; letter-spacing: .2px; user-select: none;
+    /* the sky from the unicorn game's title overlay, so hopping between the
+       menu and a game never feels like leaving */
+    background: linear-gradient(180deg, #b87ad8 0%, #7a3fb0 55%, #3d1264 100%);
+    color: #6b5385;
+  }
+  h1, h2 { font-family: 'Pacifico', 'Chalkboard SE', 'Comic Sans MS', cursive; font-weight: 400; line-height: 1.3; }
+
+  /* ---------- hearts + sparkles drifting up behind the card ---------- */
+  .sprinkles { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
+  .sprinkles span {
+    position: absolute; bottom: -50px; opacity: 0;
+    animation-name: floatUp; animation-timing-function: linear; animation-iteration-count: infinite;
+  }
+  @keyframes floatUp {
+    0%   { transform: translateY(0) rotate(-12deg) scale(.75); opacity: 0; }
+    12%  { opacity: .85; }
+    85%  { opacity: .85; }
+    100% { transform: translateY(-106vh) rotate(16deg) scale(1.1); opacity: 0; }
+  }
+
+  /* ---------- the card ---------- */
+  .wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .card {
+    position: relative;
+    background-image:
+      radial-gradient(rgba(255,180,222,.4) 1.7px, transparent 1.8px),
+      linear-gradient(180deg, #fff7fc, #ffe6f5);
+    background-size: 22px 22px, 100% 100%;
+    border: 4px solid #fff; border-radius: 34px; padding: 22px 34px 24px; text-align: center;
+    box-shadow: 0 0 0 5px rgba(255,178,222,.85), 0 18px 60px rgba(30,0,50,.45), 0 0 70px rgba(255,150,215,.3);
+    max-width: min(760px, 94vw);
+    /* fitCard() shrinks --fit when the window is too small for the card */
+    transform: scale(var(--fit, 1)); transform-origin: center center;
+  }
+  .card h1 {
+    margin: 0; font-size: 50px;
+    background: linear-gradient(180deg, #ff7ec4 0%, #d02c9e 55%, #a92bb0 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 2px 0 rgba(255,255,255,.9)) drop-shadow(0 5px 10px rgba(200,40,150,.3));
+  }
+  .card h2 { margin: 0 0 14px; font-size: 22px; color: #8a5fd0; }
+
+  /* ---------- one big tile per game ---------- */
+  .games { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
+  .game {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    width: 300px; padding: 18px 18px 20px; border-radius: 28px;
+    border: 3px solid #fff; text-decoration: none; color: inherit;
+    box-shadow: 0 8px 0 rgba(200,90,160,.22), 0 14px 28px rgba(190,40,120,.25);
+    transition: transform .12s ease;
+  }
+  .game:active { transform: translateY(6px); box-shadow: 0 2px 0 rgba(200,90,160,.22); }
+  .game.unicorn { background: linear-gradient(180deg, #ffe1f1, #f7c7ff 60%, #d9b8ff); }
+  .game.home    { background: linear-gradient(180deg, #fff3cf, #ffe0a8 60%, #ffc98a); }
+  .game .bigmoji {
+    font-size: 72px; line-height: 1.1; display: inline-block; position: relative;
+    animation: bounce 1.6s ease-in-out infinite;
+    filter: drop-shadow(0 6px 10px rgba(190,60,150,.3));
+  }
+  .game.home .bigmoji { animation-delay: .8s; }
+  .game .bigmoji::before, .game .bigmoji::after {
+    content: '✨'; position: absolute; font-size: 22px; filter: none;
+    animation: twinkle 1.9s ease-in-out infinite;
+  }
+  .game .bigmoji::before { left: -28px; top: 8px; }
+  .game .bigmoji::after  { right: -28px; top: 22px; animation-delay: .95s; }
+  @keyframes twinkle { 0%,100% { transform: scale(.6) rotate(-12deg); opacity: .35; }
+                       50%     { transform: scale(1.1) rotate(12deg);  opacity: 1; } }
+  @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+  .game .name { font-family: 'Pacifico', cursive; font-size: 30px; line-height: 1.2; margin-top: 4px; }
+  .game.unicorn .name { color: #c22c7c; }
+  .game.home    .name { color: #d0641c; }
+  .game .blurb { font-size: 17px; line-height: 1.35; color: #6b5385; min-height: 46px; }
+  .game .progress {
+    margin-top: 6px; font-size: 15px; font-weight: 600; padding: 5px 16px; border-radius: 999px;
+    background: rgba(255,255,255,.75); border: 2px solid #fff; color: #9a6a00;
+    box-shadow: 0 3px 0 rgba(214,164,30,.25);
+  }
+  .game.unicorn .progress { color: #b0299c; }
+  .game .play {
+    margin-top: 10px; font-weight: 600; font-size: 22px; color: #fff;
+    border: 3px solid #fff; border-radius: 999px; padding: 9px 30px;
+    text-shadow: 0 2px 3px rgba(160,20,100,.35);
+  }
+  .game.unicorn .play { background: linear-gradient(180deg, #ffa3d6, #f453a4); box-shadow: 0 6px 0 #c22c7c; }
+  .game.home    .play { background: linear-gradient(180deg, #ffbe6b, #f5862e); box-shadow: 0 6px 0 #c95b12; }
+
+  /* ---------- installing ---------- */
+  .smallbtn {
+    font-family: inherit; font-weight: 500; font-size: 17px; cursor: pointer;
+    background: #fff; border: 2.5px dashed #ffaed8; color: #c22c7c;
+    border-radius: 999px; padding: 9px 22px; margin: 14px 4px 0;
+    box-shadow: 0 3px 0 rgba(255,174,216,.45);
+  }
+  .smallbtn:active { transform: scale(.95); }
+  .keys { font-size: 15px; color: #9a7fb8; margin-top: 12px; }
+  .hidden { display: none !important; }
+
+  /* ---------- small + short screens ---------- */
+  @media (max-width: 470px) {
+    .card { padding: 18px 16px 20px; border-radius: 28px; }
+    .card h1 { font-size: 40px; }
+    .card h2 { font-size: 18px; }
+    .game { width: 100%; max-width: 300px; padding: 14px 14px 16px; }
+  }
+  /* a phone held sideways is wide but only ~360px tall: two tiles side by
+     side, and squeeze the spacing before fitCard() has to scale anything */
+  @media (max-height: 600px) {
+    .card { padding: 12px 22px 14px; border-radius: 24px; max-width: min(820px, 96vw); }
+    .card h1 { font-size: 36px; }
+    .card h2 { font-size: 17px; margin-bottom: 8px; }
+    .games { gap: 12px; }
+    .game { width: 270px; padding: 8px 14px 12px; gap: 2px; }
+    .game .bigmoji { font-size: 50px; }
+    .game .bigmoji::before, .game .bigmoji::after { font-size: 15px; }
+    .game .bigmoji::before { left: -20px; top: 4px; }
+    .game .bigmoji::after  { right: -20px; top: 14px; }
+    .game .name { font-size: 24px; }
+    .game .blurb { font-size: 14px; min-height: 0; }
+    .game .progress { font-size: 13px; padding: 3px 12px; margin-top: 4px; }
+    .game .play { font-size: 18px; padding: 6px 22px; margin-top: 6px; }
+    .smallbtn { font-size: 14px; padding: 6px 16px; margin-top: 8px; }
+    .keys { font-size: 13px; margin-top: 6px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sprinkles { display: none; }
+    .game .bigmoji, .game .bigmoji::before, .game .bigmoji::after { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="sprinkles" id="sprinkles"></div>
+
+<div class="wrap">
+  <div class="card" id="card">
+    <h1>Lily's games</h1>
+    <h2>✨ Pick a game to play! ✨</h2>
+
+    <div class="games">
+      <a class="game unicorn" href="unicorn/">
+        <span class="bigmoji">🦄</span>
+        <span class="name">Unicorn Quest</span>
+        <span class="blurb">Jump across the lava lands and win Lily's lost magic back!</span>
+        <span class="progress" id="uqProgress">50 levels to play</span>
+        <span class="play">▶ Play!</span>
+      </a>
+      <a class="game home" href="walk-me-home/">
+        <span class="bigmoji">🏠</span>
+        <span class="name">Walk Me Home</span>
+        <span class="blurb">Hold a lost little kid's hand and help them find their way home!</span>
+        <span class="progress" id="wmhProgress">8 friends to help</span>
+        <span class="play">▶ Play!</span>
+      </a>
+    </div>
+
+    <div id="installRow" class="hidden">
+      <button class="smallbtn hidden" id="installBtn">📲 Install Lily's games</button>
+      <div class="keys hidden" id="iosTip">
+        Want it as an app? Tap <b>Share</b> ⬆️ then <b>Add to Home Screen</b>!
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ---------- how far along each game is ----------
+// Each game keeps its own save in localStorage; the menu only peeks at the
+// headline number so the tiles can say "Level 12 of 50" and the like.
+//   uq_magic  — Unicorn Quest: how many levels have been won
+//   wmh_home  — Walk Me Home: how many kids have been walked home
+function readProgress() {
+  let uq = 0, wmh = 0;
+  try {
+    uq  = Math.min(50, +localStorage.getItem('uq_magic') || 0);
+    wmh = Math.min(8,  +localStorage.getItem('wmh_home') || 0);
+  } catch (e) {}
+  document.getElementById('uqProgress').textContent =
+    uq >= 50 ? '🎉 All 50 levels won!' : uq > 0 ? '⭐ Level ' + (uq + 1) + ' of 50 is next' : '50 levels to play';
+  document.getElementById('wmhProgress').textContent =
+    wmh >= 8 ? '🎉 All 8 friends are home!' : wmh > 0 ? '💖 ' + wmh + ' of 8 friends home' : '8 friends to help';
+}
+readProgress();
+// coming back from a game with the back button can serve this page from the
+// bfcache, so refresh the numbers whenever it is shown again
+addEventListener('pageshow', readProgress);
+
+// ---------- floating hearts + sparkles (pure decoration) ----------
+const SPRINKLES = ['💖','✨','🌸','⭐','🦄','🎀','💜','🌟','🏠','💫','🎈'];
+const layer = document.getElementById('sprinkles');
+for (let i = 0; i < 18; i++) {
+  const s = document.createElement('span');
+  s.textContent = SPRINKLES[(Math.random() * SPRINKLES.length) | 0];
+  s.style.left = (Math.random() * 100) + '%';
+  s.style.fontSize = (13 + Math.random() * 20) + 'px';
+  s.style.animationDuration = (9 + Math.random() * 10) + 's';
+  s.style.animationDelay = (-Math.random() * 16) + 's';   // negative = already drifting
+  layer.appendChild(s);
+}
+
+// ---------- keep the card fully on screen ----------
+// Same trick as the games: the CSS squeezes spacing on short windows first,
+// and whatever still doesn't fit is scaled down rather than scrolled.
+function fitCard() {
+  const card = document.getElementById('card');
+  const fit = Math.min(1, (innerHeight - 12) / card.offsetHeight, (innerWidth - 12) / card.offsetWidth);
+  card.style.setProperty('--fit', fit.toFixed(4));
+}
+fitCard();
+addEventListener('resize', fitCard);
+addEventListener('orientationchange', fitCard);
+if (window.ResizeObserver) new ResizeObserver(fitCard).observe(document.getElementById('card'));
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitCard);
+
+// ---------- installing Lily's games as an app ----------
+// The service worker caches the menu and both games so everything plays with
+// no internet; the button only appears on browsers with a real install prompt.
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+
+const installRow = document.getElementById('installRow');
+const installBtn = document.getElementById('installBtn');
+const alreadyAnApp = matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches
+                     || navigator.standalone === true;
+let installPrompt = null;
+
+addEventListener('beforeinstallprompt', e => {      // Chrome, Edge, Android
+  e.preventDefault();
+  installPrompt = e;
+  installBtn.classList.remove('hidden');
+  installRow.classList.remove('hidden');
+});
+installBtn.addEventListener('click', async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice;
+  installPrompt = null;
+  installRow.classList.add('hidden');
+});
+addEventListener('appinstalled', () => {
+  installPrompt = null;
+  installRow.classList.add('hidden');
+});
+
+// iPhone and iPad have no install prompt at all — it lives in the Share menu,
+// so tell people where to look instead of showing a button that can't work.
+const onIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+              || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+if (onIOS && !alreadyAnApp && location.protocol.startsWith('http')) {
+  document.getElementById('iosTip').classList.remove('hidden');
+  installRow.classList.remove('hidden');
+}
+</script>
+</body>
+</html>

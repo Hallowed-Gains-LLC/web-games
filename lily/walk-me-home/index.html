@@ -1,0 +1,2556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Walk Me Home</title>
+<meta name="description" content="A gentle game for little players. Hold a lost kid's hand, hop over the puddles, and walk them home!">
+<link rel="manifest" href="../manifest.json">
+<meta name="theme-color" content="#2a1040">
+<link rel="icon" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Walk Me Home">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400..600&family=Pacifico&display=swap" rel="stylesheet">
+<style>
+  /* Same candy-card look as Unicorn Quest, warmed up: this game's colour is a
+     sunny peach-and-orange instead of pink, so the two games feel like
+     siblings rather than twins. */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #3d2a5e; height: 100%; }
+  body {
+    font-family: 'Fredoka', 'Baloo 2', 'Comic Sans MS', 'Chalkboard SE', 'Segoe Print', cursive, sans-serif;
+    font-weight: 500; letter-spacing: .2px;
+    user-select: none;
+  }
+  .card h1, .card h2 {
+    font-family: 'Pacifico', 'Chalkboard SE', 'Comic Sans MS', cursive;
+    font-weight: 400; line-height: 1.3;
+  }
+  canvas { display: block; }
+
+  /* ---------- HUD: frosted candy pills ---------- */
+  #hud {
+    position: fixed; top: 14px; left: 16px; z-index: 5;
+    display: flex; gap: 8px; align-items: center; pointer-events: none;
+  }
+  #hud .pill {
+    font-size: 22px; font-weight: 600; color: #c2601a;
+    background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,236,214,.92));
+    border: 2px solid rgba(255,255,255,.95);
+    border-radius: 999px; padding: 3px 16px 5px;
+    box-shadow: 0 5px 16px rgba(120,50,0,.25);
+  }
+  #mute, #pauseBtn {
+    position: fixed; top: 12px; right: 14px; z-index: 5;
+    width: 54px; height: 54px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.85);
+    background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,214,170,.45));
+    font-size: 26px; cursor: pointer;
+    box-shadow: 0 5px 14px rgba(120,50,0,.22);
+  }
+  #pauseBtn { right: 78px; }
+  #mute:active, #pauseBtn:active { transform: scale(.92); }
+
+  @media (max-width: 520px) {
+    #hud { top: 10px; left: 10px; gap: 5px; }
+    #hud .pill { font-size: 15px; padding: 2px 11px 4px; border-width: 1.5px; }
+    #mute, #pauseBtn { width: 44px; height: 44px; font-size: 21px; top: 10px; }
+    #mute { right: 10px; }
+    #pauseBtn { right: 60px; }
+  }
+  @media (max-width: 380px) {
+    #hud .pill { font-size: 13px; padding: 2px 8px 3px; }
+    #mute, #pauseBtn { width: 40px; height: 40px; font-size: 19px; top: 8px; }
+    #mute { right: 8px; }
+    #pauseBtn { right: 54px; }
+  }
+
+  .touchbtn {
+    position: fixed; bottom: 20px; z-index: 5;
+    border: 3px solid rgba(255,255,255,.8); border-radius: 50%;
+    background: linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,200,150,.42));
+    color: #fff; font-size: 34px; text-shadow: 0 2px 4px rgba(90,40,0,.5);
+    width: 78px; height: 78px; cursor: pointer; touch-action: none;
+    box-shadow: 0 6px 16px rgba(90,40,0,.25), inset 0 6px 12px rgba(255,255,255,.45);
+  }
+  .touchbtn:active { background: linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,200,150,.6)); transform: scale(.94); }
+  #btnL { left: 20px; }
+  #btnR { left: 112px; }
+  #btnJ {
+    right: 20px; width: 96px; height: 96px; font-size: 44px;
+    background: linear-gradient(180deg, rgba(255,226,190,.7), rgba(255,170,90,.55));
+    animation: jglow 2.4s ease-in-out infinite;
+  }
+  @keyframes jglow {
+    0%,100% { box-shadow: 0 6px 16px rgba(90,40,0,.25), inset 0 6px 12px rgba(255,255,255,.45), 0 0 0 0 rgba(255,190,120,0); }
+    50%     { box-shadow: 0 6px 16px rgba(90,40,0,.25), inset 0 6px 12px rgba(255,255,255,.45), 0 0 24px 5px rgba(255,190,120,.5); }
+  }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, rgba(255,150,110,.5), rgba(80,30,90,.68));
+  }
+  .sprinkles { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .sprinkles span {
+    position: absolute; bottom: -50px; opacity: 0;
+    animation-name: floatUp; animation-timing-function: linear; animation-iteration-count: infinite;
+  }
+  @keyframes floatUp {
+    0%   { transform: translateY(0) rotate(-12deg) scale(.75); opacity: 0; }
+    12%  { opacity: .85; }
+    85%  { opacity: .85; }
+    100% { transform: translateY(-106vh) rotate(16deg) scale(1.1); opacity: 0; }
+  }
+
+  .card {
+    position: relative;
+    background-image:
+      radial-gradient(rgba(255,200,150,.45) 1.7px, transparent 1.8px),
+      linear-gradient(180deg, #fffaf4, #ffeedd);
+    background-size: 22px 22px, 100% 100%;
+    border: 4px solid #fff;
+    border-radius: 34px; padding: 26px 40px; text-align: center;
+    box-shadow: 0 0 0 5px rgba(255,200,150,.9),
+                0 18px 60px rgba(50,20,0,.4),
+                0 0 70px rgba(255,180,120,.3);
+    max-width: min(640px, 94vw); max-height: 94vh; overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: #ffc9a0 transparent;
+    transform: scale(var(--fit, 1)); transform-origin: center center;
+  }
+  .card h1 {
+    margin: 4px 0 0; font-size: 42px;
+    background: linear-gradient(180deg, #ffa24d 0%, #f0641c 55%, #c8451c 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 2px 0 rgba(255,255,255,.9)) drop-shadow(0 5px 10px rgba(200,90,20,.3));
+  }
+  .card h2 { margin: 2px 0 10px; font-size: 22px; color: #c9721f; }
+  .card p  { font-size: 19px; line-height: 1.5; color: #7a5a48; margin: 8px 0 14px; }
+  .bigmoji {
+    font-size: 66px; display: inline-block; position: relative;
+    animation: bounce 1.6s ease-in-out infinite;
+    filter: drop-shadow(0 6px 10px rgba(190,90,30,.3));
+  }
+  .bigmoji::before, .bigmoji::after {
+    content: '✨'; position: absolute; font-size: 22px; filter: none;
+    animation: twinkle 1.9s ease-in-out infinite;
+  }
+  .bigmoji::before { left: -28px; top: 8px; }
+  .bigmoji::after  { right: -28px; top: 22px; animation-delay: .95s; }
+  @keyframes twinkle { 0%,100% { transform: scale(.6) rotate(-12deg); opacity: .35; }
+                       50%     { transform: scale(1.1) rotate(12deg);  opacity: 1; } }
+  @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
+  .playbtn {
+    position: relative; overflow: hidden;
+    font-family: inherit; font-weight: 600; font-size: 26px; color: #fff; cursor: pointer;
+    background: linear-gradient(180deg, #ffbe6b, #f5862e);
+    border: 3px solid #fff; border-radius: 999px; padding: 14px 40px;
+    text-shadow: 0 2px 3px rgba(160,60,0,.35);
+    box-shadow: 0 8px 0 #c95b12, 0 14px 28px rgba(200,90,20,.4);
+  }
+  .playbtn::after {
+    content: ''; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+    animation: shine 3.6s ease-in-out infinite;
+  }
+  @keyframes shine { 0% { left: -60%; } 45%, 100% { left: 130%; } }
+  .playbtn:active { transform: translateY(6px); box-shadow: 0 2px 0 #c95b12; }
+  .smallbtn {
+    font-family: inherit; font-weight: 500; font-size: 18px; cursor: pointer;
+    background: #fff; border: 2.5px dashed #ffc08a; color: #d0641c;
+    border-radius: 999px; padding: 10px 24px; margin: 12px 4px 0;
+    box-shadow: 0 3px 0 rgba(255,192,138,.5);
+    display: inline-block; text-decoration: none;
+  }
+  .smallbtn:active { transform: scale(.95); }
+  .smallbtn.danger { border-color: #f0a8a8; color: #d04545; }
+  .keys { font-size: 15px; color: #a58a70; margin-top: 14px; }
+  .hidden { display: none !important; }
+
+  .levelmap {
+    display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+    margin: 14px auto 2px; max-width: 420px; padding: 12px 12px 8px;
+    border-radius: 26px; background: rgba(255,255,255,.55);
+    border: 2.5px dashed #ffd2ae;
+  }
+  .lvlwrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .lvlnum { font-size: 11px; color: #a58a70; line-height: 1; }
+  .lvlwrap.here .lvlnum { color: #f0641c; font-weight: 600; }
+  .lvlbtn {
+    width: 46px; height: 46px; flex: none;
+    border-radius: 50%; border: 3px solid #fff;
+    font-size: 22px; font-family: inherit; font-weight: 600; cursor: pointer;
+    padding: 0; line-height: 1; position: relative;
+    box-shadow: 0 4px 0 rgba(200,120,60,.25), 0 6px 12px rgba(190,90,30,.18);
+  }
+  .lvlbtn.perfect::after {
+    content: '💖'; position: absolute; top: -8px; right: -8px; font-size: 15px;
+    filter: drop-shadow(0 1px 2px rgba(180,60,60,.5));
+  }
+  .lvlbtn:active { transform: translateY(3px); box-shadow: none; }
+  .lvlbtn.done   { background: linear-gradient(180deg, #fff0bd, #ffd353); }
+  .lvlbtn.next   { background: linear-gradient(180deg, #ffbe6b, #f5862e); color: #fff; animation: pulse 1.2s ease-in-out infinite; }
+  .lvlbtn.locked {
+    background: linear-gradient(180deg, #fbf3ec, #f0e2d4); color: #cdb8a6;
+    border-color: rgba(255,255,255,.75); box-shadow: none; cursor: default;
+  }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+  .mapcap { font-size: 15px; color: #a58a70; margin-top: 8px; }
+
+  /* the rescued kids, all in a row on the title card */
+  #friendsWall {
+    display: block; margin: 10px auto 0; width: 100%; max-width: 440px; height: 110px;
+    border-radius: 22px; background: linear-gradient(180deg, #bfe6ff 0%, #e6f7ff 60%, #a8e08a 60%, #8fd36b 100%);
+    border: 3px dashed #ffd2ae;
+  }
+  #winKid {
+    display: block; margin: 0 auto 6px; width: 200px; height: 130px;
+    border-radius: 22px; background: linear-gradient(180deg, #bfe6ff 0%, #e6f7ff 62%, #a8e08a 62%, #8fd36b 100%);
+    border: 3px dashed #ffd2ae;
+  }
+
+  .thingbox {
+    display: inline-block; margin: 8px 0 2px;
+    font-size: 17px; font-weight: 500; color: #9a6a00;
+    background: linear-gradient(180deg, #fffbe6, #ffeaa8);
+    border: 2.5px solid #fff; border-radius: 999px; padding: 6px 18px;
+    box-shadow: 0 3px 0 rgba(214,164,30,.35);
+  }
+  .thingbox b { color: #f0641c; }
+
+  .card .rainbowtext {
+    background: linear-gradient(90deg, #ff5f5f,#ffb14d,#ffe94d,#6fdc6f,#5fb8ff,#b38fff,#ff5f5f);
+    background-size: 200% auto;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: rbslide 2s linear infinite;
+  }
+  @keyframes rbslide { to { background-position: 200% center; } }
+  .tiny { margin-top: 12px; font-size: 13px; }
+  .tiny .smallbtn { font-size: 14px; padding: 7px 16px; }
+  #resetConfirm b { color: #d04545; font-size: 16px; }
+
+  /* frame-time readout, only with ?debug in the address */
+  #debug {
+    position: fixed; left: 16px; bottom: 110px; z-index: 6; pointer-events: none;
+    font: 500 14px/1.4 monospace; color: #fff; background: rgba(0,0,0,.55);
+    padding: 6px 10px; border-radius: 10px; white-space: pre;
+  }
+  #toast {
+    position: fixed; top: 84px; left: 50%; transform: translateX(-50%);
+    z-index: 5; pointer-events: none; max-width: 92vw; text-align: center;
+    background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(255,236,214,.94));
+    border: 2.5px solid rgba(255,255,255,.95);
+    color: #c2601a; font-weight: 500;
+    font-size: 20px; padding: 10px 26px; border-radius: 999px;
+    box-shadow: 0 6px 20px rgba(80,30,0,.25);
+    opacity: 0; transition: opacity .6s;
+  }
+
+  @media (max-width: 470px) {
+    .card { padding: 20px 16px; border-radius: 28px; }
+    .card h1 { font-size: 34px; }
+    .card h2 { font-size: 19px; }
+    .card p  { font-size: 17px; }
+    .bigmoji { font-size: 54px; }
+    .playbtn { font-size: 23px; padding: 13px 30px; }
+    .levelmap { gap: 8px; padding: 10px 8px 6px; max-width: 100%; }
+    .lvlbtn { width: 42px; height: 42px; font-size: 20px; }
+    #toast { font-size: 16px; padding: 8px 18px; top: 66px; }
+  }
+  @media (max-height: 600px) {
+    /* a phone held sideways: keep the toast out of the way of the people */
+    #toast { top: 60px; font-size: 15px; padding: 7px 16px; max-width: 70vw; }
+    .card { padding: 14px 26px; border-radius: 24px; }
+    .card h1 { font-size: 30px; }
+    .card h2 { font-size: 17px; margin: 0 0 6px; }
+    .card p  { font-size: 16px; line-height: 1.4; margin: 5px 0 9px; }
+    .bigmoji { font-size: 40px; }
+    .bigmoji::before, .bigmoji::after { font-size: 15px; }
+    .bigmoji::before { left: -20px; top: 4px; }
+    .bigmoji::after  { right: -20px; top: 14px; }
+    .playbtn { font-size: 21px; padding: 10px 30px; box-shadow: 0 6px 0 #c95b12, 0 10px 20px rgba(200,90,20,.4); }
+    .smallbtn { font-size: 15px; padding: 7px 18px; margin-top: 8px; }
+    .keys { font-size: 13px; margin-top: 8px; }
+    .levelmap { gap: 7px; padding: 8px 8px 5px; margin: 8px auto 2px; }
+    .lvlbtn { width: 38px; height: 38px; font-size: 18px; border-width: 2px; }
+    .lvlnum { font-size: 10px; }
+    .mapcap { font-size: 13px; margin-top: 5px; }
+    .thingbox { font-size: 15px; padding: 5px 14px; margin: 5px 0 2px; }
+    .tiny { margin-top: 8px; }
+    #friendsWall { height: 84px; margin-top: 6px; }
+    #winKid { width: 160px; height: 100px; }
+  }
+  @media (max-height: 600px) and (min-width: 560px) {
+    #title .card {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0 26px; align-items: center;
+      max-width: min(880px, 96vw);
+    }
+  }
+
+  #hud, .touchbtn { transition: opacity .35s ease; }
+  body:has(.overlay:not(.hidden)) #hud,
+  body:has(.overlay:not(.hidden)) .touchbtn { opacity: 0; pointer-events: none; }
+  body:has(.overlay:not(.hidden)) #toast { visibility: hidden; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sprinkles, .playbtn::after { display: none; }
+    .bigmoji, .bigmoji::before, .bigmoji::after, #btnJ, .lvlbtn.next { animation: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <span class="pill">🏠 Level <span id="levelNum">1</span></span>
+  <span class="pill" id="goalPill">🔍 Find Mia</span>
+  <span class="pill">🧸 <span id="thingCount">0 / 0</span></span>
+</div>
+<button id="mute" title="Sound on/off">🔊</button>
+<button id="pauseBtn" title="Pause (Esc)">⏸️</button>
+
+<button class="touchbtn" id="btnL">◀</button>
+<button class="touchbtn" id="btnR">▶</button>
+<button class="touchbtn" id="btnJ">⬆</button>
+
+<div id="toast"></div>
+<div id="debug" class="hidden"></div>
+
+<div id="title" class="overlay">
+  <div class="card">
+    <div class="tcol">
+      <span class="bigmoji">🔍</span>
+      <h1>Walk Me Home</h1>
+      <h2>✨ 8 lost little friends ✨</h2>
+      <p>Some little kids got lost! Be their <b>mom or dad</b>: follow the
+         clues, find where they're hiding, and walk them back <b>home</b>.</p>
+      <button class="playbtn" id="startBtn">▶ Play!</button><br>
+      <a class="smallbtn" href="../">🎮 All games</a>
+    </div>
+    <div class="tcol">
+      <div class="levelmap" id="levelMap"></div>
+      <div class="mapcap" id="mapCap">Walk a friend home to meet the next one!</div>
+      <canvas id="friendsWall" width="880" height="220"></canvas>
+      <div class="keys">⬅ ➡ walk &nbsp;•&nbsp; ⬆ or SPACE to hop &nbsp;•&nbsp; hop again in the air for a big hop ✨<br>
+           🔍 follow the dropped things and footprints to find them, then 🏠 walk them home</div>
+      <div class="tiny">
+        <button class="smallbtn" id="resetLink">↺ Start over</button>
+        <span id="resetConfirm" class="hidden">
+          <b>Forget all the friends you walked home?</b><br>
+          <button class="smallbtn danger" id="resetYes">Yes, start over</button>
+          <button class="smallbtn" id="resetNo">No, keep them!</button>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="pauseScreen" class="overlay hidden">
+  <div class="card">
+    <span class="bigmoji">🧸</span>
+    <h1>Paused</h1>
+    <p id="pauseMsg">Taking a little rest…</p>
+    <button class="playbtn" id="resumeBtn">▶ Keep Playing!</button><br>
+    <button class="smallbtn" id="restartBtn">🔁 Restart Level</button>
+    <button class="smallbtn" id="pmapBtn">🗺️ Choose a level</button>
+  </div>
+</div>
+
+<div id="winScreen" class="overlay hidden">
+  <div class="card">
+    <canvas id="winKid" width="400" height="260"></canvas>
+    <h1 id="winTitle">Home!</h1>
+    <p id="winMsg"></p>
+    <div class="thingbox" id="winThings"></div><br>
+    <button class="playbtn" id="nextBtn">▶ Next friend!</button><br>
+    <button class="smallbtn" id="mapBtn">🗺️ Choose a level</button>
+    <div class="keys" id="nextHint">(or press SPACE for the next one!)</div>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ============================================================
+// Walk Me Home — a gentle game for small hands
+//
+// Eight little kids (ages 3 to 7) have wandered off, one per level, and you
+// are the kid's mom or dad. Each level starts at the family's house. Follow
+// the clues along the path (the things the kid dropped, and little footprints)
+// to a clearing with three hiding spots. Sniffles and a thought bubble come
+// from the right one and tiny shoes peek out underneath; check a wrong one
+// and a bunny, bird, crab or owl pops out instead. Once found, the kid takes
+// your hand, gets their things back, and follows you all the way home, where
+// the other parent is waiting at the door for the hug. Some levels are by
+// day, some under the moon, and a friendly horse gives rides on a few.
+//
+// This is one of the games on the "Lily's games" menu (../index.html). It is
+// self-contained: every picture, sound and tune is generated in this file.
+//
+// Layout of this file:
+//   1. canvas + constants          5. audio: sound effects + the looping tune
+//   2. the kids, their houses,     6. game flow (title, play, houses, win)
+//      the level themes            7. update() — physics and following
+//   3. saving progress             8. drawing, back to front
+//   4. level builder + input       9. main loop and console helpers
+// ============================================================
+
+// ---------- 1. canvas ----------
+const canvas = document.getElementById('game');
+let ctx = canvas.getContext('2d');
+
+// Logical world height is fixed; width follows the window (same as Unicorn Quest).
+const H = 540;
+let scale = 1, viewW = 960, dpr = 1;
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  canvas.width = innerWidth * dpr;
+  canvas.height = innerHeight * dpr;
+  canvas.style.width = innerWidth + 'px';
+  canvas.style.height = innerHeight + 'px';
+  scale = innerHeight > 0 ? innerHeight / H : 1;
+  viewW = innerWidth > 0 ? innerWidth / scale : 960;
+}
+addEventListener('resize', resize);
+resize();
+
+const LEVELS = 8;
+const GROUND_Y = 430;      // where the path sits; ground segments can be a little higher
+const WATER_Y = 476;       // the water surface in the gaps
+const GRAV = 1900, WALK = 265, JUMP_V = 720, HOP_V = 600;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, u) => a + (b - a) * u;
+const ease = u => u < 0.5 ? 2*u*u : 1 - Math.pow(-2*u + 2, 2) / 2;
+function hash(n) { const s = Math.sin(n * 127.1) * 43758.5453; return s - Math.floor(s); }
+
+const PASTELS = ['#ff8fc8','#ffd94d','#8fd8ff','#b28fff','#8fffb0','#ffb28f'];
+const PINKS   = ['#ff8fc8','#ff6fb5','#ffb3dd','#ff9ecf','#ffc2e6'];
+const pinkOne = () => PINKS[(Math.random()*PINKS.length)|0];
+const pick = (arr, R) => arr[Math.floor(R() * arr.length)];
+
+// ---------- 2. the kids ----------
+// One kid per level. `age` sets how big they are drawn and how far behind you
+// they toddle; `home` is the house they need to get back to. Every kid's house
+// has a bright wall colour AND one big feature, so even a three-year-old can
+// match "the yellow one with the red door" from the picture in the bubble.
+//   hair styles: pigtails | cap | bun | curly | short | puffs (grown-ups: long | bob | short | cap)
+//   house features: flag | tree | flowerbox | heart | star | smoke | snowman | rainbow
+// `parent` is who you play: the kid's mom or dad, sharing the kid's skin and
+// hair colours. The other parent waits at home for the hug.
+const KIDS = [
+  {name:'Mia',  age:3, girl:true,  skin:'#f6cfa6', hair:'#5a3a22', style:'pigtails', shirt:'#ff8fc8', pants:'#8fd8ff',
+   theme:'park',   home:{wall:'#ffe066', roof:'#f0641c', door:'#e83f3f', feature:'flag'},
+   parent:{mom:true,  style:'long',  shirt:'#f0641c', pants:'#5a3f7a'}},
+  {name:'Theo', age:4, girl:false, skin:'#c98d5a', hair:'#2b1c12', style:'cap', cap:'#5fb8ff', shirt:'#ffd94d', pants:'#6fa8dc',
+   theme:'meadow', home:{wall:'#8fd8ff', roof:'#3f6fd8', door:'#ffd94d', feature:'tree'},
+   parent:{mom:false, style:'short', shirt:'#3f6fd8', pants:'#4a4a6a', beard:true}},
+  {name:'Zoe',  age:5, girl:true,  skin:'#f2c9a0', hair:'#d98a3c', style:'bun', shirt:'#8fffb0', pants:'#ff8fc8',
+   theme:'beach',  home:{wall:'#ffb3dd', roof:'#c2458f', door:'#ffffff', feature:'heart'},
+   parent:{mom:true,  style:'bob',   shirt:'#c2458f', pants:'#ffffff'}},
+  {name:'Sam',  age:6, girl:false, skin:'#8d5a3b', hair:'#1b1210', style:'curly', shirt:'#ff7a5c', pants:'#3f6fd8',
+   theme:'farm',   home:{wall:'#e8493b', roof:'#7a3a2a', door:'#ffffff', feature:'star'},
+   parent:{mom:false, style:'short', shirt:'#7a3a2a', pants:'#3f6fd8', beard:true}},
+  {name:'Ava',  age:4, girl:true,  skin:'#ffdcc0', hair:'#e8493b', style:'curly', shirt:'#b28fff', pants:'#ffd94d',
+   theme:'woods',  home:{wall:'#8fd36b', roof:'#c98a4b', door:'#b28fff', feature:'flowerbox'},
+   parent:{mom:false, style:'cap',   cap:'#c98a4b', shirt:'#5fbf5f', pants:'#4a4a6a'}},
+  {name:'Leo',  age:7, girl:false, skin:'#e0b48a', hair:'#3a2a1a', style:'short', glasses:true, shirt:'#5fb8ff', pants:'#4a4a6a', scarf:'#ff5f5f',
+   theme:'snow',   home:{wall:'#c8a6ff', roof:'#6f4fb0', door:'#ff5f5f', feature:'snowman'},
+   parent:{mom:true,  style:'long',  shirt:'#6f4fb0', pants:'#4a4a6a', scarf:'#ff5f5f'}},
+  {name:'Nia',  age:5, girl:true,  skin:'#6b4025', hair:'#1a100a', style:'puffs', shirt:'#ffd94d', pants:'#ff8fc8', raincoat:true,
+   theme:'rain',   home:{wall:'#ffa24d', roof:'#c8451c', door:'#5fb8ff', feature:'rainbow'},
+   parent:{mom:true,  style:'bob',   shirt:'#c8451c', pants:'#5fb8ff', raincoat:true}},
+  {name:'Bea',  age:3, girl:true,  skin:'#f3cdb0', hair:'#f0c060', style:'pigtails', shirt:'#ff9ecf', pants:'#b28fff',
+   theme:'fair',   home:{wall:'#fff0c2', roof:'#e83f7f', door:'#6f4fb0', feature:'smoke'},
+   parent:{mom:false, style:'short', shirt:'#e83f7f', pants:'#4a4a6a'}},
+];
+// how each kid is spoken about on the cards
+const they = k => k.girl ? 'she' : 'he';
+const their = k => k.girl ? 'her' : 'his';
+const them = k => k.girl ? 'her' : 'him';
+const parentWord = k => k.parent.mom ? 'mom' : 'dad';
+const parentCall = k => k.parent.mom ? 'Mommy!' : 'Daddy!';
+// how the parent and the other parent are drawn (drawPerson looks)
+const parentLook = k => ({skin: k.skin, hair: k.hair, style: k.parent.style, cap: k.parent.cap, shirt: k.parent.shirt,
+                          pants: k.parent.pants, shoes: '#3a2b2b', beard: k.parent.beard, scarf: k.parent.scarf, raincoat: k.parent.raincoat});
+const otherParentLook = k => ({skin: k.skin, hair: k.hair, style: k.parent.mom ? 'short' : 'long', shirt: k.home.roof,
+                               pants: '#4a4a6a', shoes: '#3a2b2b', beard: k.parent.mom && k.age % 2 === 0});
+
+// the things a kid might have dropped on the way; each level uses a few
+const THINGS = ['teddy','ball','hat','boot','lolly','book','bucket','duck','horsey'];
+// who pops out of a hiding spot when the kid is not in it
+const CRITTER_IN = {bush: 'bunny', tree: 'bird', pine: 'owl', rock: 'bunny', log: 'bird', hay: 'bunny',
+                    snowpile: 'bunny', sandcastle: 'crab', tent: 'bird'};
+
+// ---------- the eight places ----------
+// name: where the kid is lost, as it reads after "lost". sky: top → middle →
+// horizon. hills: far, near. grass/dirt: the path. deco: what stands along
+// the path. weather: what falls from the sky. night: moon, stars, fireflies
+// and lit windows instead of the sun (three of the eight are night levels).
+// horse: a friendly horse trots along this level and gives rides.
+// hide: the three hiding spots in the clearing at the end (drawSpot kinds).
+const THEMES = {
+  park:   {name:'in the Sunny Park',   sky:['#7fc8ff','#bfe6ff','#e6f7ff'], hills:['#a8e08a','#7fcf6a'], grass:'#7fd36b', dirt:'#b0784a', water:'#6fc3ff', deco:'trees',  weather:null, hide:['bush','tree','rock']},
+  meadow: {name:'in the Flower Meadow',sky:['#ffb3dd','#ffd6ee','#fff0f6'], hills:['#b8e69a','#8fd36b'], grass:'#8fd36b', dirt:'#b0784a', water:'#7fd0ff', deco:'flowers',weather:'petals', horse:'#c98a4b', hide:['bush','tree','log']},
+  beach:  {name:'at the Beach',        sky:['#101a4a','#25407f','#5f8fc8'], hills:['#3a6fae','#245a96'], grass:'#e8d8a8', dirt:'#c9b07a', water:'#2f6fb0', deco:'palms',  weather:null, night:true, hide:['sandcastle','rock','tent']},
+  farm:   {name:'at the Farm',         sky:['#8fd0ff','#ffe9b8','#fff6dd'], hills:['#e8d078','#a8c860'], grass:'#a8d860', dirt:'#a06a3c', water:'#7fc3ff', deco:'farm',   weather:null, horse:'#3a2b2b', hide:['hay','bush','log']},
+  woods:  {name:'in the Autumn Woods', sky:['#ffb88a','#ffd9b0','#fff0dd'], hills:['#e8a860','#c87840'], grass:'#d8a850', dirt:'#8a5a3a', water:'#7fb8e8', deco:'autumn', weather:'leaves', hide:['tree','log','bush']},
+  snow:   {name:'in the Snowy Village',sky:['#1a2456','#34498c','#8aa3d8'], hills:['#cfdcf6','#aabfe8'], grass:'#eef3ff', dirt:'#9db4dc', water:'#5f8fd0', deco:'pines',  weather:'snow', night:true, hide:['snowpile','pine','log']},
+  rain:   {name:'in the Rainy Town',   sky:['#8f9fc8','#b8c4e0','#d8dff0'], hills:['#8fbf8a','#6fa86f'], grass:'#7fc36b', dirt:'#8a6a4a', water:'#7fb0e8', deco:'town',   weather:'rain', rainbow:true, hide:['bush','tree','rock']},
+  fair:   {name:'at the Starry Fair',  sky:['#1a1f4d','#3d2a6e','#7a4a8f'], hills:['#3f5f6a','#2f4a55'], grass:'#4f9f5a', dirt:'#5a3f3a', water:'#4f6fb8', deco:'fair',   weather:null, night:true, horse:'#fff4f8', hide:['tent','bush','log']},
+};
+
+// ---------- 3. saving progress ----------
+//   wmh_home   — how many kids have been walked home (levels are unlocked in order)
+//   wmh_things — the most of their things you ever found back, per level
+let homeCount = 0, bestThings = [];
+try {
+  homeCount = Math.min(LEVELS, +localStorage.getItem('wmh_home') || 0);
+  bestThings = JSON.parse(localStorage.getItem('wmh_things') || '[]') || [];
+} catch (e) {}
+function saveProgress() {
+  try {
+    localStorage.setItem('wmh_home', homeCount);
+    localStorage.setItem('wmh_things', JSON.stringify(bestThings));
+  } catch (e) {}
+}
+
+// ---------- 4. the level builder ----------
+// A level is the family's house on the left, a row of ground segments with
+// water gaps between them, a few floating grassy ledges to hop up to, the
+// things the kid dropped (the clues) with footprints between them, and a
+// clearing with three hiding spots at the far end. Everything comes from a
+// seeded hash, so level 3 is always the same level 3.
+let currentLevel = 1;
+let kid, theme, segs = [], ledges = [], things = [], houses = [], decos = [], ducks = [], horses = [], spots = [], prints = [];
+let worldW = 3000, maxX = 2900, clearingX = 2000;
+
+function buildLevel(n) {
+  let seed = n * 7919;
+  const R = () => hash(seed++);
+  const k = KIDS[n - 1], th = THEMES[k.theme];
+  const S = [], L = [], T = [], D = [], Q = [];
+
+  // the start: home, on a long safe stretch
+  S.push({x: -300, w: 900, y: GROUND_Y});
+  const HS = [{...k.home, x: 130, mine: true, open: 0, inZone: false}];
+  let x = 600;
+
+  // the walk: gaps get a touch wider and more frequent as the levels go on,
+  // but every one stays well inside an easy hop
+  const gaps = 4 + n;
+  const thingCount = 3 + Math.floor((n - 1) / 3);          // 3, 3, 3, 4, 4, 4, 5, 5
+  const kinds = [];
+  while (kinds.length < thingCount) {
+    const kind = pick(THINGS, R);
+    if (!kinds.includes(kind)) kinds.push(kind);
+  }
+  let thingsLeft = thingCount;
+  for (let i = 0; i < gaps; i++) {
+    const gap = 70 + R() * (20 + n * 6);
+    const w = 220 + R() * 200;
+    const y = R() < 0.25 ? GROUND_Y - 20 - Math.floor(R() * 2) * 15 : GROUND_Y;   // gentle steps
+    const seg = {x: x + gap, w, y};
+    S.push(seg);
+    // a rubber duck bobbing in some gaps
+    if (R() < 0.45) Q.push({x: x + gap / 2, ph: R() * 6.28, dir: R() < 0.5 ? -1 : 1});
+    // a floating ledge over the middle of a wider segment, sometimes with a thing on it
+    if (w > 300 && R() < 0.6) {
+      const ledge = {x: seg.x + 60 + R() * (w - 200), w: 110 + R() * 50, y: y - 85 - R() * 25};
+      L.push(ledge);
+      if (thingsLeft > 0 && R() < 0.8) {
+        T.push({x: ledge.x + ledge.w / 2, y: ledge.y - 40, kind: kinds[--thingsLeft], taken: false, ph: R() * 6.28});
+      }
+    }
+    // a thing floating over the gap you just hopped
+    if (thingsLeft > 0 && R() < 0.4) {
+      T.push({x: x + gap / 2, y: Math.min(y, S[S.length - 2].y) - 80, kind: kinds[--thingsLeft], taken: false, ph: R() * 6.28});
+    }
+    x = seg.x + w;
+  }
+  // any things not placed yet just sit on the path
+  while (thingsLeft > 0) {
+    const seg = S[1 + Math.floor(R() * (S.length - 1))];
+    T.push({x: seg.x + 40 + R() * (seg.w - 80), y: seg.y - 34, kind: kinds[--thingsLeft], taken: false, ph: R() * 6.28});
+  }
+
+  // the clearing: three hiding spots, the kid behind one of them
+  const gap = 70 + R() * 30;
+  const clearing = {x: x + gap, w: 200 + 3 * 220 + 120, y: GROUND_Y};
+  S.push(clearing);
+  const kidAt = Math.floor(R() * 3);
+  const SP = th.hide.map((kind, i) => ({x: clearing.x + 200 + i * 220, kind, critter: theme_critter(kind, th),
+                                        hasKid: i === kidAt, popT: -99, inZone: false, ph: R() * 6.28}));
+
+  // the kid's little footprints, leading away from home along the path
+  const PR = [];
+  for (const sg of S) {
+    if (sg === clearing) continue;
+    for (let fx = Math.max(sg.x + 30, 260); fx < sg.x + sg.w - 30; fx += 62) PR.push({x: fx, y: sg.y, side: PR.length % 2});
+  }
+
+  // a friendly horse trotting up and down the widest stretch of path; its back
+  // is a moving platform you can ride (it never leaves its stretch of ground)
+  const HR = [];
+  if (th.horse) {
+    const walk = S.slice(1, -1).filter(sg => sg.w > 330).sort((a, b) => b.w - a.w)[0];
+    if (walk) HR.push({seg: walk, x0: walk.x + 70, x1: walk.x + walk.w - 70, x: walk.x + 90, y: walk.y - 58,
+                       dir: 1, spd: 65 + n * 4, col: th.horse, mane: th.horse === '#fff4f8' ? '#ff8fc8' : '#5a3a22',
+                       w: 76, dx: 0, rode: false});
+  }
+
+  // background decoration along the whole path, in the theme's flavour
+  // (none right behind the house or the hiding spots, so they stay clear)
+  for (let dx = -200; dx < clearing.x + clearing.w; dx += 90 + R() * 120) {
+    if (Math.abs(dx - 130) < 120 || dx > clearing.x + 120) continue;
+    D.push({x: dx, kind: Math.floor(R() * 3), s: 0.8 + R() * 0.5, ph: R() * 6.28});
+  }
+
+  return {segs: S, ledges: L, things: T, houses: HS, decos: D, ducks: Q, horses: HR, spots: SP, prints: PR,
+          clearingX: clearing.x, worldW: clearing.x + clearing.w + 40, maxX: clearing.x + clearing.w - 40};
+}
+// an owl rather than a bird after dark
+function theme_critter(kind, th) {
+  const c = CRITTER_IN[kind];
+  return c === 'bird' && th.night ? 'owl' : c;
+}
+
+// How many things each level holds, counted once at boot; a level is PERFECT
+// when you found them all.
+const THINGS_IN = [];
+for (let n = 1; n <= LEVELS; n++) THINGS_IN.push(buildLevel(n).things.length);
+const isPerfect = n => (bestThings[n - 1] || 0) >= THINGS_IN[n - 1];
+const thingsTotal = () => bestThings.reduce((a, b) => a + (b || 0), 0);
+const THINGS_ALL = THINGS_IN.reduce((a, b) => a + b, 0);
+
+// ---------- the player and the kid ----------
+// You are the kid's parent. hh is half the physics box: feet at y + hh.
+const player = {x: 60, y: 402, vx: 0, vy: 0, hw: 15, hh: 28,
+                facing: 1, onGround: false, prevGround: false, hops: 0,
+                anim: 0, squash: 0, stand: null, lastStep: 0};
+let clueT = -99, clueKind = null;        // the parent's thought bubble: a clue just found, or calling out
+let hintShown = false;                   // the "listen for sniffles" toast, once per level
+let lookAhead = 0.42;                    // where the parent sits across the screen (shifts when walking home)
+// The kid follows your footsteps: we remember where you were and they walk
+// that same path a moment later, so whatever you hopped over, they hop too.
+const follower = {x: 470, y: 404, vx: 0, facing: -1, anim: 0, air: false, found: false,
+                  foundT: -99, sniffT: 0, sniffShow: -99, homeT: -99, spot: null};
+const trail = [];          // [{t, x, y, facing, onGround}] — your last second or so
+let lastSafeX = 60, lastSafeY = GROUND_Y;
+
+let state = 'title';       // title | play | rescue | win | pause
+let camX = 0, got = 0;
+let rescueT = 0, rescueFrom = {x: 0, y: 0};
+let winT = 0, winShown = false, winWasNew = false, winHouse = null, confettiTimer = 0, fwTimer = 0;
+let finale = false;
+
+function loadLevel(n) {
+  currentLevel = n;
+  for (const k in gradCache) delete gradCache[k];
+  kid = KIDS[n - 1];
+  theme = THEMES[kid.theme];
+  const L = buildLevel(n);
+  segs = L.segs; ledges = L.ledges; things = L.things; houses = L.houses; decos = L.decos; ducks = L.ducks; horses = L.horses;
+  spots = L.spots; prints = L.prints;
+  worldW = L.worldW; maxX = L.maxX; clearingX = L.clearingX;
+  got = 0;
+  player.x = 230; player.y = GROUND_Y - player.hh; player.vx = 0; player.vy = 0;
+  player.facing = 1; player.onGround = true; player.hops = 0; player.stand = null;   // standing, so the title backdrop shows him at rest
+  const spot = spots.find(sp => sp.hasKid);
+  Object.assign(follower, {x: spot.x, y: GROUND_Y - kidH(kid), vx: 0, facing: -1, anim: 0, air: false,
+                           found: false, foundT: -99, sniffT: 1.5, sniffShow: -99, homeT: -99, spot});
+  trail.length = 0;
+  lastSafeX = 230; lastSafeY = GROUND_Y;
+  camX = 0; lookAhead = 0.42; winShown = false; winWasNew = false; winHouse = null; finale = false;
+  clueT = -99; clueKind = null; hintShown = false;
+  parts.length = 0;
+  updateHud();
+}
+// how tall a kid stands (feet to the middle of their body) — little ones are little
+const kidScale = k => 0.7 + (k.age - 3) * 0.075;    // 3yo: 0.70 … 7yo: 1.00
+const kidH = k => 24 * kidScale(k);
+
+// ---------- input ----------
+const keys = {l: false, r: false, j: false};
+let jumpBuf = 0, coyote = 0;
+function pressJump() { jumpBuf = 0.14; }
+
+addEventListener('keydown', e => {
+  if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key)) e.preventDefault();
+  if (e.key === 'Escape') {
+    if (state === 'play') pauseGame();
+    else if (state === 'pause') resumeGame();
+    return;
+  }
+  if (state === 'pause') return;
+  if (state === 'title') { if (!e.repeat && (e.key === ' ' || e.key === 'Enter')) startGame(Math.min(homeCount + 1, LEVELS)); return; }
+  if (state === 'win' && winShown && !e.repeat && (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowUp')) {
+    if (currentLevel < LEVELS) startGame(currentLevel + 1);
+    else showTitle();
+    return;
+  }
+  if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') keys.l = true;
+  if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.r = true;
+  if (e.key === 'ArrowUp' || e.key === ' ' || e.key === 'w' || e.key === 'W') {
+    keys.j = true;
+    if (!e.repeat) pressJump();
+  }
+});
+addEventListener('keyup', e => {
+  if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') keys.l = false;
+  if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.r = false;
+  if (e.key === 'ArrowUp' || e.key === ' ' || e.key === 'w' || e.key === 'W') keys.j = false;
+});
+addEventListener('blur', () => { keys.l = keys.r = keys.j = false; });
+
+function bindHold(id, on, off) {
+  const el = document.getElementById(id);
+  el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture(e.pointerId); on(); });
+  el.addEventListener('pointerup',     () => off());
+  el.addEventListener('pointercancel', () => off());
+  el.addEventListener('lostpointercapture', () => off());
+}
+bindHold('btnL', () => keys.l = true,  () => keys.l = false);
+bindHold('btnR', () => keys.r = true,  () => keys.r = false);
+bindHold('btnJ', () => { pressJump(); keys.j = true; }, () => keys.j = false);
+
+// ---------- 5. audio ----------
+let AC = null, master = null, muted = false;
+function initAudio() {
+  if (AC) return;
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    master = AC.createGain();
+    master.gain.value = muted ? 0 : 0.8;
+    master.connect(AC.destination);
+    nextStep = AC.currentTime + 0.2;
+  } catch (e) { AC = null; }
+}
+// a plucked note: quick attack, ringing decay (music-box / glockenspiel feel)
+function tone(f, dur, type = 'sine', vol = 0.15, when = 0, slideTo = 0) {
+  if (!AC) return;
+  const t0 = when || AC.currentTime;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+  g.gain.setValueAtTime(0, t0);
+  g.gain.linearRampToValueAtTime(vol, t0 + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(master);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+// a held note with a soft swell in and out (the chord pad under the tune)
+function pad(f, dur, vol, when) {
+  if (!AC) return;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine';
+  o.frequency.value = f;
+  g.gain.setValueAtTime(0, when);
+  g.gain.linearRampToValueAtTime(vol, when + 0.25);
+  g.gain.setValueAtTime(vol, when + dur - 0.3);
+  g.gain.linearRampToValueAtTime(0, when + dur);
+  o.connect(g); g.connect(master);
+  o.start(when); o.stop(when + dur + 0.05);
+}
+// a puff of filtered noise: footsteps, shakers, splashes
+let noiseBuf = null;
+function noise(dur, vol, when, hp = 2000, lp = 9000) {
+  if (!AC) return;
+  if (!noiseBuf) {
+    noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  const t0 = when || AC.currentTime;
+  const src = AC.createBufferSource(); src.buffer = noiseBuf;
+  src.loop = true; src.loopStart = Math.random() * 0.5; src.loopEnd = src.loopStart + 0.4;
+  const h = AC.createBiquadFilter(); h.type = 'highpass'; h.frequency.value = hp;
+  const l = AC.createBiquadFilter(); l.type = 'lowpass'; l.frequency.value = lp;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(h); h.connect(l); l.connect(g); g.connect(master);
+  src.start(t0, src.loopStart); src.stop(t0 + dur + 0.02);
+}
+
+// --- sound effects ---
+// Toy-box sounds: a xylophone for finds, bells, a party whistle, a wobbly
+// neigh, little critters. Nothing here is shared with Unicorn Quest.
+const later = d => AC ? AC.currentTime + d : 0;
+function sJump()   {                        // "hup!" — a little swoop up
+  tone(380, 0.14, 'triangle', 0.1, 0, 900);
+}
+function sHop()    {                        // a quick trill for the extra hop in the air
+  [0, 0.05, 0.1].forEach((d, i) => tone(760 + i * 180, 0.07, 'square', 0.05, later(d)));
+  tone(1100, 0.2, 'sine', 0.07, later(0.14), 1500);
+}
+function sLand()   {                        // a soft thump
+  tone(110, 0.1, 'sine', 0.1, 0, 55);
+  noise(0.07, 0.06, 0, 150, 900);
+}
+function sStep()   {                        // the softest footsteps
+  noise(0.03, 0.025, 0, 600, 2400);
+}
+function sCall()   {                        // "Mia? Where are you?" — two soft questioning notes
+  tone(520, 0.22, 'triangle', 0.06, 0);
+  tone(660, 0.3, 'triangle', 0.06, later(0.24), 740);
+}
+function sClue()   {                        // "aha!" — a bright little ping and a slide up
+  tone(1046.5, 0.12, 'sine', 0.1);
+  tone(700, 0.25, 'triangle', 0.07, later(0.1), 1400);
+}
+function sNope()   { tone(440, 0.16, 'triangle', 0.09); tone(370, 0.22, 'triangle', 0.09, later(0.17)); }   // "mm-mm", not here
+function sCritter(kind) {                   // whoever pops out says hello
+  if (kind === 'bunny') { tone(900, 0.08, 'sine', 0.08, 0, 1300); tone(900, 0.08, 'sine', 0.08, later(0.12), 1300); }
+  else if (kind === 'bird') [0, 0.09, 0.18].forEach(d => tone(1800, 0.07, 'sine', 0.06, later(d), 2400));
+  else if (kind === 'owl') { tone(420, 0.25, 'sine', 0.08, 0, 380); tone(420, 0.35, 'sine', 0.08, later(0.3), 340); }
+  else if (kind === 'crab') [0, 0.08, 0.16, 0.24].forEach(d => noise(0.03, 0.08, later(d), 1500, 5000));
+}
+function sThing()  {                        // a xylophone "plink-plonk-PLING" that climbs with each find
+  const base = [523.25, 587.33, 659.25, 783.99, 880][got % 5];
+  [1, 1.25, 1.5].forEach((r, i) => tone(base * r, 0.18, 'sine', 0.14, later(i * 0.07)));
+  tone(base * 3, 0.5, 'sine', 0.05, later(0.2));
+  noise(0.02, 0.05, 0, 3000, 9000);
+}
+function sHandOver() {                      // "wheeee" up, and a bell when it lands in the kid's arms
+  tone(400, 0.4, 'sine', 0.07, 0, 1600);
+  tone(1568, 0.35, 'triangle', 0.08, later(0.42));
+  tone(2093, 0.5, 'sine', 0.04, later(0.46));
+}
+function sSniff()  { tone(520, 0.12, 'sine', 0.05, 0, 440); tone(470, 0.16, 'sine', 0.045, later(0.16), 380); }
+function sFound()  {                        // "yay!" — three quick rising notes and a sparkle
+  [659.25, 783.99, 1046.5].forEach((f, i) => tone(f, 0.18, 'triangle', 0.16, later(i * 0.09)));
+  tone(2093, 0.5, 'sine', 0.05, later(0.3));
+}
+function sSplash() {                        // "sploosh": a deep plunge with the water closing over it
+  tone(260, 0.5, 'sine', 0.12, 0, 40);
+  noise(0.12, 0.25, 0, 100, 500);
+  noise(0.45, 0.14, later(0.1), 400, 3000);
+  [0.25, 0.38, 0.5].forEach(d => tone(900 + Math.random() * 400, 0.08, 'sine', 0.04, later(d), 1800));   // droplets
+}
+function sBubble() {                        // the rescue bubble blowing up around you and floating off
+  noise(0.3, 0.05, 0, 1500, 5000);
+  for (let i = 0; i < 6; i++) tone(320 + i * 70, 0.22, 'sine', 0.05, later(0.1 + i * 0.16), 640 + i * 140);
+}
+function sPopBubble() { tone(1200, 0.1, 'sine', 0.1, 0, 200); noise(0.06, 0.12, 0, 2000, 8000); }
+function sKnock()  { [0, 0.16].forEach(d => { tone(180, 0.09, 'sine', 0.14, later(d), 110); noise(0.05, 0.12, later(d), 300, 1200); }); }
+function sDoor()   { tone(200, 0.3, 'sawtooth', 0.025, 0, 380); }
+function sWin() {                           // a bright "ta-da-da-DAAA" with bells on top
+  if (!AC) return;
+  const t0 = AC.currentTime;
+  [[392, 0], [523.25, 0.14], [659.25, 0.28], [783.99, 0.42]].forEach(([f, d]) => tone(f, 0.24, 'square', 0.05, t0 + d));
+  [783.99, 987.77, 1174.7].forEach(f => tone(f, 1.4, 'triangle', 0.08, t0 + 0.6));
+  [1567.98, 1975.53, 2349.3, 3135.96].forEach((f, i) => tone(f, 0.6, 'sine', 0.05, t0 + 0.75 + i * 0.1));
+}
+function sPerfect() {                       // a run of tiny bells tumbling up and over
+  if (!AC) return;
+  const t0 = AC.currentTime + 1.6;
+  [1046.5, 1318.5, 1568, 2093, 2637, 2093, 1568, 2093, 2637, 3136].forEach((f, i) => tone(f, 0.22, 'sine', 0.09, t0 + i * 0.07));
+}
+function sFirework() {                      // a party-whistle up, then the bang and a shower of sparkle
+  tone(600, 0.35, 'sine', 0.05, 0, 2400);
+  tone(80, 0.25, 'sine', 0.14, later(0.38), 30);
+  noise(0.35, 0.14, later(0.38), 500, 3000);
+  noise(0.6, 0.04, later(0.5), 5000, 12000);
+}
+function sNeigh() {                         // a friendly horse: a wobbly "nei-hei-hei-heigh"
+  if (!AC) return;
+  const t0 = AC.currentTime;
+  for (let i = 0; i < 6; i++) tone(820 - i * 60 + (i % 2) * 90, 0.11, 'sawtooth', 0.035, t0 + i * 0.08, 700 - i * 60);
+  tone(420, 0.3, 'sawtooth', 0.03, t0 + 0.5, 300);
+}
+function sClop()   { tone(700, 0.04, 'sine', 0.05, 0, 250); noise(0.03, 0.05, 0, 800, 3000); }
+
+// --- the tune: "Walking Home" ---
+// A gentle, skipping walking-pace tune in G major that loops without a seam.
+// It is written like a piano roll: every token is one eighth note.
+//   "D5"  start a note (name + octave, sharps as F#4)
+//   "-"   keep holding the previous note
+//   "."   rest
+//   "|"   bar line, ignored — just to keep the bars readable
+// 16 bars of 4/4 at ~111 BPM (an eighth every 0.27s), so one pass is ~35s.
+// The last bar walks up A–F#–A–C on the D chord, which lands straight back on
+// the opening D over G: that is what makes the loop feel like one long walk
+// instead of a tune that keeps starting over.
+const STEP = 0.27;                 // seconds per eighth note
+const STEPS_PER_BAR = 8;
+const MELODY = `
+  D5 - B4 - G4 - A4 B4 | C5 - B4 - G4 - - . | E5 - D5 - C5 - B4 C5 | D5 - - - A4 - - . |
+  D5 - B4 - G4 - A4 B4 | C5 - B4 - G4 - - . | E5 - D5 - C5 - B4 -  | A4 - B4 - C5 - D5 - |
+  E5 - - - G5 - E5 -   | D5 - C5 - E5 - - . | D5 - B4 - G4 - B4 -  | A4 - - - - - B4 C5 |
+  E5 - D5 - C5 - D5 -  | B4 - - - G4 - - . | A4 - C5 - B4 - A4 -  | A4 - F#4 - A4 - C5 - |
+`;
+// one chord per bar; the bass plays root then fifth, the pad hums the triad
+const CHORDS = ['G','Em','C','D',  'G','Em','C','D',  'Em','C','G','D',  'C','G','Am','D'];
+const CHORD_NOTES = {                  // bass root, bass fifth, pad triad
+  G:  {bass: ['G2', 'D3'], pad: ['G3', 'B3', 'D4']},
+  Em: {bass: ['E3', 'B2'], pad: ['E3', 'G3', 'B3']},
+  C:  {bass: ['C3', 'G2'], pad: ['C4', 'E4', 'G4']},
+  D:  {bass: ['D3', 'A2'], pad: ['D4', 'F#4', 'A4']},
+  Am: {bass: ['A2', 'E3'], pad: ['A3', 'C4', 'E4']},
+};
+// note name → frequency, via its MIDI number
+const NOTE_INDEX = {C:0, D:2, E:4, F:5, G:7, A:9, B:11};
+function noteHz(name) {
+  const m = /^([A-G])(#?)(\d)$/.exec(name);
+  const midi = 12 * (+m[3] + 1) + NOTE_INDEX[m[1]] + (m[2] ? 1 : 0);
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+// turn the piano roll into "what starts on each step, and for how long"
+function parseRoll(roll) {
+  const tokens = roll.split(/\s+/).filter(tk => tk && tk !== '|');
+  const starts = tokens.map(() => null);
+  let open = null;
+  tokens.forEach((tk, i) => {
+    if (tk === '-') { if (open) open.len++; }
+    else if (tk === '.') open = null;
+    else { open = {hz: noteHz(tk), len: 1}; starts[i] = open; }
+  });
+  return starts;
+}
+const MELODY_AT = parseRoll(MELODY);
+const LOOP_STEPS = MELODY_AT.length;                       // 128
+if (LOOP_STEPS !== CHORDS.length * STEPS_PER_BAR) console.warn('melody and chords disagree on length');
+
+let nextStep = 0, stepIdx = 0;
+function musicTick() {
+  if (!AC || state === 'title') return;
+  // after a pause, skip ahead instead of machine-gunning the missed notes
+  if (nextStep < AC.currentTime - 0.5) nextStep = AC.currentTime + 0.1;
+  while (nextStep < AC.currentTime + 0.35) {
+    const step = stepIdx % LOOP_STEPS;
+    const pass = Math.floor(stepIdx / LOOP_STEPS);
+    const inBar = step % STEPS_PER_BAR;
+    const chord = CHORD_NOTES[CHORDS[Math.floor(step / STEPS_PER_BAR)]];
+    // the tune, and on every other pass a soft music-box echo an octave up
+    const m = MELODY_AT[step];
+    if (m) {
+      tone(m.hz, m.len * STEP * 0.95, 'triangle', 0.055, nextStep);
+      if (pass % 2 === 1) tone(m.hz * 2, m.len * STEP * 0.7, 'sine', 0.03, nextStep + STEP * 0.5);
+    }
+    // bass: root on beat 1, fifth on beat 3
+    if (inBar === 0) tone(noteHz(chord.bass[0]), STEP * 3.6, 'sine', 0.07, nextStep);
+    if (inBar === 4) tone(noteHz(chord.bass[1]), STEP * 3.6, 'sine', 0.055, nextStep);
+    // the pad hums the chord under the whole bar
+    if (inBar === 0) for (const nm of chord.pad) pad(noteHz(nm), STEP * STEPS_PER_BAR, 0.016, nextStep);
+    // walking feet: a soft shaker on the off-beats, a woodblock tock on 2 and 4
+    if (inBar % 2 === 1) noise(0.05, 0.035, nextStep, 4000, 9000);
+    if (inBar === 2 || inBar === 6) tone(900, 0.07, 'sine', 0.05, nextStep, 400);
+    nextStep += STEP;
+    stepIdx++;
+  }
+}
+document.getElementById('mute').addEventListener('click', () => {
+  muted = !muted;
+  document.getElementById('mute').textContent = muted ? '🔇' : '🔊';
+  if (master) master.gain.value = muted ? 0 : 0.8;
+});
+
+// ---------- particles ----------
+const parts = [];
+function spawn(o) {
+  if (parts.length > 500) parts.shift();
+  parts.push(Object.assign({age: 0, life: 0.8, vx: 0, vy: 0, g: 0, size: 5, color: '#fff', type: 'dot', rot: Math.random() * 6}, o));
+}
+function burst(x, y, n, mk) { for (let i = 0; i < n; i++) spawn(mk(i)); }
+function heartBurst(x, y, n = 10) {
+  burst(x, y, n, () => ({
+    x: x + Math.random() * 40 - 20, y: y + Math.random() * 20 - 10,
+    vx: Math.random() * 120 - 60, vy: -(60 + Math.random() * 120), g: 120,
+    size: 3 + Math.random() * 3, color: pinkOne(), life: 1.1, type: 'heart'
+  }));
+}
+
+// ---------- floating hearts behind the cards (pure decoration) ----------
+const SPRINKLES = ['💖','✨','🏠','⭐','🧸','🎈','💛','🌟','🩷','💫','🌼'];
+for (const ov of document.querySelectorAll('.overlay')) {
+  const layer = document.createElement('div');
+  layer.className = 'sprinkles';
+  for (let i = 0; i < 16; i++) {
+    const s = document.createElement('span');
+    s.textContent = SPRINKLES[(Math.random() * SPRINKLES.length) | 0];
+    s.style.left = (Math.random() * 100) + '%';
+    s.style.fontSize = (13 + Math.random() * 20) + 'px';
+    s.style.animationDuration = (9 + Math.random() * 10) + 's';
+    s.style.animationDelay = (-Math.random() * 16) + 's';
+    layer.appendChild(s);
+  }
+  ov.insertBefore(layer, ov.firstChild);
+}
+
+// ---------- 6. game flow ----------
+function toast(msg, ms = 5000) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.opacity = 1;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => el.style.opacity = 0, ms);
+}
+
+function refreshTitle() {
+  hideResetConfirm();
+  const next = Math.min(homeCount + 1, LEVELS);
+  const k = KIDS[next - 1];
+  document.getElementById('startBtn').textContent =
+    homeCount >= LEVELS ? '▶ Play again with ' + k.name + '!' : '▶ Help ' + k.name + '!';
+  document.getElementById('mapCap').textContent =
+    homeCount >= LEVELS ? '🎉 Everyone is home! Play any level again!'
+    : homeCount > 0 ? homeCount + ' of 8 friends home — ' + k.name + ' is next!'
+    : 'Walk a friend home to meet the next one!';
+  const map = document.getElementById('levelMap');
+  map.innerHTML = '';
+  for (let i = 1; i <= LEVELS; i++) {
+    const wrap = document.createElement('div');
+    wrap.className = 'lvlwrap' + (i === next ? ' here' : '');
+    const b = document.createElement('button');
+    b.className = 'lvlbtn';
+    if (i <= homeCount) {
+      b.classList.add('done');
+      b.textContent = '🏠';
+      b.title = 'Level ' + i + ' — ' + KIDS[i - 1].name + ' is home!';
+      if (isPerfect(i)) b.classList.add('perfect');
+    } else if (i === homeCount + 1) {
+      b.classList.add('next');
+      b.textContent = '▶';
+      b.title = 'Level ' + i + ' — help ' + KIDS[i - 1].name + '!';
+    } else {
+      b.classList.add('locked');
+      b.textContent = '🔒';
+      b.disabled = true;
+      b.title = 'Level ' + i;
+    }
+    if (!b.disabled) b.addEventListener('click', () => startGame(i));
+    const num = document.createElement('span');
+    num.className = 'lvlnum';
+    num.textContent = i;
+    wrap.appendChild(b);
+    wrap.appendChild(num);
+    map.appendChild(wrap);
+  }
+  fitCards();
+}
+
+function startGame(n) {
+  initAudio();
+  if (AC && AC.state === 'suspended') AC.resume();
+  loadLevel(n);
+  document.getElementById('title').classList.add('hidden');
+  document.getElementById('winScreen').classList.add('hidden');
+  if (document.activeElement) document.activeElement.blur();
+  state = 'play';
+  toast(kid.name + ' (' + kid.age + ') is lost ' + theme.name + '! Follow the clues to find ' + them(kid) + ' 🔍', 6000);
+  clueT = performance.now() / 1000 + 0.6; clueKind = 'call';
+  setTimeout(sCall, 600);
+}
+document.getElementById('startBtn').addEventListener('click', () => startGame(Math.min(homeCount + 1, LEVELS)));
+
+function showTitle() {
+  state = 'title';
+  document.getElementById('winScreen').classList.add('hidden');
+  document.getElementById('pauseScreen').classList.add('hidden');
+  document.getElementById('title').classList.remove('hidden');
+  refreshTitle();
+}
+document.getElementById('mapBtn').addEventListener('click', showTitle);
+
+function pauseGame() {
+  if (state !== 'play') return;
+  state = 'pause';
+  keys.l = keys.r = false;
+  document.getElementById('pauseMsg').textContent =
+    follower.found ? kid.name + ' is holding your hand and waiting…' : kid.name + ' is still hiding somewhere…';
+  document.getElementById('pauseScreen').classList.remove('hidden');
+  fitCards();
+}
+function resumeGame() {
+  if (state !== 'pause') return;
+  document.getElementById('pauseScreen').classList.add('hidden');
+  if (document.activeElement) document.activeElement.blur();
+  state = 'play';
+}
+document.getElementById('resumeBtn').addEventListener('click', resumeGame);
+document.getElementById('restartBtn').addEventListener('click', () => startGame(currentLevel));
+document.getElementById('pmapBtn').addEventListener('click', showTitle);
+document.getElementById('pauseBtn').addEventListener('click', () => {
+  if (state === 'play') pauseGame();
+  else if (state === 'pause') resumeGame();
+});
+document.getElementById('nextBtn').addEventListener('click', () => startGame(Math.min(currentLevel + 1, LEVELS)));
+
+function hideResetConfirm() {
+  document.getElementById('resetConfirm').classList.add('hidden');
+  document.getElementById('resetLink').classList.remove('hidden');
+  fitCards();
+}
+document.getElementById('resetLink').addEventListener('click', () => {
+  document.getElementById('resetLink').classList.add('hidden');
+  document.getElementById('resetConfirm').classList.remove('hidden');
+  fitCards();
+});
+document.getElementById('resetNo').addEventListener('click', hideResetConfirm);
+document.getElementById('resetYes').addEventListener('click', () => {
+  homeCount = 0; bestThings = [];
+  saveProgress();
+  hideResetConfirm();
+  refreshTitle();
+});
+
+function updateHud() {
+  document.getElementById('levelNum').textContent = currentLevel;
+  document.getElementById('thingCount').textContent = got + ' / ' + things.length;
+  document.getElementById('goalPill').textContent =
+    follower.found ? '🏠 Take ' + kid.name + ' home' : '🔍 Find ' + kid.name;
+}
+
+// found! the kid pops out and takes your hand
+function findKid(t) {
+  follower.found = true;
+  follower.foundT = t;
+  follower.x = follower.spot.x + (player.x < follower.spot.x ? -34 : 34);   // out in front, on your side
+  follower.air = false;
+  sFound();
+  heartBurst(follower.x, follower.y - 30, 16);
+  toast('You found ' + kid.name + '! Now walk ' + them(kid) + ' back home 🏠', 6000);
+  updateHud();
+  handOver();
+}
+
+// checking a hiding spot: the kid, or a surprised little critter
+function checkSpot(sp, t) {
+  sp.inZone = true;
+  if (sp.hasKid) { findKid(t); return; }
+  sp.popT = t;
+  sCritter(sp.critter);
+  setTimeout(sNope, 500);
+  toast('Boo! Just a ' + sp.critter + ' — keep looking! 👀', 2500);
+}
+
+// once the kid is found, everything you were carrying flies into their arms
+function handOver() {
+  let n = 0;
+  for (const s of things) {
+    if (s.holder !== 'parent') continue;
+    const from = holderChest('parent');
+    s.holder = 'kid'; s.slot = n++;
+    s.fly = {t: -0.4, from: {x: from.x, y: from.y}};
+  }
+  if (n) setTimeout(sHandOver, 500);
+}
+
+// whoops — into the water
+function startRescue() {
+  state = 'rescue';
+  rescueT = 0;
+  rescueFrom = {x: player.x, y: WATER_Y};
+  sSplash();
+  burst(player.x, WATER_Y, 16, () => ({
+    x: player.x + (Math.random() * 40 - 20), y: WATER_Y,
+    vx: Math.random() * 160 - 80, vy: -(120 + Math.random() * 220), g: 500,
+    size: 3 + Math.random() * 4, color: Math.random() < 0.5 ? theme.water : '#ffffff', life: 0.7
+  }));
+  player.vx = 0; player.vy = 0;
+  // the kid stayed on the bank, and waits there for you
+  if (follower.found) { follower.x = lastSafeX - player.facing * 34; follower.y = lastSafeY - kidH(kid); follower.air = false; }
+  trail.length = 0;
+}
+
+// back at the front door with the kid: knock, and the family comes out
+function knock(h, t) {
+  h.inZone = true;
+  sKnock();
+  startWin(h, t);
+}
+
+function startWin(h, t) {
+  if (state === 'win') return;
+  state = 'win';
+  winT = 0; confettiTimer = 0; fwTimer = 0;
+  winHouse = h;
+  follower.homeT = t;
+  winWasNew = currentLevel > homeCount;
+  if (winWasNew) homeCount = currentLevel;
+  if (got > (bestThings[currentLevel - 1] || 0)) bestThings[currentLevel - 1] = got;
+  saveProgress();
+  finale = currentLevel === LEVELS;
+  sDoor();
+  setTimeout(sWin, 500);
+  if (got >= things.length) sPerfect();
+}
+
+function showWinCard() {
+  const perfect = got >= things.length;
+  const wt = document.getElementById('winTitle');
+  wt.textContent = finale ? 'Everyone is home!' : kid.name + ' is home!';
+  wt.classList.toggle('rainbowtext', finale);
+  document.getElementById('winMsg').innerHTML =
+    (finale ? 'All 8 friends are safe and sound, thanks to you! 🎉<br>' : '') +
+    'You brought ' + kid.name + ' all the way back home. Big hugs all round 🤗' +
+    (perfect ? '<br>💖 <b>PERFECT!</b> You found every single thing ' + they(kid) + ' dropped!' : '');
+  document.getElementById('winThings').innerHTML =
+    '🧸 You found <b>' + got + ' of ' + things.length + '</b> of ' + their(kid) + ' things' +
+    (perfect ? '!' : ' — the rest are still out there!');
+  document.getElementById('nextBtn').classList.toggle('hidden', finale);
+  document.getElementById('nextHint').classList.toggle('hidden', finale);
+  document.getElementById('winScreen').classList.remove('hidden');
+  fitCards();
+}
+
+// ---------- 7. update ----------
+function update(dt, t) {
+  if (state === 'play' || state === 'win') {
+    let move = 0;
+    if (state === 'play') move = (keys.l ? -1 : 0) + (keys.r ? 1 : 0);
+    player.vx = lerp(player.vx, move * WALK, Math.min(1, dt * 30));   // up to speed in a couple of frames
+    if (move) player.facing = move;
+    if (Math.abs(player.vx) > 40 && player.onGround) {
+      player.anim += dt * 11;
+      if (Math.floor(player.anim / Math.PI) !== player.lastStep) { player.lastStep = Math.floor(player.anim / Math.PI); sStep(); }
+    }
+
+    coyote = player.onGround ? 0.12 : Math.max(0, coyote - dt);
+    jumpBuf = Math.max(0, jumpBuf - dt);
+
+    if (state === 'win') {
+      if (player.onGround && winT < 3) { player.vy = -330; player.onGround = false; }   // happy hops
+    } else if (jumpBuf > 0) {
+      if (player.onGround || coyote > 0) {
+        player.vy = -JUMP_V; player.onGround = false; coyote = 0; jumpBuf = 0;
+        player.squash = -0.45; sJump();
+      } else if (player.hops < 1) {          // one extra hop in the air, for forgiveness
+        player.vy = -HOP_V; player.hops++; jumpBuf = 0;
+        sHop();
+        burst(player.x, player.y + 14, 8, () => ({
+          x: player.x + (Math.random() * 30 - 15), y: player.y + 18,
+          vx: Math.random() * 80 - 40, vy: 40 + Math.random() * 80,
+          size: 2.5 + Math.random() * 2.5, color: PASTELS[(Math.random() * PASTELS.length) | 0],
+          life: 0.5, type: 'star'
+        }));
+      }
+    }
+
+    player.vy = Math.min(player.vy + GRAV * dt, 950);
+    // riding the horse: it carries you along
+    if (player.stand && player.stand.horse && player.onGround) player.x += player.stand.dx;
+    const prevFeet = player.y + player.hh;
+    player.x += player.vx * dt;
+    player.y += player.vy * dt;
+    player.x = clamp(player.x, -140, maxX);
+
+    // land on ground segments and ledges (one-way, from above)
+    player.prevGround = player.onGround;
+    player.onGround = false; player.stand = null;
+    if (player.vy >= 0) {
+      // the horse's back counts as a little platform that moves with it
+      const backs = horses.map(h => ({x: h.x - h.w / 2, w: h.w, y: h.y, horse: h, dx: h.dx}));
+      for (const p of backs.concat(ledges, segs)) {
+        if (player.x > p.x - 12 && player.x < p.x + p.w + 12 && prevFeet <= p.y + 10 && player.y + player.hh >= p.y) {
+          player.y = p.y - player.hh;
+          player.vy = 0; player.onGround = true; player.hops = 0; player.stand = p;
+          if (segs.includes(p)) { lastSafeX = clamp(player.x, p.x + 30, p.x + p.w - 30); lastSafeY = p.y; }
+          if (!player.prevGround) {
+            player.squash = 0.5; sLand();
+            if (p.horse) {                   // hop aboard!
+              if (!p.horse.rode) { p.horse.rode = true; toast('A horsey ride! 🐴', 3000); }
+              sNeigh(); heartBurst(p.horse.x, p.horse.y - 30, 6);
+            }
+            burst(player.x, p.y, 6, () => ({
+              x: player.x + (Math.random() * 30 - 15), y: p.y,
+              vx: Math.random() * 60 - 30, vy: -(20 + Math.random() * 40), g: 300,
+              size: 2.5 + Math.random() * 2, color: 'rgba(255,255,255,0.7)', life: 0.35, type: 'puff'
+            }));
+          }
+          break;
+        }
+      }
+    }
+    player.squash = lerp(player.squash, 0, Math.min(1, dt * 9));
+
+    // breadcrumbs for the kid to follow
+    trail.push({t, x: player.x, y: player.y + player.hh, facing: player.facing, onGround: player.onGround});
+    while (trail.length && trail[0].t < t - 2) trail.shift();
+
+    if (state === 'play') {
+      // the hiding spots: walk up to one to look behind it
+      if (!follower.found) {
+        for (const sp of spots) {
+          const near = Math.abs(player.x - sp.x) < 34 && player.onGround;
+          if (near && !sp.inZone) checkSpot(sp, t);
+          if (!near && Math.abs(player.x - sp.x) > 70) sp.inZone = false;
+        }
+        if (!hintShown && player.x > clearingX + 40) {
+          hintShown = true;
+          toast(kid.name + ' is hiding here somewhere! Listen for sniffles… 👂', 5000);
+        }
+      }
+
+      // the dropped things are the clues: scoop one up and it flies into the
+      // kid's arms (or yours, until the kid is found)
+      for (const s of things) {
+        if (s.taken) continue;
+        const dx = player.x - s.x, dy = player.y - s.y;
+        if (dx * dx + dy * dy < 46 * 46) {
+          s.taken = true; got++; updateHud(); sThing();
+          s.holder = follower.found ? 'kid' : 'parent';
+          s.slot = things.filter(o => o.holder === s.holder).length - 1;
+          s.fly = {t: 0, from: {x: s.x, y: s.y}};
+          if (s.holder === 'kid') setTimeout(sHandOver, 150);
+          else { clueT = t; clueKind = s.kind; setTimeout(sClue, 250); }
+          burst(s.x, s.y, 12, () => ({
+            x: s.x, y: s.y, vx: Math.random() * 220 - 110, vy: Math.random() * 220 - 110,
+            size: 3 + Math.random() * 3, color: Math.random() < 0.3 ? pinkOne() : '#ffd94d',
+            life: 0.7, type: Math.random() < 0.3 ? 'heart' : 'star'
+          }));
+        }
+      }
+
+      // home: walk up to the front door with the kid to knock
+      if (follower.found) {
+        for (const h of houses) {
+          const near = Math.abs(player.x - h.x) < 30 && player.onGround && player.stand && segs.includes(player.stand);
+          if (near && !h.inZone) knock(h, t);
+          if (!near && Math.abs(player.x - h.x) > 60) h.inZone = false;
+        }
+      }
+
+      // splash!
+      if (player.y + player.hh > WATER_Y + 14) startRescue();
+    }
+  }
+
+  else if (state === 'rescue') {
+    // a big soap bubble scoops you up and floats you back to the bank
+    rescueT += dt;
+    const targetY = lastSafeY - player.hh;
+    if (rescueT < 0.35) {
+      player.y = WATER_Y + 30;
+    } else if (rescueT < 1.9) {
+      if (rescueT - dt < 0.35) sBubble();
+      const u = ease(clamp((rescueT - 0.35) / 1.55, 0, 1));
+      player.x = lerp(rescueFrom.x, lastSafeX, u);
+      player.y = lerp(WATER_Y + 10, targetY - 40, Math.min(1, u * 1.15)) + (u > 0.85 ? (u - 0.85) / 0.15 * 40 : 0);
+    } else {
+      player.x = lastSafeX; player.y = targetY;
+      player.onGround = true; player.hops = 0; player.vy = 0;
+      sPopBubble();
+      burst(player.x, player.y, 12, () => ({
+        x: player.x + Math.random() * 60 - 30, y: player.y + Math.random() * 60 - 30,
+        vx: Math.random() * 80 - 40, vy: -(20 + Math.random() * 60),
+        size: 3, color: 'rgba(205,240,255,0.9)', life: 0.5, type: 'puff'
+      }));
+      state = 'play';
+    }
+  }
+
+  // the things being carried: a short flight into someone's arms
+  for (const s of things) if (s.fly) { s.fly.t += dt; if (s.fly.t >= 0.55) s.fly = null; }
+
+  // the horse trots up and down its stretch of path, and clip-clops when close
+  for (const h of horses) {
+    const px = h.x;
+    h.x += h.dir * h.spd * dt;
+    if (h.x > h.x1) { h.x = h.x1; h.dir = -1; }
+    if (h.x < h.x0) { h.x = h.x0; h.dir = 1; }
+    h.dx = h.x - px;
+    h.anim = (h.anim || 0) + dt * 9;
+    if (Math.floor(h.anim / Math.PI) !== h.lastClop && Math.abs(h.x - player.x) < 420 && state === 'play') { h.lastClop = Math.floor(h.anim / Math.PI); sClop(); }
+  }
+
+  // --- the kid ---
+  if (state !== 'rescue') {
+    if (follower.found && follower.homeT < 0) {
+      // walk your path, a moment behind — little ones lag a little more
+      const delay = 0.62 - (kid.age - 3) * 0.04;
+      // just found: she is beside you and there is no path behind you yet to follow
+      if (t - follower.foundT < 0.8) trail.length = 0;
+      let s = trail[0];
+      for (let i = trail.length - 1; i >= 0; i--) if (trail[i].t <= t - delay) { s = trail[i]; break; }
+      if (s) {
+        let tx = s.x - s.facing * 34, ty = s.y - kidH(kid);
+        // when you are riding the horse she hops up right behind, instead of
+        // replaying footsteps in mid-air where the horse used to be
+        if (player.stand && player.stand.horse && Math.abs(follower.x - player.x) < 140) {
+          tx = player.x - player.facing * 30; ty = player.stand.y - kidH(kid);
+        }
+        const nx = lerp(follower.x, tx, Math.min(1, dt * 9));
+        follower.vx = (nx - follower.x) / Math.max(dt, 0.001);
+        follower.x = nx;
+        follower.y = lerp(follower.y, ty, Math.min(1, dt * 12));
+        follower.air = !s.onGround;
+        if (Math.abs(follower.vx) > 30) { follower.facing = follower.vx > 0 ? 1 : -1; follower.anim += dt * 12; }
+        else follower.facing = player.x >= follower.x ? 1 : -1;
+      }
+    } else if (!follower.found) {
+      // sniffles from the hiding spot, once you are near the clearing
+      follower.sniffT -= dt;
+      if (follower.sniffT <= 0) {
+        follower.sniffT = 2.4 + Math.random() * 1.5;
+        if (state === 'play' && follower.x > camX - 50 && follower.x < camX + viewW + 50) {
+          sSniff();
+          follower.sniffShow = t;
+        }
+      }
+    }
+  }
+
+  // --- winning: the door opens, the kid runs in for a hug ---
+  if (state === 'win') {
+    winT += dt;
+    const h = winHouse;
+    h.open = Math.min(1, winT / 0.6);
+    if (winT > 0.5) {
+      const u = ease(clamp((winT - 0.5) / 1.2, 0, 1));
+      follower.x = lerp(follower.x, h.x - 6, Math.min(1, dt * 6));
+      follower.facing = h.x >= follower.x ? 1 : -1;
+      follower.anim += dt * 12 * (1 - u);
+      follower.y = GROUND_Y - kidH(kid);
+      follower.air = false;
+    }
+    confettiTimer -= dt;
+    if (winT < (finale ? 6 : 3.5) && confettiTimer <= 0) {
+      confettiTimer = finale ? 0.15 : 0.25;
+      burst(h.x, GROUND_Y - 120, finale ? 16 : 10, () => {
+        const heart = Math.random() < 0.5;
+        return {
+          x: h.x + Math.random() * 300 - 150, y: GROUND_Y - 220 - Math.random() * 100,
+          vx: Math.random() * 120 - 60, vy: Math.random() * 40, g: heart ? 130 : 260,
+          size: heart ? 5 : 4, color: heart ? pinkOne() : PASTELS[(Math.random() * PASTELS.length) | 0],
+          life: 2.4, type: heart ? 'heart' : 'conf'
+        };
+      });
+    }
+    if (finale) {
+      fwTimer -= dt;
+      if (winT > 0.6 && winT < 6 && fwTimer <= 0) {
+        fwTimer = 0.5;
+        const fx = camX + 60 + Math.random() * Math.max(100, viewW - 120), fy = 60 + Math.random() * 180;
+        const col = PASTELS[(Math.random() * PASTELS.length) | 0];
+        sFirework();
+        burst(fx, fy, 22, i => {
+          const a = i / 22 * Math.PI * 2, sp = 90 + Math.random() * 130;
+          return {x: fx, y: fy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 110, size: 3, color: col, life: 1.3, type: 'star'};
+        });
+      }
+    }
+    if (winT > (finale ? 6.5 : 3) && !winShown) { winShown = true; showWinCard(); }
+  }
+
+  // --- fireflies on the night levels ---
+  if (theme.night && state !== 'title' && Math.random() < dt * 2.5) {
+    spawn({x: camX + Math.random() * viewW, y: GROUND_Y - 30 - Math.random() * 150,
+           vx: Math.random() * 30 - 15, vy: Math.random() * 20 - 10, size: 2.2,
+           color: '#f6ffb0', life: 5 + Math.random() * 3, type: 'firefly', rot: Math.random() * 6, weather: true});
+  }
+  // --- weather ---
+  if (theme.weather && state !== 'title') {
+    const rate = theme.weather === 'rain' ? 40 : theme.weather === 'snow' ? 14 : 6;
+    if (Math.random() < dt * rate) {
+      const w = theme.weather;
+      spawn({x: camX + Math.random() * (viewW + 200) - 100, y: -20,
+             vx: w === 'rain' ? -40 : (Math.random() * 40 - 20) + (w === 'leaves' ? -30 : 0),
+             vy: w === 'rain' ? 520 : w === 'snow' ? 40 + Math.random() * 30 : 60 + Math.random() * 40,
+             size: w === 'rain' ? 1.4 : w === 'snow' ? 2 + Math.random() * 2 : 4,
+             color: w === 'rain' ? 'rgba(200,225,255,0.7)' : w === 'snow' ? 'rgba(255,255,255,0.9)'
+                  : w === 'petals' ? pinkOne() : ['#e8493b','#f0a030','#d8b040'][(Math.random() * 3) | 0],
+             type: w === 'rain' ? 'rain' : w === 'snow' ? 'dot' : 'leaf', life: w === 'rain' ? 1.1 : 6, weather: true});
+    }
+  }
+
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const q = parts[i];
+    q.age += dt;
+    if (q.age > q.life) { parts.splice(i, 1); continue; }
+    q.vy += (q.g || 0) * dt;
+    if (q.type === 'leaf' || (q.weather && q.type === 'dot')) q.x += Math.sin(q.age * 2 + q.rot) * 40 * dt;
+    if (q.type === 'firefly') { q.x += Math.sin(q.age * 1.3 + q.rot) * 30 * dt; q.y += Math.cos(q.age * 1.7 + q.rot) * 25 * dt; }
+    q.x += q.vx * dt; q.y += q.vy * dt;
+    if (q.weather && q.y > GROUND_Y + 40) q.age = q.life;
+  }
+
+  // camera: locked to the parent, no smoothing. A camera that eases after
+  // them makes a steady walk look like a burst of speed and then a slowdown.
+  // Only the look-ahead drifts: walking home (leftwards) you sit further
+  // right on the screen so you can see where you are going.
+  lookAhead = lerp(lookAhead, player.facing > 0 ? 0.42 : 0.58, Math.min(1, dt * 2));
+  camX = clamp(player.x - viewW * lookAhead, 0, Math.max(0, worldW - viewW));
+
+  musicTick();
+}
+
+// ---------- 8. drawing ----------
+function setLayer(par) {
+  const s = scale * dpr;
+  ctx.setTransform(s, 0, 0, s, -camX * par * s, 0);
+}
+function rounded(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function heartPath(x, y, r) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + r);
+  ctx.bezierCurveTo(x - r * 1.4, y - r * 0.3, x - r * 0.55, y - r * 1.25, x, y - r * 0.35);
+  ctx.bezierCurveTo(x + r * 0.55, y - r * 1.25, x + r * 1.4, y - r * 0.3, x, y + r);
+  ctx.closePath();
+}
+function starPath(x, y, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 5;
+    const rr = i % 2 ? r * 0.45 : r;
+    const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  ctx.closePath();
+}
+function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+const FONT = '"Fredoka", "Baloo 2", "Comic Sans MS", sans-serif';
+
+// Gradients that never change during a level are built once and kept, not
+// rebuilt sixty times a second. The cache empties on a resize or a new level.
+const gradCache = {};
+function cachedGrad(key, make) { return gradCache[key] || (gradCache[key] = make()); }
+addEventListener('resize', () => { for (const k in gradCache) delete gradCache[k]; });
+
+function drawSky(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = cachedGrad('sky', () => {
+    const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    g.addColorStop(0, theme.sky[0]);
+    g.addColorStop(0.55, theme.sky[1]);
+    g.addColorStop(0.85, theme.sky[2]);
+    return g;
+  });
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  setLayer(0.05);
+  if (theme.night) {
+    // twinkling stars and a sleepy moon
+    for (let i = 0; i < 60; i++) {
+      const sx = camX * 0.05 + (hash(i * 3.1) * 1.4 - 0.2) * viewW, sy = 10 + hash(i * 7.7) * 260;
+      ctx.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(t * (1 + hash(i)) + i));
+      ctx.fillStyle = '#fff5cc';
+      if (hash(i * 5.3) > 0.8) { starPath(sx, sy, 3.5); ctx.fill(); } else circle(sx, sy, 1.4);
+    }
+    ctx.globalAlpha = 1;
+    drawMoon(camX * 0.05 + viewW * 0.78, 90);
+  } else {
+    drawSun(camX * 0.05 + viewW * 0.8, 95, t);
+  }
+  if (theme.rainbow) {
+    setLayer(0.15);
+    const cx = camX * 0.15 + viewW * 0.5, cy = 420;
+    const cols = ['#ff5f5f','#ffb14d','#ffe94d','#6fdc6f','#5fb8ff','#b38fff'];
+    ctx.globalAlpha = 0.45;
+    cols.forEach((c, i) => {
+      ctx.strokeStyle = c; ctx.lineWidth = 9;
+      ctx.beginPath(); ctx.arc(cx, cy, 330 - i * 9, Math.PI, 0); ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+  }
+}
+function drawSun(sx, sy, t) {
+  ctx.save(); ctx.translate(sx, sy); ctx.rotate(t * 0.08);
+  ctx.fillStyle = cachedGrad('sunray', () => {
+    const rg = ctx.createLinearGradient(0, -30, 0, -62);
+    rg.addColorStop(0, 'rgba(255,240,170,0.34)'); rg.addColorStop(1, 'rgba(255,240,170,0)');
+    return rg;
+  });
+  for (let i = 0; i < 12; i++) {
+    ctx.rotate(Math.PI / 6);
+    const len = 52 + Math.sin(t * 1.3 + i) * 9;
+    ctx.beginPath(); ctx.moveTo(-7, -30); ctx.lineTo(0, -len); ctx.lineTo(7, -30); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+  // the sun sits still on screen, so its gradients can be built once
+  ctx.save(); ctx.translate(sx, sy);
+  ctx.fillStyle = cachedGrad('sunhalo', () => {
+    const halo = ctx.createRadialGradient(0, 0, 8, 0, 0, 78);
+    halo.addColorStop(0, 'rgba(255,250,210,0.9)'); halo.addColorStop(0.5, 'rgba(255,225,140,0.3)'); halo.addColorStop(1, 'rgba(255,200,120,0)');
+    return halo;
+  });
+  circle(0, 0, 78);
+  ctx.fillStyle = cachedGrad('sundisc', () => {
+    const disc = ctx.createRadialGradient(-7, -8, 3, 0, 0, 27);
+    disc.addColorStop(0, '#fffdf0'); disc.addColorStop(0.55, '#fff2b8'); disc.addColorStop(1, '#ffd875');
+    return disc;
+  });
+  circle(0, 0, 26);
+  ctx.restore();
+  ctx.fillStyle = 'rgba(230,150,60,0.5)';
+  circle(sx - 9, sy - 4, 2.3); circle(sx + 9, sy - 4, 2.3);
+  ctx.strokeStyle = 'rgba(230,150,60,0.5)'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(sx, sy + 1, 9, 0.45, Math.PI - 0.45); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,170,120,0.25)'; circle(sx - 16, sy + 4, 4); circle(sx + 16, sy + 4, 4);
+}
+function drawMoon(mx, my) {
+  const halo = ctx.createRadialGradient(mx, my, 6, mx, my, 66);
+  halo.addColorStop(0, 'rgba(226,236,255,0.55)'); halo.addColorStop(1, 'rgba(190,206,255,0)');
+  ctx.fillStyle = halo; circle(mx, my, 66);
+  ctx.fillStyle = '#f4f6ff'; circle(mx, my, 24);
+  ctx.fillStyle = 'rgba(186,194,232,0.55)'; circle(mx + 8, my - 8, 4.5); circle(mx - 9, my + 6, 3.4);
+  ctx.strokeStyle = 'rgba(120,130,190,0.75)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(mx - 8, my - 1, 3.4, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+  ctx.beginPath(); ctx.arc(mx + 6, my - 1, 3.4, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+  ctx.beginPath(); ctx.arc(mx - 1, my + 8, 3.6, 0.3, Math.PI - 0.3); ctx.stroke();
+}
+
+// soft rolling hills, two layers deep
+function drawHills(t) {
+  const layers = [{par: 0.2, col: theme.hills[0], base: 400, amp: 40, len: 520},
+                  {par: 0.4, col: theme.hills[1], base: 425, amp: 30, len: 340}];
+  for (const L of layers) {
+    setLayer(L.par);
+    const x0 = camX * L.par - 100, x1 = camX * L.par + viewW + 100;
+    ctx.fillStyle = L.col;
+    ctx.beginPath();
+    ctx.moveTo(x0, 600);
+    for (let x = x0; x <= x1; x += 20) ctx.lineTo(x, L.base - Math.abs(Math.sin(x / L.len * Math.PI)) * L.amp - Math.sin(x / 97) * 6);
+    ctx.lineTo(x1, 600); ctx.closePath(); ctx.fill();
+  }
+}
+
+function cloudPath(cx, cy, s) {
+  ctx.beginPath();
+  for (const [dx, dy, r] of [[0, 0, 26], [-28, 8, 18], [26, 6, 20], [-8, -14, 20], [14, -10, 18]]) {
+    ctx.moveTo(cx + dx * s + r * s, cy + dy * s); ctx.arc(cx + dx * s, cy + dy * s, r * s, 0, 7);
+  }
+}
+function drawClouds(t) {
+  setLayer(0.12);
+  const off = camX * 0.12;
+  const k0 = Math.floor(off / 420) - 1, n = Math.ceil(viewW / 420) + 2;
+  for (let i = 0; i < n; i++) {
+    const k = k0 + i;
+    const cx = k * 420 + hash(k * 3.3) * 240 + Math.sin(t * 0.1 + k) * 20;
+    const cy = 60 + hash(k * 9.1) * 130, s = 0.6 + hash(k * 4.7) * 0.6;
+    ctx.fillStyle = theme.night ? 'rgba(200,190,240,0.35)' : 'rgba(255,255,255,0.92)';
+    cloudPath(cx, cy, s); ctx.fill();
+    if (!theme.night) {          // a sleepy little smile
+      ctx.fillStyle = 'rgba(160,170,210,0.55)';
+      circle(cx - 8 * s, cy + 2 * s, 2 * s); circle(cx + 8 * s, cy + 2 * s, 2 * s);
+      ctx.strokeStyle = 'rgba(160,170,210,0.55)'; ctx.lineWidth = 1.6 * s; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(cx, cy + 5 * s, 6 * s, 0.4, Math.PI - 0.4); ctx.stroke();
+    }
+  }
+}
+
+// what stands along the path, in the theme's flavour (parallax 0.7, behind the ground)
+function drawDecos(t) {
+  setLayer(0.7);
+  for (const d of decos) {
+    const x = d.x;
+    if (x < camX * 0.7 - 120 || x > camX * 0.7 + viewW + 120) continue;
+    const sway = Math.sin(t * 0.8 + d.ph) * 0.03;
+    ctx.save(); ctx.translate(x, GROUND_Y + 6); ctx.scale(d.s, d.s);
+    switch (theme.deco) {
+      case 'trees': case 'town': case 'fair':
+        if (theme.deco === 'town' && d.kind === 1) drawLamp(t, d); else drawTree(sway, ['#5fbf5f','#7fd36b','#4aa84a'][d.kind]);
+        if (theme.deco === 'fair' && d.kind === 2) drawLanterns(x, t);
+        break;
+      case 'flowers': d.kind === 0 ? drawTree(sway, '#7fd36b') : drawBigFlower(t, d); break;
+      case 'palms': d.kind === 2 ? drawUmbrella(d) : drawPalm(sway); break;
+      case 'farm': d.kind === 0 ? drawFence() : d.kind === 1 ? drawSunflower(t, d) : drawHayBale(); break;
+      case 'autumn': drawTree(sway, ['#e8703b','#f0a030','#d84a3b'][d.kind]); break;
+      case 'pines': d.kind === 2 ? drawSnowman() : drawPine(); break;
+    }
+    ctx.restore();
+  }
+}
+function drawTree(sway, leaf) {
+  ctx.fillStyle = '#9a6a3c'; rounded(-7, -70, 14, 76, 6); ctx.fill();
+  ctx.save(); ctx.translate(0, -74); ctx.rotate(sway);
+  ctx.fillStyle = leaf;
+  circle(0, -10, 34); circle(-26, 6, 24); circle(26, 6, 24); circle(0, -34, 22);
+  ctx.fillStyle = 'rgba(255,255,255,0.18)'; circle(-10, -28, 12);
+  ctx.restore();
+}
+function drawPine() {
+  ctx.fillStyle = '#7a5a3c'; ctx.fillRect(-6, -30, 12, 36);
+  ctx.fillStyle = '#3f8f5f';
+  for (let i = 0; i < 3; i++) {
+    const y = -30 - i * 28, w = 46 - i * 10;
+    ctx.beginPath(); ctx.moveTo(-w, y); ctx.lineTo(0, y - 40); ctx.lineTo(w, y); ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  for (let i = 0; i < 3; i++) { const y = -30 - i * 28, w = 46 - i * 10; ctx.beginPath(); ctx.moveTo(-w * 0.5, y - 20); ctx.lineTo(0, y - 40); ctx.lineTo(w * 0.5, y - 20); ctx.closePath(); ctx.fill(); }
+}
+function drawPalm(sway) {
+  ctx.strokeStyle = '#b08050'; ctx.lineWidth = 12; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(10, -60, 4, -110); ctx.stroke();
+  ctx.save(); ctx.translate(4, -110); ctx.rotate(sway);
+  ctx.fillStyle = '#4fbf6f';
+  for (let i = 0; i < 6; i++) {
+    ctx.save(); ctx.rotate(i * Math.PI / 3 + 0.3);
+    ctx.beginPath(); ctx.ellipse(28, 0, 32, 11, 0, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+  ctx.fillStyle = '#8a5a2a'; circle(0, 4, 7); circle(9, 8, 6);
+  ctx.restore();
+}
+function drawBigFlower(t, d) {
+  const col = PASTELS[d.kind * 2 % PASTELS.length];
+  ctx.strokeStyle = '#5fbf5f'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -60); ctx.stroke();
+  ctx.save(); ctx.translate(0, -66); ctx.rotate(Math.sin(t + d.ph) * 0.1);
+  ctx.fillStyle = col;
+  for (let i = 0; i < 6; i++) { ctx.save(); ctx.rotate(i * Math.PI / 3); ctx.beginPath(); ctx.ellipse(0, -16, 9, 16, 0, 0, 7); ctx.fill(); ctx.restore(); }
+  ctx.fillStyle = '#ffd94d'; circle(0, 0, 10);
+  ctx.fillStyle = '#7a5a2a'; circle(-3, -2, 1.4); circle(3, -2, 1.4);
+  ctx.strokeStyle = '#7a5a2a'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(0, 1, 4, 0.4, Math.PI - 0.4); ctx.stroke();
+  ctx.restore();
+}
+function drawSunflower(t, d) {
+  ctx.strokeStyle = '#4a9a4a'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -90); ctx.stroke();
+  ctx.save(); ctx.translate(0, -96); ctx.rotate(Math.sin(t * 0.7 + d.ph) * 0.06);
+  ctx.fillStyle = '#ffd94d';
+  for (let i = 0; i < 12; i++) { ctx.save(); ctx.rotate(i * Math.PI / 6); ctx.beginPath(); ctx.ellipse(0, -22, 7, 14, 0, 0, 7); ctx.fill(); ctx.restore(); }
+  ctx.fillStyle = '#7a4a2a'; circle(0, 0, 14);
+  ctx.restore();
+}
+function drawFence() {
+  ctx.fillStyle = '#fff4e0';
+  for (let i = -2; i <= 2; i++) rounded(i * 26 - 5, -46, 10, 50, 4), ctx.fill();
+  ctx.fillRect(-60, -38, 120, 7); ctx.fillRect(-60, -18, 120, 7);
+}
+function drawHayBale() { ctx.fillStyle = '#e8c860'; rounded(-30, -40, 60, 44, 14); ctx.fill(); ctx.strokeStyle = '#c8a040'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-30, -18); ctx.lineTo(30, -18); ctx.stroke(); }
+function drawUmbrella(d) {
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -80); ctx.stroke();
+  ctx.fillStyle = d.kind ? '#ff8fc8' : '#5fb8ff';
+  ctx.beginPath(); ctx.arc(0, -78, 50, Math.PI, 0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#fff';
+  for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(0, -78); ctx.arc(0, -78, 50, Math.PI + (i * 2 + 0.5) * Math.PI / 6, Math.PI + (i * 2 + 1.5) * Math.PI / 6); ctx.closePath(); ctx.fill(); }
+}
+function drawLamp(t) {
+  ctx.fillStyle = '#4a4a6a'; rounded(-4, -120, 8, 124, 3); ctx.fill();
+  ctx.fillStyle = 'rgba(255,230,150,0.35)'; circle(0, -126, 26);
+  ctx.fillStyle = '#ffe9a8'; rounded(-10, -140, 20, 22, 6); ctx.fill();
+}
+function drawLanterns(x, t) {
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-90, -150); ctx.quadraticCurveTo(0, -125, 90, -150); ctx.stroke();
+  for (let i = -3; i <= 3; i++) {
+    const lx = i * 28, ly = -150 + (1 - (i / 3) ** 2) * 22;
+    ctx.fillStyle = 'rgba(255,220,120,0.35)'; circle(lx, ly + 10, 14 + Math.sin(t * 2 + i) * 2);
+    ctx.fillStyle = PASTELS[(i + 3) % PASTELS.length]; rounded(lx - 7, ly, 14, 18, 5); ctx.fill();
+  }
+}
+function drawSnowman() {
+  ctx.fillStyle = '#fff'; circle(0, -22, 22); circle(0, -56, 16);
+  ctx.fillStyle = '#3a2b2b'; circle(-5, -60, 1.8); circle(5, -60, 1.8); circle(0, -24, 2); circle(0, -14, 2);
+  ctx.fillStyle = '#f0641c'; ctx.beginPath(); ctx.moveTo(0, -56); ctx.lineTo(14, -53); ctx.lineTo(0, -51); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#ff5f5f'; rounded(-14, -44, 28, 7, 3); ctx.fill();
+}
+
+// the ground: grass on top, earth below, right down into the water
+function drawGround(t) {
+  setLayer(1);
+  for (const p of segs) {
+    if (p.x + p.w < camX - 60 || p.x > camX + viewW + 60) continue;
+    ctx.fillStyle = theme.dirt;
+    rounded(p.x, p.y - 4, p.w, WATER_Y + 60 - p.y, 14); ctx.fill();
+    ctx.fillStyle = theme.grass;
+    rounded(p.x - 4, p.y - 10, p.w + 8, 24, 12); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    rounded(p.x + 4, p.y - 8, p.w - 8, 6, 4); ctx.fill();
+    // tufts, or little flowers
+    for (let i = 0; i < p.w / 70; i++) {
+      const fx = p.x + 30 + (i * 173) % Math.max(1, p.w - 60);
+      if (theme.deco === 'palms' || theme.deco === 'pines') { ctx.fillStyle = theme.deco === 'palms' ? '#ffb3dd' : '#8fd8ff'; circle(fx, p.y - 8, 3); continue; }
+      ctx.fillStyle = PASTELS[i % PASTELS.length]; circle(fx, p.y - 13, 3.2);
+      ctx.fillStyle = '#fff'; circle(fx, p.y - 13, 1.2);
+    }
+  }
+  for (const L of ledges) {
+    if (L.x + L.w < camX - 60 || L.x > camX + viewW + 60) continue;
+    ctx.fillStyle = theme.dirt; rounded(L.x, L.y - 2, L.w, 22, 11); ctx.fill();
+    ctx.fillStyle = theme.grass; rounded(L.x - 3, L.y - 9, L.w + 6, 18, 9); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.25)'; rounded(L.x + 3, L.y - 7, L.w - 6, 5, 3); ctx.fill();
+  }
+}
+
+function drawWater(t) {
+  setLayer(1);
+  ctx.fillStyle = cachedGrad('water', () => {
+    const g = ctx.createLinearGradient(0, WATER_Y, 0, H);
+    g.addColorStop(0, theme.water); g.addColorStop(1, theme.night ? '#1a2a5a' : '#2f7fc8');
+    return g;
+  });
+  ctx.fillRect(camX - 20, WATER_Y, viewW + 40, H - WATER_Y + 20);
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let x = camX - 20; x < camX + viewW + 20; x += 6) {
+    const y = WATER_Y + 2 + Math.sin(x / 26 + t * 2.2) * 2.5;
+    x === camX - 20 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  for (const d of ducks) {
+    if (d.x < camX - 60 || d.x > camX + viewW + 60) continue;
+    const dx = d.x + Math.sin(t * 0.7 + d.ph) * 20, dy = WATER_Y + Math.sin(t * 2.5 + d.ph) * 2.5;
+    drawDuck(dx, dy, Math.sin(t * 0.7 + d.ph + Math.PI / 2) > 0 ? 1 : -1, 1);
+  }
+}
+function drawDuck(x, y, facing, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(facing * s, s);
+  ctx.fillStyle = '#ffd94d';
+  ctx.beginPath(); ctx.ellipse(0, -6, 15, 10, 0, 0, 7); ctx.fill();
+  circle(10, -18, 8.5);
+  ctx.fillStyle = '#f0641c'; ctx.beginPath(); ctx.moveTo(17, -18); ctx.lineTo(25, -16); ctx.lineTo(17, -14); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#3a2b2b'; circle(12, -20, 1.5);
+  ctx.restore();
+}
+
+// ---- the things a kid dropped ----
+function drawThing(kind, x, y, s = 1, t = 0) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  switch (kind) {
+    case 'teddy':
+      ctx.fillStyle = '#c98a4b';
+      circle(-8, -10, 5); circle(8, -10, 5); circle(0, -6, 10); circle(0, 8, 9); circle(-9, 10, 4); circle(9, 10, 4);
+      ctx.fillStyle = '#ffe0b8'; circle(0, -3, 4);
+      ctx.fillStyle = '#3a2b2b'; circle(-3.5, -7, 1.3); circle(3.5, -7, 1.3); circle(0, -3.5, 1.4);
+      break;
+    case 'ball':
+      ctx.fillStyle = '#e8493b'; circle(0, 0, 13);
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, 13, -0.5, 0.5); ctx.arc(0, 0, 13, Math.PI - 0.5, Math.PI + 0.5); ctx.fill();
+      ctx.fillStyle = '#ffd94d'; starPath(0, 0, 5); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.5)'; circle(-5, -6, 3);
+      break;
+    case 'hat':
+      ctx.fillStyle = '#5fb8ff'; ctx.beginPath(); ctx.arc(0, 2, 12, Math.PI, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#3f6fd8'; rounded(-2, 0, 20, 6, 3); ctx.fill();
+      ctx.fillStyle = '#ffd94d'; circle(0, -10, 3);
+      break;
+    case 'boot':
+      ctx.fillStyle = '#ff8fc8'; rounded(-7, -14, 12, 22, 4); ctx.fill(); rounded(-7, 0, 22, 10, 5); ctx.fill();
+      ctx.fillStyle = '#fff'; rounded(-7, -14, 12, 5, 2); ctx.fill();
+      break;
+    case 'lolly':
+      ctx.fillStyle = '#fff'; rounded(-1.5, 2, 3, 16, 1.5); ctx.fill();
+      ctx.fillStyle = '#ff6fb5'; circle(0, -4, 10);
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.2;
+      ctx.beginPath(); for (let a = 0; a < 12; a += 0.2) { const r = a * 0.75; ctx.lineTo(Math.cos(a) * r, -4 + Math.sin(a) * r); } ctx.stroke();
+      break;
+    case 'book':
+      ctx.fillStyle = '#b28fff'; rounded(-11, -10, 22, 22, 3); ctx.fill();
+      ctx.fillStyle = '#fff'; rounded(-8, -7, 16, 16, 2); ctx.fill();
+      ctx.fillStyle = '#ffd94d'; starPath(0, 1, 5); ctx.fill();
+      break;
+    case 'bucket':
+      ctx.fillStyle = '#5fb8ff'; ctx.beginPath(); ctx.moveTo(-11, -8); ctx.lineTo(11, -8); ctx.lineTo(8, 12); ctx.lineTo(-8, 12); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ffd94d'; rounded(-12, -11, 24, 5, 2); ctx.fill();
+      ctx.strokeStyle = '#ffd94d'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(0, -10, 10, Math.PI, 0); ctx.stroke();
+      break;
+    case 'duck': drawDuck(0, 12, 1, 0.75); break;
+    case 'horsey':                                    // a little toy horse
+      drawHorseBody(0, 8, 0.32, t, {col: '#b28fff', mane: '#ff8fc8', facing: 1, toy: true});
+      break;
+  }
+  ctx.restore();
+}
+
+// the things someone is carrying, hugged to their chest
+// (slots fan out so up to five stay visible; `fly` is the hop into their arms)
+const HOLD_SLOTS = [[0, 2], [-9, 6], [9, 6], [-5, -6], [5, -6]];
+function holderChest(who) {
+  return who === 'kid' ? {x: follower.x, y: follower.y - 2 * kidScale(kid), s: 0.62 * kidScale(kid)}
+                       : {x: player.x, y: player.y, s: 0.66};
+}
+function drawHeld(who, t) {
+  for (const s of things) {
+    if (s.holder !== who) continue;
+    const c = holderChest(who);
+    const slot = HOLD_SLOTS[s.slot % HOLD_SLOTS.length];
+    let x = c.x + slot[0] * c.s * 1.6, y = c.y + slot[1] * c.s * 1.6, sc = c.s;
+    if (s.fly) {
+      const u = ease(clamp(s.fly.t / 0.55, 0, 1));
+      x = lerp(s.fly.from.x, x, u); y = lerp(s.fly.from.y, y, u) - Math.sin(u * Math.PI) * 70;
+      sc = lerp(1.15, c.s, u);
+      ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.6; starPath(x + 12, y - 10, 3); ctx.fill(); ctx.globalAlpha = 1;
+    }
+    drawThing(s.kind, x, y, sc, t);
+  }
+}
+
+// ---- the horse ----
+// (x, y) is the top of its back. Trots on the spot when `anim` moves.
+function drawHorseBody(x, y, s, t, o) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s * (o.facing || 1), s);
+  const swing = o.toy ? 0 : Math.sin(o.anim || 0);
+  const col = o.col, dark = 'rgba(0,0,0,0.18)';
+  // tail
+  ctx.strokeStyle = o.mane; ctx.lineWidth = 9; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-40, 10); ctx.quadraticCurveTo(-58, 18 + Math.sin(t * 3) * 6, -54, 40); ctx.stroke();
+  // legs
+  ctx.strokeStyle = col; ctx.lineWidth = 11;
+  const legs = [[-28, swing], [-16, -swing], [20, -swing], [32, swing]];
+  for (const [lx, sw] of legs) { ctx.beginPath(); ctx.moveTo(lx, 20); ctx.lineTo(lx + sw * 9, 56); ctx.stroke(); }
+  ctx.fillStyle = '#3a2b2b';
+  for (const [lx, sw] of legs) { ctx.beginPath(); ctx.ellipse(lx + sw * 9, 57, 7, 4, 0, 0, 7); ctx.fill(); }
+  // body
+  ctx.fillStyle = col; rounded(-46, 0, 92, 40, 20); ctx.fill();
+  ctx.fillStyle = dark; rounded(-46, 26, 92, 14, 12); ctx.fill();
+  // saddle blanket
+  ctx.fillStyle = o.toy ? '#ffd94d' : '#ff6fb5'; rounded(-18, -2, 36, 26, 6); ctx.fill();
+  ctx.fillStyle = '#fff'; rounded(-14, 2, 28, 5, 2); ctx.fill();
+  // neck + head
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.moveTo(26, 14); ctx.lineTo(46, -30); ctx.lineTo(66, -26); ctx.lineTo(50, 18); ctx.closePath(); ctx.fill();
+  rounded(44, -44, 40, 26, 11); ctx.fill();
+  ctx.fillStyle = dark; rounded(66, -34, 18, 16, 7); ctx.fill();     // muzzle
+  // ears, mane
+  ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(48, -42); ctx.lineTo(52, -58); ctx.lineTo(58, -42); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = o.mane;
+  for (let i = 0; i < 4; i++) circle(38 + i * 5, -36 + i * 12, 8);
+  circle(52, -50, 6);
+  // face
+  ctx.fillStyle = '#3a2b2b'; circle(62, -36, 2.6);
+  ctx.fillStyle = '#fff'; circle(62.8, -36.8, 0.9);
+  ctx.fillStyle = 'rgba(255,120,150,0.4)'; circle(58, -28, 3.5);
+  ctx.fillStyle = '#3a2b2b'; circle(78, -28, 1.4);
+  ctx.restore();
+}
+function drawHorses(t) {
+  setLayer(1);
+  for (const h of horses) {
+    if (h.x < camX - 120 || h.x > camX + viewW + 120) continue;
+    drawHorseBody(h.x, h.y, 1, t, {col: h.col, mane: h.mane, facing: h.dir, anim: h.anim});
+    // a twinkle to say "hop on!"
+    ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.4 + 0.4 * Math.sin(t * 3 + h.x);
+    starPath(h.x + Math.sin(t) * 10, h.y - 22, 4); ctx.fill(); ctx.globalAlpha = 1;
+  }
+}
+function drawThings(t) {
+  setLayer(1);
+  for (const s of things) {
+    if (s.taken || s.x < camX - 60 || s.x > camX + viewW + 60) continue;
+    const y = s.y + Math.sin(t * 2 + s.ph) * 6;
+    const gl = ctx.createRadialGradient(s.x, y, 4, s.x, y, 34);
+    gl.addColorStop(0, 'rgba(255,240,170,0.75)'); gl.addColorStop(1, 'rgba(255,240,170,0)');
+    ctx.fillStyle = gl; circle(s.x, y, 34);
+    drawThing(s.kind, s.x, y, 1.15, t);
+    ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t * 4 + s.ph);
+    starPath(s.x + 16, y - 16, 3.5); ctx.fill(); ctx.globalAlpha = 1;
+  }
+}
+
+// ---- houses ----
+// Drawn with the door's bottom-centre at (x, groundY). `open` swings the door
+// in (0 closed → 1 open) and puts the family in the doorway.
+function drawHouse(h, x, groundY, s, t, opts = {}) {
+  ctx.save(); ctx.translate(x, groundY); ctx.scale(s, s);
+  const W = 150, HT = 110;
+  // walls
+  ctx.fillStyle = h.wall; rounded(-W / 2, -HT, W, HT + 4, 6); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.2)'; rounded(-W / 2 + 6, -HT + 6, W - 12, 16, 6); ctx.fill();
+  // roof
+  ctx.fillStyle = h.roof;
+  ctx.beginPath(); ctx.moveTo(-W / 2 - 14, -HT + 6); ctx.lineTo(0, -HT - 62); ctx.lineTo(W / 2 + 14, -HT + 6); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.beginPath(); ctx.moveTo(-W / 2 - 14, -HT + 6); ctx.lineTo(0, -HT - 62); ctx.lineTo(0, -HT + 6); ctx.closePath(); ctx.fill();
+  // windows (lit and glowing after dark)
+  for (const wx of [-46, 46]) {
+    if (theme.night) {
+      const g = ctx.createRadialGradient(wx, -HT + 49, 6, wx, -HT + 49, 44);
+      g.addColorStop(0, 'rgba(255,225,140,0.55)'); g.addColorStop(1, 'rgba(255,225,140,0)');
+      ctx.fillStyle = g; circle(wx, -HT + 49, 44);
+    }
+    ctx.fillStyle = '#fff'; rounded(wx - 18, -HT + 32, 36, 34, 6); ctx.fill();
+    ctx.fillStyle = theme.night ? '#ffe9a8' : '#bfe6ff'; rounded(wx - 14, -HT + 36, 28, 26, 4); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(wx, -HT + 36); ctx.lineTo(wx, -HT + 62); ctx.moveTo(wx - 14, -HT + 49); ctx.lineTo(wx + 14, -HT + 49); ctx.stroke();
+  }
+  // the doorway, and whoever is in it
+  ctx.fillStyle = '#5a3a2a'; rounded(-20, -58, 40, 60, 8); ctx.fill();
+  if (opts.family) drawPerson(0, -36, 1.15, opts.family, t, {facing: 1, hug: true, big: true});
+  // the door swings open to the side
+  const open = h.open || 0;
+  ctx.save(); ctx.translate(-20, 0); ctx.scale(1 - open * 0.9, 1);
+  ctx.fillStyle = h.door; rounded(0, -58, 40, 60, 8); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.12)'; rounded(6, -50, 28, 44, 5); ctx.fill();
+  ctx.fillStyle = '#ffd94d'; circle(32, -28, 3.5);
+  ctx.restore();
+  // the doorstep
+  ctx.fillStyle = 'rgba(0,0,0,0.12)'; rounded(-28, -2, 56, 6, 3); ctx.fill();
+  // the one big thing that makes this house THIS house
+  drawFeature(h.feature, W, HT, t);
+  ctx.restore();
+}
+function drawFeature(f, W, HT, t) {
+  switch (f) {
+    case 'flag':
+      ctx.fillStyle = '#fff'; rounded(-2, -HT - 110, 4, 52, 2); ctx.fill();
+      ctx.fillStyle = '#e83f3f'; ctx.beginPath(); ctx.moveTo(2, -HT - 108); ctx.lineTo(34 + Math.sin(t * 4) * 3, -HT - 98); ctx.lineTo(2, -HT - 86); ctx.closePath(); ctx.fill();
+      break;
+    case 'tree':
+      ctx.save(); ctx.translate(W / 2 + 30, 0); ctx.scale(0.8, 0.8); drawTree(Math.sin(t) * 0.03, '#5fbf5f'); ctx.restore();
+      ctx.fillStyle = '#e8493b'; for (let i = 0; i < 4; i++) circle(W / 2 + 30 + Math.cos(i * 1.7) * 18, -80 + Math.sin(i * 2.3) * 14, 4);
+      break;
+    case 'flowerbox':
+      for (const wx of [-46, 46]) {
+        ctx.fillStyle = '#c98a4b'; rounded(wx - 20, -HT + 66, 40, 10, 3); ctx.fill();
+        for (let i = -1; i <= 1; i++) { ctx.fillStyle = PASTELS[(i + 3) % PASTELS.length]; circle(wx + i * 12, -HT + 62, 6); ctx.fillStyle = '#ffd94d'; circle(wx + i * 12, -HT + 62, 2.2); }
+      }
+      break;
+    case 'heart':
+      ctx.fillStyle = '#ff6fb5'; heartPath(0, -HT - 24, 14); ctx.fill();
+      ctx.fillStyle = '#fff'; heartPath(0, -HT - 24, 7); ctx.fill();
+      break;
+    case 'star':
+      ctx.fillStyle = '#ffd94d'; starPath(0, -HT - 26, 17); ctx.fill();
+      ctx.strokeStyle = '#fff3b0'; ctx.lineWidth = 2.5; starPath(0, -HT - 26, 17); ctx.stroke();
+      break;
+    case 'smoke':
+      ctx.fillStyle = '#7a4a3a'; rounded(36, -HT - 44, 20, 40, 3); ctx.fill();
+      for (let i = 0; i < 3; i++) {
+        const u = ((t * 0.4 + i / 3) % 1);
+        ctx.fillStyle = 'rgba(255,255,255,' + (0.8 - u * 0.8) + ')'; circle(46 + Math.sin(u * 6) * 8, -HT - 50 - u * 50, 7 + u * 9);
+      }
+      break;
+    case 'snowman':
+      ctx.save(); ctx.translate(W / 2 + 34, 0); ctx.scale(0.85, 0.85); drawSnowman(); ctx.restore();
+      break;
+    case 'rainbow':
+      ['#ff5f5f','#ffb14d','#ffe94d','#6fdc6f','#5fb8ff','#b38fff'].forEach((c, i) => {
+        ctx.strokeStyle = c; ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.arc(0, -HT - 10, 46 - i * 5, Math.PI + 0.35, -0.35); ctx.stroke();
+      });
+      break;
+  }
+}
+function drawHouses(t) {
+  setLayer(1);
+  for (const h of houses) {
+    if (h.x < camX - 200 || h.x > camX + viewW + 200) continue;
+    drawHouse(h, h.x, GROUND_Y - 4, 1, t, {family: h.open > 0 ? otherParentLook(kid) : null});
+  }
+}
+// ---- people ----
+// Everybody is drawn the same way: a big round head on a little body, arms
+// and legs that swing when walking. (x, y) is the middle of the body; feet
+// are at y + 24 before scaling. `opts`: facing, walk (leg swing phase),
+// air (knees tucked), sad (tears + wobbly mouth), shake (head shaking "no"),
+// wave (one arm up), hug (both arms out), hand (reach the other arm back).
+function drawPerson(x, y, s, look, t, opts = {}) {
+  const f = opts.facing || 1;
+  ctx.save(); ctx.translate(x, y); ctx.scale(s * f, s);
+  const swing = opts.air ? 0 : Math.sin(opts.walk || 0) * 0.7;
+  // legs
+  ctx.strokeStyle = look.pants; ctx.lineWidth = 8; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-5, 8); ctx.lineTo(-5 + swing * 8, opts.air ? 18 : 22); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(5, 8); ctx.lineTo(5 - swing * 8, opts.air ? 18 : 22); ctx.stroke();
+  ctx.fillStyle = look.shoes || '#e83f3f';
+  circle(-5 + swing * 8, opts.air ? 19 : 23, 4.5); circle(5 - swing * 8, opts.air ? 19 : 23, 4.5);
+  // body
+  ctx.fillStyle = look.shirt; rounded(-11, -12, 22, 26, 9); ctx.fill();
+  if (look.raincoat) { ctx.fillStyle = 'rgba(255,255,255,0.35)'; for (let i = 0; i < 3; i++) circle(0, -6 + i * 7, 1.6); }
+  if (look.overalls) { ctx.fillStyle = look.pants; rounded(-8, -2, 16, 16, 4); ctx.fill(); ctx.fillRect(-6, -12, 3, 12); ctx.fillRect(3, -12, 3, 12); }
+  // arms
+  ctx.strokeStyle = look.shirt; ctx.lineWidth = 6.5;
+  const backArm = () => {
+    ctx.beginPath(); ctx.moveTo(-9, -8);
+    if (opts.hand) ctx.lineTo(-22, 2);
+    else if (opts.hug) ctx.lineTo(-22, -16);
+    else ctx.lineTo(-13 - swing * 6, 6);
+    ctx.stroke();
+  };
+  const frontArm = () => {
+    ctx.beginPath(); ctx.moveTo(9, -8);
+    if (opts.wave) ctx.lineTo(18, -26 + Math.sin(t * 9) * 3);
+    else if (opts.hug) ctx.lineTo(22, -16);
+    else if (opts.holdOut) ctx.lineTo(22, 0);
+    else ctx.lineTo(13 + swing * 6, 6);
+    ctx.stroke();
+  };
+  backArm();
+  ctx.fillStyle = look.skin;
+  if (opts.hand) circle(-22, 2, 3.6); else if (opts.hug) circle(-22, -16, 3.6); else circle(-13 - swing * 6, 6, 3.6);
+  // head
+  const shake = opts.shake ? Math.sin(t * 18) * 0.18 : 0;
+  ctx.save(); ctx.translate(0, -26); ctx.rotate(shake);
+  ctx.fillStyle = look.skin; circle(0, 0, 16);
+  // hair
+  ctx.fillStyle = look.hair;
+  switch (look.style) {
+    case 'pigtails':
+      ctx.beginPath(); ctx.arc(0, -2, 16.5, Math.PI, 0); ctx.fill();
+      circle(-17, 4, 6); circle(17, 4, 6);
+      ctx.fillStyle = '#ff6fb5'; circle(-15, -1, 2.5); circle(15, -1, 2.5);
+      break;
+    case 'bun':
+      ctx.beginPath(); ctx.arc(0, -2, 16.5, Math.PI, 0); ctx.fill(); circle(0, -18, 7);
+      ctx.fillStyle = '#ff6fb5'; circle(0, -13, 2.5);
+      break;
+    case 'curly':
+      for (let i = 0; i < 7; i++) circle(Math.cos(Math.PI + i * Math.PI / 6) * 15, -3 + Math.sin(Math.PI + i * Math.PI / 6) * 15, 6);
+      break;
+    case 'puffs':
+      ctx.beginPath(); ctx.arc(0, -2, 16.5, Math.PI, 0); ctx.fill(); circle(-12, -13, 8); circle(12, -13, 8);
+      break;
+    case 'short':
+      ctx.beginPath(); ctx.arc(0, -3, 16.5, Math.PI, 0); ctx.fill(); ctx.fillRect(-16.5, -3, 33, 4);
+      break;
+    case 'cap':
+      ctx.beginPath(); ctx.arc(0, -2, 16.5, Math.PI, 0); ctx.fill();
+      ctx.fillStyle = look.cap; ctx.beginPath(); ctx.arc(0, -3, 17, Math.PI, 0); ctx.fill(); rounded(0, -6, 24, 6, 3); ctx.fill();
+      break;
+    case 'ponytail':
+      ctx.beginPath(); ctx.arc(0, -2, 16.5, Math.PI, 0); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(-16, 4 + Math.sin((opts.walk || 0) * 2) * 2, 5, 11, 0.4, 0, 7); ctx.fill();
+      ctx.fillStyle = '#ffd94d'; circle(-14, -3, 3);
+      break;
+    case 'long':
+      ctx.beginPath(); ctx.arc(0, -2, 16.5, Math.PI, 0); ctx.fill(); rounded(-17, -2, 8, 26, 4); ctx.fill(); rounded(9, -2, 8, 26, 4); ctx.fill();
+      break;
+    case 'bob':
+      ctx.beginPath(); ctx.arc(0, -2, 16.5, Math.PI, 0); ctx.fill(); rounded(-17, -2, 7, 14, 4); ctx.fill(); rounded(10, -2, 7, 14, 4); ctx.fill();
+      break;
+  }
+  if (look.beard) { ctx.fillStyle = look.hair; ctx.beginPath(); ctx.arc(0, 2, 15, Math.PI * 0.22, Math.PI * 0.78); ctx.closePath(); ctx.fill(); }
+  // face
+  const eyeY = 1;
+  if (opts.sad) {
+    ctx.strokeStyle = '#3a2b2b'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(-5, eyeY + 1, 2.8, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    ctx.beginPath(); ctx.arc(5, eyeY + 1, 2.8, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    ctx.fillStyle = '#8fd8ff'; circle(-7, eyeY + 6 + Math.abs(Math.sin(t * 3)) * 3, 1.8);
+    ctx.strokeStyle = '#3a2b2b'; ctx.beginPath(); ctx.arc(0, eyeY + 11, 3, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+  } else {
+    ctx.fillStyle = '#3a2b2b'; circle(-5, eyeY, 2.2); circle(5, eyeY, 2.2);
+    ctx.fillStyle = '#fff'; circle(-4.3, eyeY - 0.8, 0.8); circle(5.7, eyeY - 0.8, 0.8);
+    ctx.strokeStyle = '#3a2b2b'; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(0, eyeY + 4, opts.big ? 5 : 3.6, 0.3, Math.PI - 0.3); ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(255,120,150,0.35)'; circle(-9, eyeY + 5, 3); circle(9, eyeY + 5, 3);
+  if (look.glasses) {
+    ctx.strokeStyle = '#3f6fd8'; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.arc(-5, eyeY, 5, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(5, eyeY, 5, 0, 7); ctx.stroke();
+  }
+  ctx.restore();
+  if (look.scarf) { ctx.fillStyle = look.scarf; rounded(-13, -13, 26, 7, 3); ctx.fill(); rounded(4, -10, 7, 16, 3); ctx.fill(); }
+  // the arm nearest us goes on top of everything
+  frontArm();
+  ctx.fillStyle = look.skin;
+  if (opts.wave) circle(18, -26 + Math.sin(t * 9) * 3, 3.6); else if (opts.hug) circle(22, -16, 3.6); else if (opts.holdOut) circle(22, 0, 3.6); else circle(13 + swing * 6, 6, 3.6);
+  ctx.restore();
+}
+
+// the balloon every kid carries, with their age on it
+function drawBalloon(x, y, age, col, t) {
+  const bx = x + Math.sin(t * 1.5) * 4, by = y - 62 + Math.sin(t * 2) * 3;
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + (bx - x) * 0.3, y - 30, bx, by + 18); ctx.stroke();
+  ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(bx, by, 15, 18, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(bx - 3, by + 17); ctx.lineTo(bx + 3, by + 17); ctx.lineTo(bx, by + 21); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.ellipse(bx - 5, by - 7, 4, 6, 0.4, 0, 7); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '600 17px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(age, bx, by + 1);
+}
+
+// ---- the hiding spots, the footprints, and who pops out ----
+function drawFootprints() {
+  setLayer(1);
+  ctx.fillStyle = theme.night ? 'rgba(255,255,255,0.22)' : 'rgba(80,50,30,0.22)';
+  for (const f of prints) {
+    if (f.x < camX - 40 || f.x > camX + viewW + 40) continue;
+    ctx.beginPath(); ctx.ellipse(f.x, f.y - 6 + (f.side ? 3 : -3), 5, 3, 0, 0, 7); ctx.fill();
+  }
+}
+// one hiding spot, drawn with its base at (x, ground)
+function drawSpot(kind, x, y, t, ph) {
+  ctx.save(); ctx.translate(x, y);
+  const sway = Math.sin(t * 0.9 + ph) * 0.03;
+  switch (kind) {
+    case 'bush':
+      ctx.fillStyle = '#5fbf5f'; circle(-24, -22, 22); circle(24, -22, 22); circle(0, -34, 26); circle(0, -14, 24);
+      ctx.fillStyle = 'rgba(255,255,255,0.18)'; circle(-8, -40, 10);
+      ctx.fillStyle = '#e8493b'; circle(-20, -30, 4); circle(14, -18, 4); circle(6, -44, 4);
+      break;
+    case 'tree': ctx.scale(0.85, 0.85); drawTree(sway, '#5fbf5f'); break;
+    case 'pine': ctx.scale(0.95, 0.95); drawPine(); break;
+    case 'rock':
+      ctx.fillStyle = '#a8a8c0'; rounded(-34, -44, 68, 48, 20); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.25)'; rounded(-24, -40, 30, 12, 6); ctx.fill();
+      ctx.fillStyle = '#7fd36b'; circle(-30, -6, 8); circle(30, -8, 7);
+      break;
+    case 'log':
+      ctx.fillStyle = '#9a6a3c'; rounded(-44, -34, 88, 36, 16); ctx.fill();
+      ctx.fillStyle = '#c98a4b'; ctx.beginPath(); ctx.ellipse(40, -16, 10, 16, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#9a6a3c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(40, -16, 5, 9, 0, 0, 7); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.15)'; rounded(-40, -30, 60, 8, 4); ctx.fill();
+      break;
+    case 'hay': ctx.scale(1.3, 1.3); drawHayBale(); break;
+    case 'snowpile':
+      ctx.fillStyle = '#ffffff'; circle(-22, -18, 22); circle(22, -18, 22); circle(0, -30, 28);
+      ctx.fillStyle = 'rgba(140,170,230,0.35)'; circle(-14, -6, 14); circle(20, -8, 12);
+      break;
+    case 'sandcastle':
+      ctx.fillStyle = '#f0d090'; rounded(-36, -40, 72, 44, 6); ctx.fill();
+      for (const tx of [-28, 0, 28]) { rounded(tx - 9, -66, 18, 30, 4); ctx.fill(); }
+      ctx.fillStyle = '#e8b860'; for (const tx of [-28, 0, 28]) rounded(tx - 9, -66, 18, 6, 2), ctx.fill();
+      ctx.fillStyle = '#ff6fb5'; ctx.beginPath(); ctx.moveTo(0, -66); ctx.lineTo(0, -84); ctx.lineTo(14, -78); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; rounded(-8, -22, 16, 26, 8); ctx.fill();
+      break;
+    case 'tent':
+      ctx.fillStyle = '#ff8fc8'; ctx.beginPath(); ctx.moveTo(-44, 0); ctx.lineTo(0, -74); ctx.lineTo(44, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-22, 0); ctx.lineTo(0, -74); ctx.lineTo(-8, 0); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(0, -74); ctx.lineTo(22, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#6f4fb0'; ctx.beginPath(); ctx.moveTo(-12, 0); ctx.lineTo(0, -30); ctx.lineTo(12, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ffd94d'; starPath(0, -80, 6); ctx.fill();
+      break;
+  }
+  ctx.restore();
+}
+function drawCritter(kind, x, y, t) {
+  ctx.save(); ctx.translate(x, y);
+  if (kind === 'bunny') {
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-7, -30, 5, 14, -0.1, 0, 7); ctx.fill(); ctx.beginPath(); ctx.ellipse(7, -30, 5, 14, 0.1, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffb3dd'; ctx.beginPath(); ctx.ellipse(-7, -30, 2.5, 9, -0.1, 0, 7); ctx.fill(); ctx.beginPath(); ctx.ellipse(7, -30, 2.5, 9, 0.1, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fff'; circle(0, -8, 15);
+    ctx.fillStyle = '#3a2b2b'; circle(-5, -10, 2); circle(5, -10, 2);
+    ctx.fillStyle = '#ff8fc8'; circle(0, -5, 2);
+    ctx.strokeStyle = '#3a2b2b'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-12, -4); ctx.lineTo(-4, -3); ctx.moveTo(12, -4); ctx.lineTo(4, -3); ctx.stroke();
+  } else if (kind === 'bird' || kind === 'owl') {
+    const owl = kind === 'owl';
+    ctx.fillStyle = owl ? '#a8743c' : '#5fb8ff'; ctx.beginPath(); ctx.ellipse(0, -10, 14, 16, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = owl ? '#e8c890' : '#bfe6ff'; ctx.beginPath(); ctx.ellipse(0, -4, 8, 9, 0, 0, 7); ctx.fill();
+    if (owl) { ctx.fillStyle = '#a8743c'; ctx.beginPath(); ctx.moveTo(-12, -22); ctx.lineTo(-8, -32); ctx.lineTo(-2, -22); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(12, -22); ctx.lineTo(8, -32); ctx.lineTo(2, -22); ctx.closePath(); ctx.fill(); }
+    ctx.fillStyle = '#fff'; circle(-5, -14, owl ? 5.5 : 3.5); circle(5, -14, owl ? 5.5 : 3.5);
+    ctx.fillStyle = '#3a2b2b'; circle(-5, -14, 2.2); circle(5, -14, 2.2);
+    ctx.fillStyle = '#ffa24d'; ctx.beginPath(); ctx.moveTo(-4, -9); ctx.lineTo(0, -4 + Math.abs(Math.sin(t * 12)) * 2); ctx.lineTo(4, -9); ctx.closePath(); ctx.fill();
+  } else if (kind === 'crab') {
+    ctx.fillStyle = '#e8493b'; ctx.beginPath(); ctx.ellipse(0, -10, 16, 11, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#e8493b'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    for (const sx of [-1, 1]) { ctx.beginPath(); ctx.moveTo(sx * 12, -8); ctx.lineTo(sx * 24, -18 + Math.sin(t * 10) * 3); ctx.stroke(); ctx.fillStyle = '#e8493b'; circle(sx * 25, -20 + Math.sin(t * 10) * 3, 5); }
+    ctx.fillStyle = '#fff'; circle(-5, -14, 3.5); circle(5, -14, 3.5);
+    ctx.fillStyle = '#3a2b2b'; circle(-5, -14, 1.8); circle(5, -14, 1.8);
+  }
+  ctx.restore();
+}
+function drawSpots(t) {
+  setLayer(1);
+  for (const sp of spots) {
+    if (sp.x < camX - 120 || sp.x > camX + viewW + 120) continue;
+    const y = GROUND_Y - 4;
+    // the hidden kid's shoes, just showing underneath
+    if (sp.hasKid && !follower.found) {
+      ctx.fillStyle = '#e83f3f'; const ks = kidScale(kid);
+      circle(sp.x - 6 * ks, y + 1, 4.2 * ks); circle(sp.x + 6 * ks, y + 1, 4.2 * ks);
+    }
+    // a critter peeking up from behind, for a moment
+    const since = t - sp.popT;
+    if (since > 0 && since < 2.2) {
+      const up = ease(clamp(since / 0.25, 0, 1)) * (since < 1.85 ? 1 : ease(clamp((2.2 - since) / 0.35, 0, 1)));
+      drawCritter(sp.critter, sp.x + 10, y - 30 - up * 34 + Math.sin(t * 8) * 2 * up, t);
+    }
+    drawSpot(sp.kind, sp.x, y, t, sp.ph);
+  }
+}
+
+// the parent, and whatever they are carrying
+function drawHelper(t) {
+  if (state === 'rescue' && rescueT < 0.35) return;      // under the water, until the bubble finds you
+  setLayer(1);
+  const sq = player.squash;
+  ctx.save();
+  ctx.translate(player.x, player.y + player.hh);
+  ctx.scale(1 - sq * 0.3, 1 + sq * 0.3);
+  drawPerson(0, -24 * 1.15, 1.15, parentLook(kid), t, {
+    facing: player.facing, walk: player.anim, air: !player.onGround && state !== 'rescue',
+    hand: follower.found && follower.homeT < 0 && Math.abs(follower.x - player.x) < 70,
+    wave: state === 'win' && winT > 1, big: state === 'win' || (follower.found && t - follower.foundT < 3),
+  });
+  ctx.restore();
+  drawHeld('parent', t);
+}
+function drawKid(t) {
+  if (!follower.found) return;                              // still hiding: only the shoes show (drawSpots)
+  setLayer(1);
+  const s = kidScale(kid);
+  const walking = Math.abs(follower.vx) > 30;
+  const goneIn = follower.homeT >= 0 && winT > 1.7;         // she's inside now
+  if (goneIn) return;
+  // "holding hands": the kid's arm reaches to you when close by
+  const near = follower.homeT < 0 && Math.abs(follower.x - player.x) < 70;
+  const kidFacing = near ? (player.x >= follower.x ? 1 : -1) : follower.facing;
+  const pop = clamp((t - follower.foundT) / 0.45, 0, 1);    // a little jump for joy when found
+  const y = follower.y - Math.sin(pop * Math.PI) * 34;
+  drawPerson(follower.x, y, s, kid, t, {
+    facing: kidFacing, walk: walking ? follower.anim : 0, air: follower.air || pop < 1,
+    holdOut: near, big: t - follower.foundT < 3,
+  });
+  drawHeld('kid', t);
+  // the little one's balloon, tied to the other hand
+  drawBalloon(follower.x - kidFacing * 12 * s, y + 4 * s, kid.age, kid.girl ? '#ff6fb5' : '#5fb8ff', t + kid.age);
+  if (near) heartTwinkle((follower.x + player.x) / 2, Math.min(follower.y, player.y) - 40, t);
+}
+function heartTwinkle(x, y, t) {
+  ctx.fillStyle = pinkOne();
+  ctx.globalAlpha = 0.35 + 0.35 * Math.sin(t * 4);
+  heartPath(x, y + Math.sin(t * 2) * 3, 4); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+// thought bubbles: sniffles from the hiding spot, "Mommy!", and the clues
+function drawBubble(x, y, w, h, tailDown = true) {
+  ctx.fillStyle = 'rgba(255,255,255,0.96)';
+  ctx.strokeStyle = '#ffd2ae'; ctx.lineWidth = 3;
+  rounded(x - w / 2, y - h, w, h, 16); ctx.fill(); ctx.stroke();
+  if (tailDown) {
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    circle(x - 6, y + 8, 6); circle(x - 12, y + 18, 3.5);
+    ctx.strokeStyle = '#ffd2ae'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x - 6, y + 8, 6, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(x - 12, y + 18, 3.5, 0, 7); ctx.stroke();
+  }
+}
+function bubbleText(txt, x, y, size, col, weight = 500) {
+  ctx.fillStyle = col; ctx.font = weight + ' ' + size + 'px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(txt, x, y);
+}
+function drawKidBubble(t) {
+  if (state !== 'play' && state !== 'rescue') return;
+  setLayer(1);
+  if (!follower.found) {
+    // a sniffle drifts up from behind the hiding spot
+    const since = t - follower.sniffShow;
+    if (since < 0 || since > 1.4) return;
+    const sp = follower.spot, top = GROUND_Y - 96 - Math.min(1, since / 0.3) * 10;
+    ctx.globalAlpha = since > 1.1 ? (1.4 - since) / 0.3 : 1;
+    drawBubble(sp.x + 16, top, 88, 40);
+    bubbleText('sniff…', sp.x + 16, top - 20, 18, '#8a6a5a');
+    ctx.globalAlpha = 1;
+    return;
+  }
+  const sinceFound = t - follower.foundT;
+  if (sinceFound < 1.8) {
+    const s = kidScale(kid), bx = follower.x, top = follower.y - 46 * s - 26;
+    drawBubble(bx, top, 96, 40);
+    bubbleText(parentCall(kid), bx, top - 20, 20, '#f0641c', 600);
+  }
+}
+// the parent thinking out loud: calling for the kid, or a clue just found
+function drawParentBubble(t) {
+  if (state !== 'play' || !clueKind) return;
+  const since = t - clueT;
+  if (since < 0 || since > 2.6) return;
+  setLayer(1);
+  const bx = player.x, top = player.y - 48;
+  const pop = Math.min(1, since / 0.2);
+  ctx.save(); ctx.translate(bx, top); ctx.scale(0.8 + 0.2 * pop, 0.8 + 0.2 * pop);
+  ctx.globalAlpha = since > 2.2 ? (2.6 - since) / 0.4 : 1;
+  if (clueKind === 'call') {
+    drawBubble(0, 0, 150, 42);
+    bubbleText(kid.name + '? Where are you?', 0, -21, 15, '#8a6a5a');
+  } else {
+    // "Mia's teddy! went this way ➜" — the thing on the left, the arrow on the right
+    drawBubble(0, 0, 184, 66);
+    drawThing(clueKind, -68, -34, 0.8, t);
+    bubbleText(kid.name + "'s " + clueKind + '!', 0, -44, 14, '#8a6a5a');
+    bubbleText('went this way', -6, -24, 13, '#8a6a5a');
+    ctx.fillStyle = '#f0641c';
+    ctx.beginPath(); ctx.moveTo(66, -32); ctx.lineTo(80, -24); ctx.lineTo(66, -16); ctx.closePath(); ctx.fill();
+    ctx.fillRect(52, -27, 16, 6);
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
+// the soap bubble carrying you back to the bank
+function drawRescue(t) {
+  if (state !== 'rescue' || rescueT < 0.35) return;
+  setLayer(1);
+  const r = 46;
+  const g = ctx.createRadialGradient(player.x - 10, player.y - 14, 4, player.x, player.y, r);
+  g.addColorStop(0, 'rgba(255,255,255,0.45)'); g.addColorStop(0.7, 'rgba(205,240,255,0.18)'); g.addColorStop(1, 'rgba(180,220,255,0.55)');
+  ctx.fillStyle = g; circle(player.x, player.y, r);
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(player.x, player.y, r, 0, 7); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(player.x, player.y, r - 9, Math.PI * 1.15, Math.PI * 1.45); ctx.stroke();
+}
+
+function drawParticles() {
+  setLayer(1);
+  for (const q of parts) {
+    ctx.globalAlpha = Math.max(0, q.weather ? Math.min(1, (q.life - q.age) / 0.8) : 1 - q.age / q.life);
+    ctx.fillStyle = q.color;
+    if (q.type === 'star') { starPath(q.x, q.y, q.size + 1.5); ctx.fill(); }
+    else if (q.type === 'heart') {
+      ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(Math.sin(q.rot + q.age * 3) * 0.4); heartPath(0, 0, q.size + 1); ctx.fill(); ctx.restore();
+    } else if (q.type === 'conf' || q.type === 'leaf') {
+      ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot + q.age * (q.type === 'leaf' ? 2 : 5));
+      if (q.type === 'leaf') { ctx.beginPath(); ctx.ellipse(0, 0, 6, 3.5, 0, 0, 7); ctx.fill(); } else ctx.fillRect(-4, -3, 8, 6);
+      ctx.restore();
+    } else if (q.type === 'rain') {
+      ctx.strokeStyle = q.color; ctx.lineWidth = q.size; ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - 3, q.y - 14); ctx.stroke();
+    } else if (q.type === 'firefly') {
+      const glow = 0.4 + 0.6 * Math.abs(Math.sin(q.age * 3 + q.rot));
+      ctx.globalAlpha *= glow;
+      const g = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, 12);
+      g.addColorStop(0, 'rgba(246,255,176,0.9)'); g.addColorStop(1, 'rgba(246,255,176,0)');
+      ctx.fillStyle = g; circle(q.x, q.y, 12);
+      ctx.fillStyle = '#ffffe0'; circle(q.x, q.y, q.size);
+    } else if (q.type === 'puff') circle(q.x, q.y, q.size * (1 + q.age));
+    else circle(q.x, q.y, q.size);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function render(t) {
+  drawSky(t);
+  drawClouds(t);
+  drawHills(t);
+  drawDecos(t);
+  drawHouses(t);
+  drawGround(t);
+  drawFootprints();
+  drawThings(t);
+  drawHorses(t);
+  drawSpots(t);
+  if (state === 'rescue') { drawKid(t); drawWater(t); drawHelper(t); drawRescue(t); }
+  else { drawKid(t); drawHelper(t); drawWater(t); }
+  drawKidBubble(t);
+  drawParentBubble(t);
+  drawParticles();
+}
+
+// ---- the rescued kids, all in a row on the title card ----
+// Drawn on a second canvas by borrowing the game's drawing helpers.
+function drawFriendsWall(t) {
+  const c = document.getElementById('friendsWall');
+  if (!c.offsetParent) return;                    // the title card is hidden
+  const real = ctx;
+  ctx = c.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, c.width, c.height);
+  const gap = c.width / (LEVELS + 1);
+  for (let i = 0; i < LEVELS; i++) {
+    const k = KIDS[i], x = gap * (i + 1), y = c.height * 0.62 + 30;
+    ctx.setTransform(1, 0, 0, 1, x, y);
+    if (i < homeCount) {
+      const s = 1.5 * kidScale(k);
+      drawPerson(0, -24 * s, s, k, t, {facing: 1, wave: (t + i) % 4 < 1.4, walk: 0});
+      ctx.fillStyle = '#7a5a48'; ctx.font = '600 22px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(k.name, 0, 30);
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.55)'; circle(0, -66, 26); rounded(-18, -46, 36, 44, 14); ctx.fill();
+      ctx.fillStyle = '#c9a98a'; ctx.font = '600 30px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('?', 0, -64);
+    }
+  }
+  ctx = real;
+}
+// the kid on the win card, hugging their grown-up
+function drawWinKid(t) {
+  const c = document.getElementById('winKid');
+  if (!c.offsetParent) return;
+  const real = ctx;
+  ctx = c.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, c.width, c.height);
+  const gy = c.height * 0.62 + 60;
+  ctx.setTransform(1, 0, 0, 1, c.width / 2, gy);
+  // both parents, and the kid in the middle
+  drawPerson(56, -24 * 1.9, 1.9, otherParentLook(kid), t, {facing: -1, hug: true, big: true});
+  drawPerson(-56, -24 * 1.9, 1.9, parentLook(kid), t, {facing: 1, hug: true, big: true});
+  const s = 1.9 * kidScale(kid);
+  drawPerson(0, -24 * s + Math.sin(t * 3) * 2, s, kid, t, {facing: 1, hug: true, big: true});
+  for (let i = 0; i < 3; i++) {
+    ctx.fillStyle = pinkOne(); ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t * 3 + i * 2);
+    heartPath(-40 + i * 40, -140 + Math.sin(t * 2 + i) * 8, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx = real;
+}
+
+// ---------- keep every card fully on screen ----------
+function fitCard(card) {
+  if (!card.offsetHeight) return;
+  card.style.maxHeight = 'none';
+  const fit = Math.min(1, (innerHeight - 12) / card.offsetHeight, (innerWidth - 12) / card.offsetWidth);
+  card.style.setProperty('--fit', fit.toFixed(4));
+}
+function fitCards() { document.querySelectorAll('.card').forEach(fitCard); }
+if (window.ResizeObserver) {
+  const ro = new ResizeObserver(fitCards);
+  document.querySelectorAll('.card').forEach(c => ro.observe(c));
+}
+addEventListener('resize', fitCards);
+addEventListener('orientationchange', fitCards);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitCards);
+
+// ---------- offline play ----------
+// One service worker (../sw.js) covers the whole "Lily's games" site. The
+// "install as an app" button lives on the game menu (../index.html).
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  addEventListener('load', () => navigator.serviceWorker.register('../sw.js').catch(() => {}));
+}
+
+// ---------- 9. main loop ----------
+// With ?debug in the address a little readout shows the real frame rate, the
+// longest recent frame, and how much of each frame the game's own code took —
+// the difference between that and the frame time is the browser painting.
+const DEBUG = /[?&]debug/.test(location.search);
+const dbg = {frames: 0, worst: 0, busy: 0, since: performance.now()};
+if (DEBUG) document.getElementById('debug').classList.remove('hidden');
+
+let last = performance.now();
+function loop(now) {
+  const t = now / 1000;
+  let dt = (now - last) / 1000;
+  last = now;
+  if (DEBUG) { dbg.frames++; dbg.worst = Math.max(dbg.worst, dt * 1000); }
+  if (dt > 0.033) dt = 0.033;
+  const busy0 = DEBUG ? performance.now() : 0;
+  if (state !== 'title' && state !== 'pause') update(dt, t);
+  render(t);
+  if (DEBUG) {
+    dbg.busy += performance.now() - busy0;
+    if (now - dbg.since > 1000) {
+      const secs = (now - dbg.since) / 1000;
+      document.getElementById('debug').textContent =
+        'fps ' + (dbg.frames / secs).toFixed(0) + '   worst ' + dbg.worst.toFixed(0) + ' ms\n' +
+        'game code ' + (dbg.busy / dbg.frames).toFixed(1) + ' ms/frame\n' +
+        'canvas ' + canvas.width + 'x' + canvas.height + ' @' + dpr + 'x   parts ' + parts.length;
+      Object.assign(dbg, {frames: 0, worst: 0, busy: 0, since: now});
+    }
+  }
+  if (state === 'title') drawFriendsWall(t);
+  if (state === 'win' && winShown) drawWinKid(t);
+  requestAnimationFrame(loop);
+}
+
+loadLevel(Math.min(homeCount + 1, LEVELS));
+refreshTitle();
+requestAnimationFrame(loop);
+
+// little helper for testing from the console
+window.DEV = {
+  player, follower,
+  tp: (x, y) => { player.x = x; player.y = y ?? 380; player.vy = 0; },
+  state: () => state,
+  level: n => startGame(n),
+  unlockAll: () => { homeCount = LEVELS; saveProgress(); refreshTitle(); },
+  info: () => ({level: currentLevel, kid: kid.name, home: homeCount, worldW, clearingX, homeX: houses[0].x,
+                spots: spots.map(sp => ({x: sp.x, kind: sp.kind, kid: sp.hasKid})), things: things.length}),
+  buildLevel,
+  horses: () => horses,
+  things: () => things,
+  music: () => ({steps: LOOP_STEPS, seconds: LOOP_STEPS * STEP, step: stepIdx % LOOP_STEPS}),
+  step: (dt = 0.016, n = 1) => {
+    for (let i = 0; i < n; i++) if (state !== 'title' && state !== 'pause') update(dt, performance.now() / 1000 + i * dt);
+    try { render(performance.now() / 1000); } catch (e) {}
+  },
+};
+</script>
+</body>
+</html>
