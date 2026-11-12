@@ -42,6 +42,12 @@ The website checks this repo for new commits every 30 minutes, so **a push to
 
    Use `"icon": "icon.png"` (a path inside the folder) instead of `emoji` to
    show an image.
+
+   **Analytics:** the website adds its Google Analytics tag to every page of
+   a game when it deploys. If the game is made for young children, add
+   `"analytics": false` to its `game.json` (as `lily/` does). US children's
+   privacy law (COPPA) and Google's terms rule out analytics on child-directed
+   pages.
 3. Merge to `main`. No change is needed in the website repo.
 
 ## Rules every game must follow
