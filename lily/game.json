@@ -1,5 +1,6 @@
 {
   "title": "Lily's games",
   "description": "Gentle little games for small hands: Unicorn Quest and Walk Me Home.",
-  "icon": "icon-192.png"
+  "icon": "icon-192.png",
+  "analytics": false
 }
