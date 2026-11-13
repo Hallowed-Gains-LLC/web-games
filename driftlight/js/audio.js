@@ -223,6 +223,68 @@
     noise(1.6, 'highpass', 6000, 2500, 0.04);
   };
 
+  /** A dash: a quick upward rush of air. */
+  audio.dash = function () {
+    if (!ac) return;
+    noise(0.32, 'bandpass', 500, 3800, 0.16);
+    ping(root + 24, 0.04, 0.4, 'sine');
+  };
+
+  /** The chain reaches a new tier: a bright note that climbs with it. */
+  audio.combo = function (mul) {
+    if (!ac) return;
+    const step = Math.round((mul - 1) * 5);              // 1.2 -> 1, 2 -> 5
+    ping(root + 24 + scale[step % 5] + 12 * ((step / 5) | 0), 0.08, 0.9, 'triangle');
+    ping(root + 31 + scale[step % 5], 0.04, 1.2, 'sine', ac.currentTime + 0.06);
+  };
+
+  /** A shade strikes: a heavy thud and the swarm scattering. */
+  audio.shadeHit = function () {
+    if (!ac) return;
+    ping(root - 24, 0.4, 0.7, 'sine'); ping(root - 23, 0.2, 0.5, 'square');
+    noise(0.8, 'lowpass', 1800, 120, 0.25);
+  };
+
+  audio.shadeStun = function () {
+    if (!ac) return;
+    noise(0.3, 'highpass', 4000, 9000, 0.1);
+    ping(root + 30, 0.05, 0.35, 'square');
+  };
+
+  /** A shade breaks apart and gives back everything it drank. */
+  audio.shadeDie = function () {
+    if (!ac) return;
+    noise(1.4, 'lowpass', 3000, 100, 0.3);
+    for (let i = 0; i < 7; i++) ping(root + 12 + scale[i % 5] + 12 * ((i / 5) | 0), 0.07, 1.2, 'triangle', ac.currentTime + i * 0.05);
+  };
+
+  /** A knell gathers itself before ringing. */
+  audio.knellWarn = function () {
+    if (!ac) return;
+    const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(hz(root - 24), t); o.frequency.exponentialRampToValueAtTime(hz(root - 12), t + 1.3);
+    const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 1.25); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.45);
+    o.connect(f); f.connect(g); g.connect(dry); g.connect(wet);
+    o.start(t); o.stop(t + 1.5);
+  };
+
+  /** A deep bell: a low note with the inharmonic partials of a real bell. */
+  audio.knell = function (boss) {
+    if (!ac) return;
+    const base = root - (boss ? 31 : 24);
+    [[0, 0.3, 5], [12, 0.14, 3.5], [15, 0.08, 2.5], [19, 0.06, 2], [24.3, 0.05, 1.4]]
+      .forEach(([d, v, dur]) => ping(base + d, v, dur, 'sine'));
+    noise(0.5, 'lowpass', 900, 80, 0.2);
+  };
+
+  /** A wave of dark takes some of the swarm. */
+  audio.waveHit = function () {
+    if (!ac) return;
+    noise(0.9, 'bandpass', 2400, 300, 0.18);
+    ping(root - 13, 0.12, 0.6, 'square');
+  };
+
   audio.portal = function () {
     if (!ac) return;
     for (let i = 0; i < 8; i++) ping(root + scale[i % 5] + 12 * ((i / 5) | 0) + 12, 0.07, 1.6, 'triangle', ac.currentTime + i * 0.13);
