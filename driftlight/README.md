@@ -82,6 +82,22 @@ thumb, so turning back answers at once. Lift your finger and the swarm stops.
 The ending quotes John 1:5 from the World English Bible, which is in the
 public domain.
 
+## Versions
+
+The version shows small at the bottom of the title screen and the pause
+menu. It's `DL.VERSION` in `js/config.js`: bump it with every change to the
+game and add a line here, so you can tell whether a change is live.
+
+| Version | What changed |
+| --- | --- |
+| 1.2 | Dash, shades, knells, chains, leaking stars, par times and star ratings |
+| 1.1 | Touch joystick, four-colour palettes, surges and starfalls |
+| 1.0 | First release |
+
+The site redeploys `web-games` changes within about 30 minutes of a merge.
+Games are served with `Cache-Control: no-cache`, so a reload always checks
+for the new files.
+
 ## How it's built
 
 Plain HTML, CSS and JavaScript with no build step and no asset files. It
