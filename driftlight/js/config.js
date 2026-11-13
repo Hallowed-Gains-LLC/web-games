@@ -13,6 +13,13 @@
  */
 window.DL = {};
 
+/*
+ * The game's version, shown on the title screen and in the pause menu so
+ * you can tell at a glance whether a change is live. Bump it with every
+ * change to the game, and add a line to the changelog in the README.
+ */
+DL.VERSION = '1.2';
+
 DL.TUNE = {
   viewUnits: 720,        // world units across the screen's smaller side at zoom 1
 

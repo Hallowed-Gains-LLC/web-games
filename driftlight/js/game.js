@@ -410,7 +410,8 @@
       <div class="links">
         <button class="link" data-act="sound">${soundLabel()}</button>
         <a class="link" href="../">All games</a>
-      </div>`, 'low', act => {
+      </div>
+      <p class="version">v${DL.VERSION}</p>`, 'low', act => {
       if (act === 'sound') { setMuted(!audio.muted); panel.querySelector('[data-act=sound]').textContent = soundLabel(); return; }
       if (act === 'continue') { G.realm = sv.realm; G.carry = sv.carry; G.gifts = sv.gifts || {}; G.stats = sv.stats || freshStats(); }
       else { G.realm = 0; G.carry = 0; G.gifts = {}; G.stats = freshStats(); store.del('save'); }
@@ -483,6 +484,7 @@
       <button class="btn" data-act="sound">${soundLabel()}</button>
       <button class="btn" data-act="restart">Restart realm</button>
       <button class="btn" data-act="quit">Leave</button>
+      <p class="version">v${DL.VERSION}</p>
       <p style="font-size:15px;margin-top:14px">${TOUCH ? 'Touch anywhere and drag to steer: your thumb is the stick. Tap, or touch with a second finger, to pulse. Tap Dash to dash.'
                 : 'Move with the mouse or the arrow keys. Click or press space to pulse. Right-click or Shift to dash.'}</p>`,
     'dim', act => {
