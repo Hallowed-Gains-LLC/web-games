@@ -38,6 +38,16 @@
   #realmName { text-transform: uppercase; letter-spacing: .3em; font-size: 11px; color: var(--dim); }
   #light { font-family: var(--serif); font-size: 15px; color: var(--dim); margin-top: 2px; }
   #lightNum { font-weight: 500; font-size: 26px; color: var(--ink); margin-right: 4px; }
+  /* The surge meter under the light count. It fills as you gather. */
+  #heat { width: 92px; height: 3px; margin-top: 7px; border-radius: 2px; background: rgba(255, 255, 255, .14); overflow: hidden; }
+  #heatFill {
+    width: 100%; height: 100%; transform: scaleX(0); transform-origin: left; transition: transform .2s linear;
+    background: linear-gradient(90deg, #7fd4ff, #b78cff, #ff7eb6, #ffd24a);
+  }
+  #heat.surge { height: 5px; box-shadow: 0 0 12px rgba(255, 190, 220, .8); }
+  #heat.surge #heatFill { background: linear-gradient(90deg, #ff5a8a, #ffd24a, #7affc8, #6ae8ff, #b78cff, #ff5a8a); background-size: 200% 100%; animation: heat 1s linear infinite; }
+  @keyframes heat { to { background-position: -200% 0; } }
+  @media (prefers-reduced-motion: reduce) { #heat.surge #heatFill { animation: none; } }
   #pips { margin: 4px auto 0; display: flex; gap: 9px; }
   #pips i {
     width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--dim); transition: all .8s;
@@ -70,6 +80,23 @@
     position: fixed; left: 0; top: 0; z-index: 4; pointer-events: none; white-space: nowrap;
     font-family: var(--serif); font-size: 15px; color: var(--dim); text-shadow: 0 1px 8px #000;
     opacity: 0; transition: opacity .4s;
+  }
+
+  /* The touch joystick: a ring where the thumb landed and a knob under it.
+     Both sit at the page's corner and are moved with transforms. */
+  #stick {
+    position: fixed; left: 0; top: 0; z-index: 4; width: 0; height: 0; pointer-events: none;
+    opacity: 0; transition: opacity .25s;
+  }
+  #stick.on { opacity: 1; }
+  #stick::before {
+    content: ''; position: absolute; left: -56px; top: -56px; width: 112px; height: 112px; border-radius: 50%;
+    border: 1px solid rgba(244, 239, 230, .34); background: radial-gradient(circle, rgba(255, 255, 255, .07), transparent 70%);
+  }
+  #stickKnob {
+    position: absolute; left: -21px; top: -21px; width: 42px; height: 42px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, .55), rgba(255, 255, 255, .12) 70%);
+    box-shadow: 0 0 18px rgba(255, 255, 255, .45);
   }
 
   #pulseBtn {
@@ -142,6 +169,7 @@
   <div>
     <div id="realmName"></div>
     <div id="light"><span id="lightNum">0</span>light</div>
+    <div id="heat"><div id="heatFill"></div></div>
   </div>
   <div id="pips"></div>
   <button id="pauseBtn" aria-label="Pause">II</button>
@@ -149,6 +177,7 @@
 <div id="hint" role="status"></div>
 <div id="arrows"></div>
 <div id="beaconLabel"></div>
+<div id="stick"><div id="stickKnob"></div></div>
 <button id="pulseBtn" hidden aria-label="Pulse">pulse</button>
 
 <div id="card">

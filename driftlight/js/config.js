@@ -20,8 +20,8 @@ DL.TUNE = {
   // three numbers stretch them to the length the game should be. The pacing
   // bot (see the README) measures the result.
   worldScale: 1.35,      // every position and distance in a realm is multiplied by this
-  moteScale: 6,          // every vein has this many times the motes
-  costScale: 6,          // every beacon needs this many times the light
+  moteScale: 8,          // every vein has this many times the motes
+  costScale: 8,          // every beacon needs this many times the light
 
   leaderSpeed: 340,      // units/s
   leaderAccel: 5.5,      // how quickly the leader reaches its wanted velocity
@@ -41,6 +41,19 @@ DL.TUNE = {
   roamLeash: 750,        // a roaming hollow hunts you only this far from its home
   hollowGive: 3000,      // most light a dissolving hollow gives back
 
+  // Surge: gather fast enough and the swarm ignites for a while.
+  surgeFrac: 0.08,       // a full meter is this share of the light the realm's stars need...
+  surgeMin: 120,         // ...and never less than this much light (title screen, tiny realms)
+  surgeCool: 0.05,       // share of the meter that drains away per second
+  surgeTime: 7,          // seconds a surge lasts
+  surgeSpeed: 1.3,       // speed, reach and pouring rate are multiplied while surging
+  surgeReach: 1.5,
+
+  // Starfalls: showers of light across the screen.
+  starfallEvery: [34, 52],   // seconds between showers, min and max
+  starfallCount: 46,
+  starfallShare: 0.05,       // a whole shower is worth this share of the realm's need
+
   wispSpeed: 200,
   wispBite: 40,          // light/s one wisp can eat
   wispDrop: 40,          // light a scattered wisp leaves behind
@@ -56,7 +69,7 @@ DL.TUNE = {
   emberGift: 400,        // extra starting light per Ember gift
 
   swarmCap: 9000,
-  moteCap: 8000,
+  moteCap: 11000,
   fxCap: 9000,
   dustCap: 3000,
 };
@@ -66,9 +79,11 @@ const rgb = h => [(h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255];
 
 /**
  * A palette: `a` the swarm, `b` motes and beacons, `c` the nebula,
- * `bg` the deep background.
+ * `bg` the deep background, and two vivid accents `d` and `e` that share
+ * the swarm with `a` and `b`, colour patches of motes, and turn up in
+ * fireworks, shockwaves and clouds in the sky.
  */
-const pal = (a, b, c, bg) => ({ a: rgb(a), b: rgb(b), c: rgb(c), bg: rgb(bg) });
+const pal = (a, b, c, bg, d, e) => ({ a: rgb(a), b: rgb(b), c: rgb(c), bg: rgb(bg), d: rgb(d), e: rgb(e) });
 
 DL.ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 
@@ -78,12 +93,16 @@ const nearUnlit = W => W.beacons.some(b => !b.lit && Math.hypot(b.x - W.lx, b.y 
 const nearHollow = W => W.hollows.some(h => Math.hypot(h.x - W.lx, h.y - W.ly) < h.pullR + 260);
 const anyLit = W => W.beacons.some(b => b.lit);
 
+// Shown once per visit, when these first happen (see game.js).
+DL.HINT_SURGE = 'Surge! Gather quickly and your swarm ignites: faster, and reaching farther.';
+DL.HINT_STARFALL = 'A starfall. Catch what you can.';
+
 DL.REALMS = [
   /* ---------------------------------------------------------------- I */
   {
     name: 'First Light',
     line: 'Gather what glimmers.',
-    pal: pal(0xffd08a, 0xfff1c9, 0x3a4f9a, 0x050814),
+    pal: pal(0xffd08a, 0xfff1c9, 0x3a4f9a, 0x050814, 0xff7eb6, 0x7fd4ff),
     root: 50, flow: null, fog: false,
     build(B) {
       B.size(2600, 1700); B.start(420, 850); B.portal(1300, 850);
@@ -98,10 +117,11 @@ DL.REALMS = [
       B.beacon(2180, 1260, 110);
     },
     hints: [
-      { when: after(1.2), text: 'Move, and the light follows.' },
+      { when: after(1.2), text: 'Move, and the light follows.', touch: 'Touch anywhere and drag. Your thumb is the stick.' },
       { when: W => W.realmLight > 12, text: 'Gather what glimmers. Your swarm grows.' },
       { when: nearUnlit, text: 'Stay close to a sleeping star to pour your light into it.' },
-      { when: anyLit, text: 'Click, tap or press space to pulse. It calls nearby light to you.' },
+      { when: anyLit, text: 'Click or press space to pulse. It calls nearby light to you.',
+        touch: 'Tap, or touch with a second finger, to pulse. It calls nearby light to you.' },
       { when: W => W.portalOpen, text: 'Every star is awake. A way has opened.' },
     ],
   },
@@ -110,7 +130,7 @@ DL.REALMS = [
   {
     name: 'The Drift',
     line: 'Go with the current. Or don’t.',
-    pal: pal(0x7ff2e0, 0xd6fff6, 0x1f7a8c, 0x03101a),
+    pal: pal(0x7ff2e0, 0xd6fff6, 0x1f7a8c, 0x03101a, 0xb78cff, 0xc8ff7a),
     root: 53, flow: { str: 105, speed: 0.12 }, fog: false,
     build(B) {
       B.size(3400, 2200); B.start(480, 1100); B.portal(1700, 1100);
@@ -132,7 +152,7 @@ DL.REALMS = [
   {
     name: 'The Hollow',
     line: 'Some things only take.',
-    pal: pal(0xc9a2ff, 0xf0dcff, 0x5b2a86, 0x0a0514),
+    pal: pal(0xc9a2ff, 0xf0dcff, 0x5b2a86, 0x0a0514, 0xff6ad5, 0x6ae8ff),
     root: 52, minor: true, flow: null, fog: false,
     build(B) {
       B.size(3400, 2400); B.start(450, 1200); B.portal(1700, 1200);
@@ -157,7 +177,7 @@ DL.REALMS = [
   {
     name: 'Wisps',
     line: 'They are drawn to you. Answer them.',
-    pal: pal(0xffb38a, 0xffe9d6, 0x8a2f4a, 0x12060c),
+    pal: pal(0xffb38a, 0xffe9d6, 0x8a2f4a, 0x12060c, 0xffd24a, 0x5ff0d0),
     root: 55, minor: true, flow: null, fog: false,
     build(B) {
       B.size(3600, 2400); B.start(500, 1200); B.portal(1800, 1200);
@@ -183,7 +203,7 @@ DL.REALMS = [
   {
     name: 'Tidewater',
     line: 'Everything here is circling something.',
-    pal: pal(0x8affc1, 0xe2fff0, 0x0f6e6a, 0x021210),
+    pal: pal(0x8affc1, 0xe2fff0, 0x0f6e6a, 0x021210, 0x5aa8ff, 0xfff07a),
     root: 48, flow: { str: 140, speed: 0.1 }, fog: false,
     build(B) {
       B.size(3800, 2600); B.start(500, 1300); B.portal(1900, 1300);
@@ -207,7 +227,7 @@ DL.REALMS = [
   {
     name: 'The Deep',
     line: 'You are the only lamp down here.',
-    pal: pal(0xa8c7ff, 0xffffff, 0x1b2a6b, 0x02030c),
+    pal: pal(0xa8c7ff, 0xffffff, 0x1b2a6b, 0x02030c, 0xe07aff, 0x7affc8),
     root: 45, minor: true, flow: null, fog: true,
     build(B) {
       B.size(3800, 2600); B.start(500, 1300); B.portal(1900, 1300);
@@ -237,7 +257,7 @@ DL.REALMS = [
   {
     name: 'Comet Road',
     line: 'Some light won’t wait for you.',
-    pal: pal(0xbfe9ff, 0xffffff, 0x2a5d9f, 0x030a16),
+    pal: pal(0xbfe9ff, 0xffffff, 0x2a5d9f, 0x030a16, 0xffb05a, 0xff8ad0),
     root: 50, flow: null, fog: false,
     build(B) {
       B.size(4400, 2600); B.start(500, 1300); B.portal(2200, 1300);
@@ -267,7 +287,7 @@ DL.REALMS = [
   {
     name: 'The Orchard',
     line: 'Not every place is trying to take from you.',
-    pal: pal(0xd7ff8a, 0xfff3b0, 0x2f7d32, 0x061006),
+    pal: pal(0xd7ff8a, 0xfff3b0, 0x2f7d32, 0x061006, 0xff8fb8, 0xffc24a),
     root: 55, flow: { str: 32, speed: 0.06 }, fog: false,
     build(B) {
       B.size(4000, 3000); B.start(600, 1500); B.portal(2000, 1500);
@@ -293,7 +313,7 @@ DL.REALMS = [
   {
     name: 'Stormglass',
     line: 'Hold on to what you have.',
-    pal: pal(0x8ab4ff, 0xe0d4ff, 0x4b2aa8, 0x05051a),
+    pal: pal(0x8ab4ff, 0xe0d4ff, 0x4b2aa8, 0x05051a, 0xffe75a, 0xff5ad0),
     root: 47, minor: true, flow: { str: 185, speed: 0.5 }, fog: false,
     build(B) {
       B.size(4200, 2800); B.start(500, 1400); B.portal(2100, 1400);
@@ -316,7 +336,7 @@ DL.REALMS = [
   {
     name: 'The Long Dark',
     line: 'Keep going.',
-    pal: pal(0xff9a8a, 0xffe0c2, 0x6b1420, 0x0a0304),
+    pal: pal(0xff9a8a, 0xffe0c2, 0x6b1420, 0x0a0304, 0xffc94a, 0xb08aff),
     root: 49, minor: true, flow: null, fog: true,
     build(B) {
       B.size(4200, 2800); B.start(500, 1400); B.portal(2100, 1400);
@@ -346,7 +366,7 @@ DL.REALMS = [
   {
     name: 'Corona',
     line: 'Stand in the middle of it.',
-    pal: pal(0xfff0b8, 0xffffff, 0xb8791f, 0x100a02),
+    pal: pal(0xfff0b8, 0xffffff, 0xb8791f, 0x100a02, 0xff9a3c, 0xff6a8a),
     root: 48, flow: { str: 28, speed: 0.05 }, fog: false,
     build(B) {
       const cx = 2200, cy = 1600;
@@ -380,7 +400,7 @@ DL.REALMS = [
   {
     name: 'Eclipse',
     line: 'The light shines in the darkness.',
-    pal: pal(0xfff6e0, 0xffe9a8, 0x4a3f7a, 0x020108),
+    pal: pal(0xfff6e0, 0xffe9a8, 0x4a3f7a, 0x020108, 0xffd24a, 0xa08aff),
     root: 50, minor: true, flow: { str: 55, speed: 0.08 }, fog: false, finale: true,
     build(B) {
       const cx = 2400, cy = 1800;
@@ -406,8 +426,8 @@ DL.REALMS = [
 ];
 
 /* The calm sky behind the title and the ending. */
-DL.TITLE_PAL = pal(0xffd9a0, 0xfff4d6, 0x35508f, 0x04060f);
-DL.END_PAL = pal(0xffffff, 0xffe9a8, 0x6a5acd, 0x05040c);
+DL.TITLE_PAL = pal(0xffd9a0, 0xfff4d6, 0x35508f, 0x04060f, 0xff7eb6, 0x7fd4ff);
+DL.END_PAL = pal(0xffffff, 0xffe9a8, 0x6a5acd, 0x05040c, 0xff7eb6, 0x7fd4ff);
 
 /*
  * Gifts: after each realm the player picks one of three. `max` is how many

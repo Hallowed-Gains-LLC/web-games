@@ -42,6 +42,7 @@
     state: 'boot',
     realm: 0,
     gifts: {},
+    told: {},              // one-time hints already shown this visit (surge, starfall)
     carry: 0,              // light that follows you into the next realm
     stats: freshStats(),
     realmTime: 0,
@@ -49,7 +50,7 @@
     fade: 1, fadeTo: 0,    // black
     white: 0, whiteTo: 0, whiteRate: 1,
     flash: 0,
-    lit: 0, fog: 0,        // smoothed values for the renderer
+    lit: 0, fog: 0, boost: 0,   // smoothed values for the renderer (boost: surging)
     quality: TOUCH ? 0.75 : 1,
     timer: 0,              // seconds in the current state
     bot: false,
@@ -101,7 +102,14 @@
   /* Input                                                               */
   /* ------------------------------------------------------------------ */
 
-  const ptr = { x: 0, y: 0, down: false, mouse: false, seen: false, t0: 0, x0: 0, y0: 0, wx: 0, wy: 0, has: false };
+  // Mouse: the swarm follows the pointer, a click pulses.
+  const ptr = { x: 0, y: 0, seen: false };
+  // Touch: a floating joystick. Wherever the first finger lands becomes the
+  // stick's centre; dragging away from it steers, and how far sets the speed.
+  // (ox, oy) is the centre and (x, y) the finger, in CSS pixels.
+  const stick = { on: false, id: -1, ox: 0, oy: 0, x: 0, y: 0, t0: 0, moved: false };
+  const STICK_R = 56;      // CSS px from the centre to full speed
+  const STICK_DEAD = 7;    // CSS px that count as "not moved"
   const keys = { l: false, r: false, u: false, d: false };
   let wantPulse = false;
   const inp = { tx: 0, ty: 0, active: false, pulse: false, camX: 0, camY: 0, hw: 0, hh: 0 };
@@ -109,23 +117,47 @@
   const toWorldX = x => cam.x + (x - view.w / 2) / pxCss();
   const toWorldY = y => cam.y + (y - view.h / 2) / pxCss();
 
+  const stickEl = $('stick'), knobEl = $('stickKnob');
+
+  /** Move the on-screen stick to match `stick`, or hide it. */
+  function drawStick() {
+    stickEl.classList.toggle('on', stick.on);
+    if (!stick.on) return;
+    stickEl.style.transform = `translate(${stick.ox}px, ${stick.oy}px)`;
+    knobEl.style.transform = `translate(${stick.x - stick.ox}px, ${stick.y - stick.oy}px)`;
+  }
+  function dropStick() { stick.on = false; stick.id = -1; drawStick(); }
+
   canvas.addEventListener('pointerdown', e => {
     audio.init();
-    ptr.x = ptr.x0 = e.clientX; ptr.y = ptr.y0 = e.clientY;
-    ptr.down = true; ptr.seen = true; ptr.t0 = performance.now();
-    ptr.mouse = e.pointerType === 'mouse';
-    if (ptr.mouse) wantPulse = true;                 // mouse: click to pulse
+    if (e.pointerType === 'mouse') {
+      ptr.x = e.clientX; ptr.y = e.clientY; ptr.seen = true;
+      wantPulse = true;                              // mouse: click to pulse
+      return;
+    }
+    if (stick.on) { wantPulse = true; return; }      // a second finger anywhere pulses
+    stick.on = true; stick.id = e.pointerId; stick.moved = false; stick.t0 = performance.now();
+    stick.ox = stick.x = e.clientX; stick.oy = stick.y = e.clientY;
+    ptr.seen = false;                                // the mouse's target no longer applies
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* synthetic events */ }
+    drawStick();
   });
   canvas.addEventListener('pointermove', e => {
-    ptr.x = e.clientX; ptr.y = e.clientY; ptr.seen = true;
-    ptr.mouse = e.pointerType === 'mouse';
+    if (e.pointerType === 'mouse') { ptr.x = e.clientX; ptr.y = e.clientY; ptr.seen = true; return; }
+    if (!stick.on || e.pointerId !== stick.id) return;
+    stick.x = e.clientX; stick.y = e.clientY;
+    const dx = stick.x - stick.ox, dy = stick.y - stick.oy, d = Math.hypot(dx, dy);
+    if (d > STICK_DEAD) stick.moved = true;
+    // Past the rim, the centre is dragged along behind the finger. So the
+    // stick never runs out of travel, and turning back answers at once.
+    if (d > STICK_R) { stick.ox = stick.x - dx / d * STICK_R; stick.oy = stick.y - dy / d * STICK_R; }
+    drawStick();
   });
-  const release = () => {
-    if (!ptr.down) return;
-    ptr.down = false;
-    // Touch: a quick tap that didn't travel is a pulse.
-    if (!ptr.mouse && performance.now() - ptr.t0 < 240 && Math.hypot(ptr.x - ptr.x0, ptr.y - ptr.y0) < 14) wantPulse = true;
+  const release = e => {
+    if (e.pointerType === 'mouse' || !stick.on || e.pointerId !== stick.id) return;
+    // A quick tap that never left the dead zone is a pulse.
+    if (!stick.moved && performance.now() - stick.t0 < 260) wantPulse = true;
+    dropStick();
   };
   canvas.addEventListener('pointerup', release);
   canvas.addEventListener('pointercancel', release);
@@ -138,7 +170,7 @@
     else if (e.code === 'KeyM') setMuted(!audio.muted);
   });
   window.addEventListener('keyup', e => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false; });
-  window.addEventListener('blur', () => { keys.l = keys.r = keys.u = keys.d = false; if (G.state === 'play') pause(); });
+  window.addEventListener('blur', () => { keys.l = keys.r = keys.u = keys.d = false; dropStick(); if (G.state === 'play') pause(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden && G.state === 'play') pause(); });
 
   $('pulseBtn').addEventListener('pointerdown', e => { e.preventDefault(); audio.init(); wantPulse = true; });
@@ -151,16 +183,20 @@
     if (!steering) { inp.active = false; }
     else if (kx || ky) {
       const d = Math.hypot(kx, ky);
-      ptr.wx = W.lx + kx / d * 400; ptr.wy = W.ly + ky / d * 400; ptr.has = false;
-      inp.tx = ptr.wx; inp.ty = ptr.wy; inp.active = true;
-    } else if (ptr.seen && (ptr.mouse || ptr.down)) {
-      // Follow the pointer. Holding it off-centre keeps you moving, because
+      inp.tx = W.lx + kx / d * 400; inp.ty = W.ly + ky / d * 400; inp.active = true;
+    } else if (stick.on) {
+      // Joystick. The world moves the leader at (distance to its target x 4.5),
+      // up to its top speed, so a target `push * 150` away gives a speed that
+      // rises with the push and tops out a little before the rim.
+      const dx = stick.x - stick.ox, dy = stick.y - stick.oy, d = Math.hypot(dx, dy);
+      if (d > STICK_DEAD) {
+        const push = Math.min(1, (d - STICK_DEAD) / (STICK_R - STICK_DEAD));
+        inp.tx = W.lx + dx / d * push * 150; inp.ty = W.ly + dy / d * push * 150; inp.active = true;
+      } else inp.active = false;
+    } else if (ptr.seen) {
+      // Follow the mouse. Holding it off-centre keeps you moving, because
       // the camera follows and the same screen spot is a new place.
-      ptr.wx = toWorldX(ptr.x); ptr.wy = toWorldY(ptr.y); ptr.has = true;
-      inp.tx = ptr.wx; inp.ty = ptr.wy; inp.active = true;
-    } else if (ptr.has) {
-      // Finger lifted: finish gliding to where it last pointed.
-      inp.tx = ptr.wx; inp.ty = ptr.wy; inp.active = true;
+      inp.tx = toWorldX(ptr.x); inp.ty = toWorldY(ptr.y); inp.active = true;
     } else inp.active = false;
     inp.pulse = wantPulse && steering;
     wantPulse = false;
@@ -221,13 +257,20 @@
     $('pips').innerHTML = W.beacons.map(b => `<i class="${b.heart ? 'heart' : ''}"></i>`).join('');
   }
 
-  const hudCache = { light: -1, name: '' };
+  const hudCache = { light: -1, name: '', heat: -1, surge: false };
   function updateHud() {
     if ($('hud').hidden) return;
     if (W.nFollow !== hudCache.light) { hudCache.light = W.nFollow; $('lightNum').textContent = W.nFollow.toLocaleString(); }
     const pips = $('pips').children;
     if (pips.length !== W.beacons.length) buildPips();
     for (let i = 0; i < pips.length; i++) pips[i].classList.toggle('lit', W.beacons[i].lit);
+    // The surge meter: fills as you gather, then drains while the surge lasts.
+    const heat = Math.round(W.heat * 100);
+    if (heat !== hudCache.heat || W.surge !== hudCache.surge) {
+      hudCache.heat = heat; hudCache.surge = W.surge;
+      $('heatFill').style.transform = `scaleX(${heat / 100})`;
+      $('heat').classList.toggle('surge', W.surge);
+    }
     const pb = $('pulseBtn'), cd = 1 - W.pulseCd / (T.pulseCooldown / W.mul.echo);
     pb.style.setProperty('--cd', clamp(cd, 0, 1).toFixed(3));
     pb.classList.toggle('ready', W.pulseCd <= 0);
@@ -305,7 +348,6 @@
     const w = portrait ? 1200 : 2400, h = portrait ? 2100 : 1400;
     const points = portrait ? textPoints(['DRIFT', 'LIGHT'], 900, w / 2, h * 0.36) : textPoints(['DRIFTLIGHT'], 1560, w / 2, h * 0.38);
     W.loadSandbox({ w, h, pal: DL.TITLE_PAL, flow: { str: 16, speed: 0.05 }, points, swarm: 260 });
-    ptr.has = false;
     fitSandbox(); gfx.cut();
   }
 
@@ -348,7 +390,6 @@
     const realm = DL.REALMS[index];
     G.realm = index;
     W.load(index, { carry: G.carry, gifts: G.gifts });
-    ptr.has = false;
     updateCamera(0, true); gfx.cut();
     G.realmTime = 0; G.hints = new Set(); hideHint();
     audio.setRealm(realm.root, !!realm.minor);
@@ -389,7 +430,7 @@
 
   function pause() {
     if (G.state !== 'play') return;
-    setState('paused');
+    setState('paused'); dropStick();
     showPanel(`
       <h2>Paused</h2>
       <p>${DL.ROMAN[G.realm]} &middot; ${DL.REALMS[G.realm].name}</p>
@@ -397,7 +438,8 @@
       <button class="btn" data-act="sound">${soundLabel()}</button>
       <button class="btn" data-act="restart">Restart realm</button>
       <button class="btn" data-act="quit">Leave</button>
-      <p style="font-size:15px;margin-top:14px">Move with the mouse, a finger or the arrow keys. Click, tap or press space to pulse.</p>`,
+      <p style="font-size:15px;margin-top:14px">${TOUCH ? 'Touch anywhere and drag to steer: your thumb is the stick. Tap, or touch with a second finger, to pulse.'
+                : 'Move with the mouse or the arrow keys. Click or press space to pulse.'}</p>`,
     'dim', act => {
       if (act === 'resume') resume();
       else if (act === 'sound') { setMuted(!audio.muted); panel.querySelector('[data-act=sound]').textContent = soundLabel(); }
@@ -417,7 +459,6 @@
       }
     }
     W.loadSandbox({ w, h, pal: DL.END_PAL, flow: { str: 22, speed: 0.06 }, points: pts, swarm: 900 });
-    ptr.has = false;
     fitSandbox(); gfx.cut();
   }
 
@@ -462,6 +503,14 @@
         case 'wispSpawn': audio.wispSpawn(); break;
         case 'returned': audio.returned(); break;
         case 'comet': audio.comet(); break;
+        case 'surge':
+          audio.surge(); G.flash = Math.max(G.flash, REDUCED ? 0.06 : 0.22);
+          if (G.state === 'play' && !G.told.surge) { G.told.surge = true; showHint(DL.HINT_SURGE); }
+          break;
+        case 'starfall':
+          audio.starfall();
+          if (G.state === 'play' && !G.told.starfall) { G.told.starfall = true; showHint(DL.HINT_STARFALL); }
+          break;
         case 'rekindle': audio.rekindle(); if (G.state === 'play') showHint('A few sparks find you again.'); break;
         case 'ignite': audio.ignite(e.heart); G.flash = REDUCED ? 0.12 : 0.45; break;
         case 'portal': audio.portal(); break;
@@ -482,7 +531,7 @@
     if (G.state !== 'play' || G.clock - hintShownAt < 3.5) return;
     for (const h of DL.REALMS[G.realm].hints || []) {
       if (G.hints.has(h)) continue;
-      if (h.when(W, G)) { G.hints.add(h); showHint(h.text); }
+      if (h.when(W, G)) { G.hints.add(h); showHint(TOUCH && h.touch ? h.touch : h.text); }
       return;                             // hints come in order, one at a time
     }
   }
@@ -553,6 +602,8 @@
     frame.camX = cam.x; frame.camY = cam.y; frame.px = p * view.scale;
     frame.time = G.clock; frame.dt = dt; frame.pal = W.pal;
     frame.lit = G.lit; frame.fog = G.fog;
+    G.boost += ((W.surge ? 1 : 0) - G.boost) * Math.min(1, dt * 2.5);
+    frame.boost = G.boost;
     frame.hollows = s.hollows; frame.lights = s.lights;
     if (W.pulseT >= 0) {
       frame.pulse[0] = W.pulseX; frame.pulse[1] = W.pulseY; frame.pulse[2] = W.pulseRad;
@@ -645,14 +696,15 @@
     startRealm(index, false);
     G.bot = true;
     const max = (opts.max || 1200) / STEP;
-    let steps = 0;
-    while (steps < max && !W.exiting && !W.finished) { stepOnce(); W.events.length = 0; steps++; }
+    let steps = 0, surging = 0;
+    while (steps < max && !W.exiting && !W.finished) { stepOnce(); W.events.length = 0; steps++; if (W.surge) surging++; }
     G.bot = false;
     const done = W.exiting || W.finished;
     const end = W.exiting ? W.exitCount : W.nFollow;
     return {
       realm: index + 1, done, seconds: Math.round(steps * STEP), need: W.need, gathered: W.realmLight, lost: W.lost,
       end, carry: Math.min(T.carryCap, Math.round(end * T.carryFrac) + T.carryBase),
+      surges: W.surges, surgePct: Math.round(100 * surging / Math.max(1, steps)), starfalls: W.starfalls,
     };
   }
 

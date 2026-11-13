@@ -208,6 +208,21 @@
     for (let i = 0; i < 5; i++) ping(root + 24 + scale[4 - i], 0.06, 0.9, 'sine', ac.currentTime + i * 0.05);
   };
 
+  /** The swarm ignites: a fast run up two octaves over a rising hiss. */
+  audio.surge = function () {
+    if (!ac) return;
+    for (let i = 0; i < 11; i++) ping(root + 12 + scale[i % 5] + 12 * ((i / 5) | 0), 0.07, 0.9, 'triangle', ac.currentTime + i * 0.045);
+    noise(1.1, 'bandpass', 500, 6000, 0.12);
+    chord([root, root + 7, root + 12], 0.06, 0.05, 2.4);
+  };
+
+  /** A starfall begins: high notes tumbling down. */
+  audio.starfall = function () {
+    if (!ac) return;
+    for (let i = 0; i < 9; i++) ping(root + 36 - scale[i % 5] - 12 * ((i / 5) | 0), 0.045, 1.3, 'sine', ac.currentTime + i * 0.09);
+    noise(1.6, 'highpass', 6000, 2500, 0.04);
+  };
+
   audio.portal = function () {
     if (!ac) return;
     for (let i = 0; i < 8; i++) ping(root + scale[i % 5] + 12 * ((i / 5) | 0) + 12, 0.07, 1.6, 'triangle', ac.currentTime + i * 0.13);

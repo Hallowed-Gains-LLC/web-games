@@ -14,10 +14,15 @@ again.
 
 | Action | Mouse | Touch | Keyboard |
 | --- | --- | --- | --- |
-| Move | The swarm follows the pointer | Hold and drag | Arrows or WASD |
-| Pulse (calls nearby light, scatters wisps) | Click | Quick tap, or the Pulse button | Space |
+| Move | The swarm follows the pointer | Touch anywhere and drag: a joystick appears under your thumb | Arrows or WASD |
+| Pulse (calls nearby light, scatters wisps) | Click | Quick tap, a second finger, or the Pulse button | Space |
 | Pause | II button | II button | P or Esc |
 | Mute | In the pause menu | In the pause menu | M |
+
+**The touch joystick.** Wherever your first finger lands becomes the stick's
+centre. Drag away from it to steer; the farther you push, the faster you go,
+up to full speed at the ring. Push past the ring and the centre follows your
+thumb, so turning back answers at once. Lift your finger and the swarm stops.
 
 - **Motes** are light. Fly close and they come to you; brighter ones are worth more.
 - **Sleeping stars** (rings) wake when you stay close and pour enough light in.
@@ -27,6 +32,12 @@ again.
   their edge. A waking star dissolves every hollow near it, and what the hollow
   took comes back.
 - **Wisps** hunt your swarm and bite pieces off. A pulse scatters them.
+- **Surge.** The thin bar under your light count fills as you gather and
+  drains all the time, so only gathering quickly fills it. When it's full your
+  swarm ignites into a rainbow for a few seconds: faster, reaching farther and
+  pouring into stars quicker.
+- **Starfalls.** Every so often a shower of bright motes streaks across the
+  screen. Catch what you can before they're gone.
 - After each realm you keep part of your swarm and choose one of three **gifts**.
 - Your place is saved at the start of each realm.
 
@@ -78,7 +89,16 @@ also runs straight from disk.
 5. **Final:** everything combined, bent around hollows like a lens, rippled by
    the pulse, darkened by fog, then tone-mapped.
 
-All colour is additive, so overlapping particles add up toward white.
+All colour is additive, so overlapping particles add up toward white. Two
+things keep the picture colourful anyway:
+
+- **Colour is laid out in space, not scattered.** Each realm has four colours
+  (`a`, `b`, `d`, `e` in its palette, plus `c` for the nebula). They wind
+  through the swarm as a turning spiral, and motes change colour in patches
+  along a vein. Mixed at random they would just sum to white.
+- **The tone map keeps hue.** Most of it is applied to the brightest channel
+  and scaled back, so a bright pink stays pink and only the hottest cores
+  whiten.
 
 If frames stay slow for a couple of seconds, the game lowers its drawing
 resolution and dust count by itself.
@@ -99,7 +119,13 @@ Everything a designer would touch is in `js/config.js`.
   API: `B.beacon`, veins of motes (`B.ring`, `B.spiral`, `B.cluster`, `B.river`,
   `B.rose`, `B.star`, `B.drifters`), `B.spring`, `B.hollow`, `B.rift`,
   `B.comet`. Each realm also has a palette, a musical key, optional currents
-  and fog, and hints.
+  and fog, and hints. A hint can carry a `touch` wording for phones.
+- **A palette** is `pal(a, b, c, bg, d, e)`: the swarm's colour, the mote and
+  star colour, the nebula, the background, then two accents. Pick accents far
+  from `a` and `b` on the colour wheel, or the realm reads as one hue.
+- **Surge and starfalls** are the `surge*` and `starfall*` numbers in
+  `DL.TUNE`. Both scale with the light a realm's stars need, so they feel the
+  same in the first realm and the last.
 - **Pacing** comes from three numbers in `DL.TUNE`. Realms are written at a
   small, readable scale, and `worldScale`, `moteScale` and `costScale` stretch
   them to the length the game should be.
@@ -124,11 +150,18 @@ person does.
 
 Measured with the numbers in this commit:
 
-- **Bot, all twelve realms:** about 28 minutes seeing everything, and about
-  the same with limited sight. No realm gets stuck.
+- **Bot, all twelve realms:** about 24 minutes seeing everything and about 29
+  with limited sight. No realm gets stuck. The limited-sight bot surges three
+  to five times a realm; a person gathers more slowly, so expect fewer.
 - **A person:** the bot never hesitates, reads or explores, so expect roughly
   twice that, about 50 to 60 minutes. That is an estimate; nobody has played it
   through by hand yet.
 
 To make the game longer or shorter, change `moteScale` and `costScale`
-together and run the bot again.
+together (whole numbers) and run the bot again. `runBot` also reports
+`surges`, `surgePct` (share of the time spent surging) and `starfalls`.
+
+The joystick was tested with synthetic touch events in headless Chromium:
+holding still doesn't move the swarm, speed rises with the push, dragging past
+the ring and back reverses at once, a second finger pulses, and lifting stops.
+It hasn't been tried on a real phone yet.

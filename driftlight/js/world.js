@@ -32,12 +32,12 @@
   }
 
   // Mote states.
-  const M_IDLE = 0, M_PULLED = 1, M_DRIFT = 2, M_HIDDEN = 3, M_LOOSE = 4;
+  const M_IDLE = 0, M_PULLED = 1, M_DRIFT = 2, M_HIDDEN = 3, M_LOOSE = 4, M_FALL = 5;
   // Swarm states.
   const S_FOLLOW = 0, S_TO_BEACON = 1, S_EXIT = 3;
 
   const W = DL.world = {
-    M_IDLE, M_PULLED, M_DRIFT, M_HIDDEN, M_LOOSE, S_FOLLOW, S_TO_BEACON, S_EXIT,
+    M_IDLE, M_PULLED, M_DRIFT, M_HIDDEN, M_LOOSE, M_FALL, S_FOLLOW, S_TO_BEACON, S_EXIT,
 
     // --- swarm
     sx: new Float32Array(SMAX), sy: new Float32Array(SMAX),
@@ -64,6 +64,7 @@
     mState: new Uint8Array(MMAX),
     mSrc: new Int16Array(MMAX),     // spring that made it, or -1
     mRegrow: new Uint8Array(MMAX),  // 1: comes back after being gathered (title screen)
+    mHue: new Uint8Array(MMAX),     // which palette colour: 0 = b, 1 = d, 2 = e
     nm: 0,
 
     // --- fx sparks
@@ -86,7 +87,7 @@
 
   const {
     sx, sy, svx, svy, sAng, sRad, sSpd, sK, sFF, sTint, sSize, sState, sTgt,
-    mx, my, mhx, mhy, mvx, mvy, mPh, mAge, mLife, mWorth, mState, mSrc, mRegrow,
+    mx, my, mhx, mhy, mvx, mvy, mPh, mAge, mLife, mWorth, mState, mSrc, mRegrow, mHue,
     fx, fy, fvx, fvy, fLife, fMax, fSize, fDrag, fR, fG, fB,
     dx, dy, dvx, dvy, dSz, dPh,
   } = W;
@@ -127,6 +128,12 @@
     mLife[i] = life === undefined ? -1 : life;
     mWorth[i] = worth; mState[i] = state || M_IDLE;
     mSrc[i] = src === undefined ? -1 : src; mRegrow[i] = 0;
+    // Colour comes in patches a few hundred units across, so a vein of motes
+    // shifts from one of the realm's colours to the next along its length.
+    // (Mixed at random, the three colours would blur into white.) Star motes
+    // keep the realm's own mote colour.
+    const v = Math.sin(x * 0.0041 + 1.3) + Math.sin(y * 0.0047 + x * 0.0019) + (Math.random() - 0.5) * 0.5;
+    mHue[i] = worth >= 25 ? 0 : v > 0.45 ? 1 : v < -0.45 ? 2 : 0;
     return i;
   }
 
@@ -136,7 +143,7 @@
     if (i === j) return;
     mx[i] = mx[j]; my[i] = my[j]; mhx[i] = mhx[j]; mhy[i] = mhy[j]; mvx[i] = mvx[j]; mvy[i] = mvy[j];
     mPh[i] = mPh[j]; mAge[i] = mAge[j]; mLife[i] = mLife[j]; mWorth[i] = mWorth[j];
-    mState[i] = mState[j]; mSrc[i] = mSrc[j]; mRegrow[i] = mRegrow[j];
+    mState[i] = mState[j]; mSrc[i] = mSrc[j]; mRegrow[i] = mRegrow[j]; mHue[i] = mHue[j];
   }
 
   function addFx(x, y, vx, vy, life, size, r, g, b, drag) {
@@ -148,6 +155,8 @@
     fR[i] = r; fG[i] = g; fB[i] = b;
   }
 
+  const WHITE = [1, 1, 1], DARK = [0.55, 0.25, 0.9], RED = [1, 0.25, 0.4];
+
   /** A puff of sparks flying out from a point. */
   function burst(x, y, n, speed, life, size, col, drag) {
     for (let k = 0; k < n; k++) {
@@ -156,6 +165,13 @@
         col[0], col[1], col[2], drag === undefined ? 1.6 : drag);
     }
   }
+  /** The same, with each spark in a random colour of the realm's palette. */
+  function burstPal(x, y, n, speed, life, size, drag) {
+    const p = W.pal, cols = p ? [p.a, p.b, p.d, p.e] : [WHITE];
+    for (let k = 0; k < n; k++) burst(x, y, 1, speed, life, size, cols[(Math.random() * cols.length) | 0], drag);
+  }
+  /** The palette colour of mote i. */
+  const moteCol = i => (W.pal ? (mHue[i] === 1 ? W.pal.d : mHue[i] === 2 ? W.pal.e : W.pal.b) : WHITE);
   W.addSwarm = addSwarm; W.addMote = addMote; W.addFx = addFx; W.burst = burst;
 
   /* ------------------------------------------------------------------ */
@@ -220,6 +236,9 @@
     W.heart = null; W.boss = null; W.finale = false; W.fog = false; W.sandbox = false;
     W.realmLight = 0; W.lost = 0; W.returned = 0; W.wispsKilled = 0; W.cometsCaught = 0; W.pulses = 0;
     W.kinAcc = 0; W.emptyT = 0; W.springBoost = 1;
+    W.heat = 0; W.surge = false; W.surgeT = 0; W.surges = 0;
+    W.fallT = T.starfallEvery[0] + Math.random() * (T.starfallEvery[1] - T.starfallEvery[0]);
+    W.fallLeft = 0; W.fallAcc = 0; W.fallDir = 1; W.starfalls = 0;
     W.flowStr = 0; waves.length = 0;
   }
 
@@ -424,8 +443,6 @@
   /* Things that happen                                                  */
   /* ------------------------------------------------------------------ */
 
-  const WHITE = [1, 1, 1], DARK = [0.55, 0.25, 0.9], RED = [1, 0.25, 0.4];
-
   /** A mote reaches the swarm. Returns true if slot i now holds another mote. */
   function collectMote(i) {
     const w = mWorth[i], x = mx[i], y = my[i];
@@ -438,14 +455,23 @@
     }
     W.realmLight += n;
     W.events.push({ t: 'collect', w, n });
-    const pal = W.pal ? W.pal.b : WHITE;
-    burst(x, y, w >= 25 ? 26 : w >= 5 ? 6 : 2, sp + 40, 0.5, 2.6, pal);
+    burst(x, y, w >= 25 ? 30 : w >= 5 ? 7 : 3, sp + 60, 0.55, 3, moteCol(i));
+    // Gathering fills the surge meter, which also drains all the time: only
+    // gathering quickly fills it. A full meter is a share of what the realm
+    // asks for, so it is as hard to earn in the last realm as in the first.
+    if (!W.surge && (W.heat += n / Math.max(T.surgeMin, W.need * T.surgeFrac)) >= 1) startSurge();
     if (mRegrow[i]) {             // title screen: the mote grows back at home
       mState[i] = M_HIDDEN; mAge[i] = 5 + Math.random() * 5; mx[i] = mhx[i]; my[i] = mhy[i];
       return false;
     }
     removeMote(i);
     return true;
+  }
+
+  function startSurge() {
+    W.surge = true; W.surgeT = T.surgeTime; W.heat = 1; W.surges++;
+    burstPal(W.lx, W.ly, 140, 520, 0.9, 3.4, 1.4);
+    W.events.push({ t: 'surge' });
   }
 
   /** Scatter `worth` light as loose motes around a point (returned light, wisp drops). */
@@ -478,14 +504,19 @@
       const ox = mx[i] - W.lx, oy = my[i] - W.ly;
       if (ox * ox + oy * oy < r2) { mState[i] = M_PULLED; mAge[i] = 0; }
     }
+    // A ring of sparks races out with it.
+    const sp = W.pulseMax / T.pulseTime, p = W.pal, cols = p ? [p.d, p.e, p.b] : [WHITE];
+    for (let k = 0; k < 110; k++) {
+      const a = k / 110 * TAU, c = cols[k % cols.length], v = sp * (0.92 + Math.random() * 0.16);
+      addFx(W.lx + Math.cos(a) * 20, W.ly + Math.sin(a) * 20, Math.cos(a) * v, Math.sin(a) * v, T.pulseTime * 1.15, 4.2, c[0], c[1], c[2], 0.9);
+    }
     W.events.push({ t: 'pulse' });
   }
 
   function igniteBeacon(b) {
     b.lit = true; b.litT = 0;
-    const pal = W.pal ? W.pal.b : WHITE;
-    burst(b.x, b.y, 320, 620, 1.6, 3.6, pal, 1.2);
-    burst(b.x, b.y, 120, 240, 2.2, 3, WHITE, 0.8);
+    burstPal(b.x, b.y, 420, 680, 1.8, 3.8, 1.2);
+    burst(b.x, b.y, 140, 260, 2.3, 3.2, WHITE, 0.8);
     W.events.push({ t: 'ignite', x: b.x, y: b.y, heart: b.heart });
     for (const r of W.rifts) {
       if (!r.closed && Math.hypot(r.x - b.x, r.y - b.y) < b.lightR) { r.closed = true; burst(r.x, r.y, 60, 260, 0.9, 3, RED); }
@@ -544,7 +575,7 @@
     // ---- leader ----
     {
       const ox = inp.tx - W.lx, oy = inp.ty - W.ly, d = Math.hypot(ox, oy);
-      const max = T.leaderSpeed * W.mul.swift;
+      const max = T.leaderSpeed * W.mul.swift * (W.surge ? T.surgeSpeed : 1);
       let wx = 0, wy = 0;
       if (inp.active && d > 4 && !W.exiting) { const sp = Math.min(max, d * 4.5); wx = ox / d * sp; wy = oy / d * sp; }
       const k = Math.min(1, dt * T.leaderAccel);
@@ -565,6 +596,41 @@
       else {
         W.pulseRad = W.pulseMax * (1 - (1 - u) * (1 - u));
         for (const w of W.wisps) if (Math.hypot(w.x - W.pulseX, w.y - W.pulseY) < W.pulseRad) killWisp(w, true);
+      }
+    }
+
+    // ---- surge ----
+    if (W.surge) {
+      W.surgeT -= dt; W.heat = Math.max(0, W.surgeT / T.surgeTime);
+      if (W.surgeT <= 0) { W.surge = false; W.heat = 0; }
+      // The leader sheds sparks in every colour.
+      for (let k = 0; k < 2; k++) {
+        const a = Math.random() * TAU, h = t * 2 + k * 2.1;
+        addFx(lx + Math.cos(a) * W.swR * 0.5, ly + Math.sin(a) * W.swR * 0.5, -W.lvx * 0.2 + Math.cos(a) * 60, -W.lvy * 0.2 + Math.sin(a) * 60,
+          0.9, 3.4, 0.5 + 0.5 * Math.cos(h), 0.5 + 0.5 * Math.cos(h - 2.09), 0.5 + 0.5 * Math.cos(h + 2.09), 0.6);
+      }
+    } else if (W.heat > 0) W.heat = Math.max(0, W.heat - T.surgeCool * dt);
+
+    // ---- starfalls ----
+    // Every so often a shower of bright motes streaks across the view.
+    if (!W.exiting && !W.finished) {
+      W.fallT -= dt;
+      if (W.fallT <= 0) {
+        W.fallT = T.starfallEvery[0] + Math.random() * (T.starfallEvery[1] - T.starfallEvery[0]);
+        W.fallLeft = T.starfallCount; W.fallDir = Math.random() < 0.5 ? -1 : 1; W.starfalls++;
+        W.events.push({ t: 'starfall' });
+      }
+      if (W.fallLeft > 0) {
+        W.fallAcc += dt * 20;
+        while (W.fallAcc >= 1 && W.fallLeft > 0) {
+          W.fallAcc -= 1; W.fallLeft--;
+          // Start above the view, upwind, and cross it on a slant.
+          const x = inp.camX + (Math.random() * 2 - 1) * (inp.hw + 250) - W.fallDir * 260, y = inp.camY - inp.hh - 60 - Math.random() * 260;
+          // Worth more in bigger realms, but always less than a star mote (25).
+          const worth = Math.max(W.sandbox ? 1 : 2, Math.min(24, Math.round(W.need * T.starfallShare / T.starfallCount)));
+          const i = addMote(x, y, worth, M_FALL, 5);
+          if (i >= 0) { mvx[i] = W.fallDir * (150 + Math.random() * 130); mvy[i] = 430 + Math.random() * 190; mHue[i] = 1 + ((Math.random() * 2) | 0); }
+        }
       }
     }
 
@@ -600,7 +666,7 @@
       }
       if (Math.hypot(c.x - lx, c.y - ly) < 75) {
         scatterMotes(c.x, c.y, T.cometPrize, 220);
-        burst(c.x, c.y, 120, 420, 1.2, 3.4, WHITE);
+        burstPal(c.x, c.y, 160, 460, 1.3, 3.6, 1.3);
         c.cool = 9; W.cometsCaught++;
         W.events.push({ t: 'comet' });
       } else if (c.x < -300 || c.x > W.w + 300 || c.y < -300 || c.y > W.h + 300) c.cool = 2 + Math.random() * 4;
@@ -619,7 +685,7 @@
       }
       // Pour light in while the leader stays close.
       if (Math.hypot(b.x - lx, b.y - ly) < T.chargeR && W.nFollow > 0 && b.filled + b.incoming < b.cost) {
-        b.acc += Math.max(T.chargeRate, W.nFollow * T.chargeFrac) * dt;
+        b.acc += Math.max(T.chargeRate, W.nFollow * T.chargeFrac) * (W.surge ? T.surgeSpeed : 1) * dt;
         let send = Math.min(Math.floor(b.acc), b.cost - b.filled - b.incoming);
         b.acc -= Math.floor(b.acc);
         while (send-- > 0) {
@@ -644,7 +710,7 @@
           // What it took comes back.
           const give = Math.min(h.boss ? 6000 : T.hollowGive, 200 + Math.round(h.eaten * 0.9));
           scatterMotes(h.x, h.y, give, h.boss ? 900 : 380);
-          burst(h.x, h.y, 160, 520, 1.4, 3.4, W.pal ? W.pal.b : WHITE);
+          burstPal(h.x, h.y, 220, 560, 1.5, 3.6, 1.3);
           W.returned += give;
           W.events.push({ t: 'returned', boss: h.boss });
           W.hollows.splice(hi, 1);
@@ -738,7 +804,7 @@
 
     // ---- motes ----
     {
-      const R = W.swR, magnet = (T.magnetR + R * 0.35) * W.mul.reach, m2 = magnet * magnet;
+      const R = W.swR, magnet = (T.magnetR + R * 0.35) * W.mul.reach * (W.surge ? T.surgeReach : 1), m2 = magnet * magnet;
       const grab = 22 + R * 0.3, g2 = grab * grab;
       for (let i = W.nm - 1; i >= 0; i--) {
         const st = mState[i];
@@ -766,6 +832,12 @@
           mx[i] += FX * dt; my[i] += FY * dt;
           if (mx[i] < 0) mx[i] += W.w; else if (mx[i] > W.w) mx[i] -= W.w;
           if (my[i] < 0) my[i] += W.h; else if (my[i] > W.h) my[i] -= W.h;
+        } else if (st === M_FALL) {
+          mx[i] += mvx[i] * dt; my[i] += mvy[i] * dt;
+          if (Math.random() < dt * 26) {
+            const c = moteCol(i);
+            addFx(mx[i], my[i], -mvx[i] * 0.15 + (Math.random() - 0.5) * 40, -mvy[i] * 0.15 + (Math.random() - 0.5) * 40, 0.7, 3.2, c[0], c[1], c[2], 0.5);
+          }
         } else if (st === M_LOOSE) {
           mAge[i] += dt;
           mx[i] += mvx[i] * dt; my[i] += mvy[i] * dt;

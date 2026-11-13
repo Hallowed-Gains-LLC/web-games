@@ -8,7 +8,7 @@
  */
 (function () {
   const W = DL.world, gfx = DL.gfx;
-  const TAU = Math.PI * 2;
+  const TAU = Math.PI * 2, WHITE = [1, 1, 1];
 
   const hollows = new Float32Array(32), lights = new Float32Array(32);
 
@@ -19,8 +19,10 @@
   function fill(view) {
     gfx.begin();
     const P = gfx.points, MAXP = gfx.MAX_POINTS;
-    const pal = W.pal, A = pal.a, B = pal.b, C = pal.c;
+    const pal = W.pal, A = pal.a, B = pal.b, C = pal.c, D = pal.d, E = pal.e;
     const t = W.time;
+    // 0..1 while the swarm is surging; eases out over the last moments.
+    const surge = W.surge ? Math.min(1, W.surgeT / 0.8) : 0;
     const x0 = view.camX - view.hw - 60, x1 = view.camX + view.hw + 60;
     const y0 = view.camY - view.hh - 60, y1 = view.camY + view.hh + 60;
     const seen = (x, y, m) => x > x0 - m && x < x1 + m && y > y0 - m && y < y1 + m;
@@ -31,15 +33,18 @@
       const { dx, dy, dSz, dPh } = W;
       for (let i = 0; i < W.nd; i++) {
         const tw = 0.16 + 0.12 * Math.sin(t * 0.8 + dPh[i] * 5);
+        // Mostly the nebula's colour, with flecks of the realm's two accents.
+        const c = i % 5 === 0 ? D : i % 5 === 1 ? E : C;
         P[o++] = dx[i]; P[o++] = dy[i]; P[o++] = dSz[i];
-        P[o++] = C[0] * 0.6 + 0.4; P[o++] = C[1] * 0.6 + 0.4; P[o++] = C[2] * 0.6 + 0.4; P[o++] = tw;
+        P[o++] = c[0] * 0.6 + 0.4; P[o++] = c[1] * 0.6 + 0.4; P[o++] = c[2] * 0.6 + 0.4; P[o++] = tw;
       }
       n += W.nd;
     }
 
     // ---- motes ----
     {
-      const { mx, my, mPh, mWorth, mState, mLife } = W;
+      const { mx, my, mPh, mWorth, mState, mLife, mHue } = W;
+      const cols = [B, D, E];                                              // see world.js: mHue
       for (let i = 0; i < W.nm && n < MAXP; i++) {
         if (mState[i] === W.M_HIDDEN) continue;
         const x = mx[i], y = my[i];
@@ -47,13 +52,15 @@
         const w = mWorth[i];
         let a = 0.6 + 0.4 * Math.sin(t * 3 + mPh[i] * 7);
         if (mLife[i] >= 0 && mLife[i] < 1.5) a *= mLife[i] / 1.5;          // fading comet dust
-        const size = w >= 25 ? 13 : w >= 5 ? 9 : 6;
-        const white = w >= 5 ? 0.6 : 0.25;
+        const falling = mState[i] === W.M_FALL, c = cols[mHue[i]];
+        const size = w >= 25 ? 13 : falling ? 11 : w >= 5 ? 9 : 6;
+        const white = w >= 25 ? 0.6 : w >= 5 ? 0.2 : 0.06;                 // richer motes burn a little whiter
         P[o++] = x; P[o++] = y; P[o++] = size;
-        P[o++] = B[0] + (1 - B[0]) * white; P[o++] = B[1] + (1 - B[1]) * white; P[o++] = B[2] + (1 - B[2]) * white;
+        P[o++] = c[0] + (1 - c[0]) * white; P[o++] = c[1] + (1 - c[1]) * white; P[o++] = c[2] + (1 - c[2]) * white;
         P[o++] = a * (w >= 5 ? 1 : 0.85);
         n++;
         if (w >= 25) gfx.sprite(x, y, 34, B[0], B[1], B[2], 0.8 * a, gfx.STAR, t * 0.5 + mPh[i]);
+        else if (falling) gfx.sprite(x, y, 30, c[0], c[1], c[2], 0.9, gfx.STAR, mPh[i]);
       }
     }
 
@@ -63,14 +70,33 @@
       // A big swarm overlaps itself a lot. Dim each particle as the swarm
       // grows, so it keeps its colour and texture instead of burning white.
       const dim = Math.max(0.3, Math.min(1, Math.pow(500 / (W.ns + 1), 0.4)));
+      const lx = W.lx, ly = W.ly, ramp = [A, D, B, E];
+      const spiral = 0.55 / (W.swR + 30);          // about half a turn of colour from the centre to the edge
       for (let i = 0; i < W.ns && n < MAXP; i++) {
         const tint = sTint[i], going = sState[i] !== W.S_FOLLOW;
-        // Most are the realm's colour, some lean toward its accent, a few are white-hot.
+        // Colour depends on where the particle sits around the leader: the
+        // realm's four colours wind through the swarm as a slowly turning
+        // spiral. (Random colours per particle would just add up to white.)
         let r, g, b;
-        if (going || tint > 0.9) { r = g = b = 1; }
-        else { const k = tint * 0.9; r = A[0] + (B[0] - A[0]) * k; g = A[1] + (B[1] - A[1]) * k; b = A[2] + (B[2] - A[2]) * k; }
+        if (going || tint > 0.95) { r = g = b = 1; }
+        else {
+          const ox = sx[i] - lx, oy = sy[i] - ly;
+          const turn = Math.atan2(oy, ox) / TAU + Math.sqrt(ox * ox + oy * oy) * spiral - t * 0.06 + tint * 0.12;
+          if (surge < 1) {
+            const u = (turn - Math.floor(turn)) * 4, k = u | 0, f = u - k;
+            const c0 = ramp[k], c1 = ramp[(k + 1) & 3], m = f * f * (3 - 2 * f);
+            r = c0[0] + (c1[0] - c0[0]) * m; g = c0[1] + (c1[1] - c0[1]) * m; b = c0[2] + (c1[2] - c0[2]) * m;
+          }
+          if (surge > 0) {
+            // Surging: the spiral runs through the whole rainbow, and spins.
+            const h = (turn - t * 0.5) * TAU;
+            const rr = 0.5 + 0.5 * Math.cos(h), rg = 0.5 + 0.5 * Math.cos(h - 2.09), rb = 0.5 + 0.5 * Math.cos(h + 2.09);
+            if (surge >= 1) { r = rr; g = rg; b = rb; }
+            else { r += (rr - r) * surge; g += (rg - g) * surge; b += (rb - b) * surge; }
+          }
+        }
         P[o++] = sx[i]; P[o++] = sy[i]; P[o++] = sSize[i] * (going ? 1.25 : 1);
-        P[o++] = r; P[o++] = g; P[o++] = b; P[o++] = going ? 0.9 : 0.66 * dim;
+        P[o++] = r; P[o++] = g; P[o++] = b; P[o++] = going ? 0.9 : (0.66 + 0.14 * surge) * dim;
         n++;
       }
     }
@@ -96,6 +122,15 @@
       gfx.sprite(W.lx, W.ly, (60 + W.swR * 1.6) * breathe, A[0], A[1], A[2], 0.14, gfx.GLOW);   // the swarm's aura
       gfx.sprite(W.lx, W.ly, (26 + W.swR * 0.2) * breathe, A[0], A[1], A[2], 0.3, gfx.GLOW);
       gfx.sprite(W.lx, W.ly, 13, 1, 1, 1, 0.95, gfx.GLOW);
+      if (surge > 0) {
+        // A turning halo and two rings that keep changing colour.
+        for (let k = 0; k < 2; k++) {
+          const h = t * 2.4 + k * 3.1, u = (t * 0.9 + k * 0.5) % 1;
+          const r = 0.55 + 0.45 * Math.cos(h), g = 0.55 + 0.45 * Math.cos(h - 2.09), b = 0.55 + 0.45 * Math.cos(h + 2.09);
+          gfx.sprite(W.lx, W.ly, (W.swR * 1.2 + 40) * (0.6 + u), r, g, b, (1 - u) * 0.5 * surge, gfx.RING);
+          gfx.sprite(W.lx, W.ly, 90 + W.swR * 2, r, g, b, 0.1 * surge, gfx.GLOW);
+        }
+      }
     }
 
     for (const sp of W.springs) {
@@ -108,8 +143,17 @@
         const grow = Math.min(1, b.litT / 0.8), pulse = 1 + 0.05 * Math.sin(t * 1.3 + b.x);
         const big = b.heart ? 2.2 : 1;
         gfx.sprite(b.x, b.y, 520 * grow * big, B[0], B[1], B[2], 0.16, gfx.GLOW);
+        gfx.sprite(b.x, b.y, 760 * grow * big, D[0], D[1], D[2], 0.07, gfx.GLOW);
         gfx.sprite(b.x, b.y, 300 * grow * pulse * big, B[0], B[1], B[2], 1, gfx.STAR, t * 0.15 + b.y);
+        gfx.sprite(b.x, b.y, 210 * grow * (2 - pulse) * big, E[0], E[1], E[2], 0.7, gfx.STAR, -t * 0.22 + b.x);   // a second star, turning the other way
         gfx.sprite(b.x, b.y, 46 * big, 1, 1, 1, 1, gfx.GLOW);
+        // Waking sends out three shockwaves, one after another.
+        for (let k = 0; k < 3; k++) {
+          const u = (b.litT - k * 0.22) / 1.5;
+          if (u <= 0 || u >= 1) continue;
+          const c = k === 0 ? WHITE : k === 1 ? D : E;
+          gfx.sprite(b.x, b.y, (80 + 1150 * u * (2 - u)) * big, c[0], c[1], c[2], (1 - u) * (1 - u) * 0.9, gfx.RING, 45);
+        }
       } else {
         const k = b.filled / b.cost, near = Math.hypot(b.x - W.lx, b.y - W.ly) < DL.TUNE.chargeR ? 1 : 0;
         const r = b.heart ? 150 : 74;
