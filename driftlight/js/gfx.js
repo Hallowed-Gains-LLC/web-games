@@ -112,8 +112,8 @@ void main() {
     float rays = pow(abs(cos(ang + v_sp.y)), 90.) * exp(-r * 3.2)
                + pow(abs(cos(ang * 2. - v_sp.y * .6)), 60.) * exp(-r * 6.) * .45;
     a = (core + rays) * edge;
-  } else if (v_sp.x < 2.5) {            // RING
-    a = exp(-pow((r - .86) * 16., 2.));
+  } else if (v_sp.x < 2.5) {            // RING (v_sp.y makes it thinner: 0 = soft, 50 = a crisp line)
+    a = exp(-pow((r - .86) * (16. + v_sp.y), 2.));
   } else if (v_sp.x < 3.5) {            // SWIRL: the portal's spiral arms
     float s = sin(ang * 3. + log(r + .02) * 7. - u_time * 2.5);
     a = ((.5 + .5 * s) * exp(-pow((r - .45) * 2.6, 2.)) + exp(-r * r * 40.)) * edge;
@@ -179,8 +179,8 @@ float fbm(vec2 p) {
   const FS_BG = PRECISION + NOISE + `
 varying vec2 v_uv;
 uniform vec2 u_cam, u_res;
-uniform float u_px, u_time, u_lit;
-uniform vec3 u_c1, u_c2, u_c3, u_bgc;
+uniform float u_px, u_time, u_lit, u_boost;
+uniform vec3 u_c1, u_c2, u_c3, u_c4, u_c5, u_bgc;
 void main() {
   vec2 w = u_cam * .4 + (v_uv - .5) * u_res / u_px * vec2(1., -1.);   // far away, so it slides slowly
   vec2 p = w * .0011;
@@ -188,12 +188,15 @@ void main() {
   vec2 q = vec2(fbm(p + t), fbm(p + vec2(5.2, 1.3) - t));
   float n = fbm(p + q * 1.6);
   float m = fbm(p * 2.2 - q + 3.7);
-  float glow = .42 + .38 * u_lit;
+  float k = fbm(p * 1.4 + q.yx * 1.3 + 9.1);                           // where the two accent colours pool
+  float glow = .42 + .38 * u_lit + .3 * u_boost;
   vec3 col = u_bgc;
   col += u_c3 * pow(n, 2.9) * 2.0 * glow;                              // broad clouds, with dark gaps between
   col += u_c1 * pow(max(n * m * 2.1, 0.), 3.) * .8 * glow;             // warm knots where clouds overlap
   col += mix(u_c3, u_c2, .5) * pow(max(1. - abs(q.y - .5) * 5., 0.), 3.) * n * .35 * glow;   // thin bright filaments
   col += u_c2 * pow(max(q.x * n * 1.8, 0.), 5.) * .3 * u_lit;
+  col += u_c4 * smoothstep(.5, .78, k) * n * .5 * glow;                // accent clouds, apart from each other
+  col += u_c5 * smoothstep(.5, .24, k) * m * .45 * glow;
   gl_FragColor = vec4(col, 1.);
 }`;
 
@@ -276,7 +279,11 @@ void main() {
   vec2 v = uv - .5;
   col *= 1. - dot(v, v) * .6;                       // vignette
   col += u_flash * vec3(1., .97, .9);
-  col = 1. - exp(-col * 1.55);                      // tone map: bright adds up softly
+  // Tone map: bright adds up softly. Doing it per channel alone turns every
+  // bright colour white, so most of it is done on the brightest channel and
+  // scaled back, which keeps the hue. Only the very brightest cores whiten.
+  float peak = max(col.r, max(col.g, col.b));
+  col = mix(1. - exp(-col * 1.55), col * (1. - exp(-peak * 1.55)) / max(peak, 1e-4), .7);
   col += (hash(uv * u_res + fract(u_time) * 100.) - .5) * .022;   // grain (also hides banding in dark skies)
   col = mix(col, vec3(1.), u_white);
   col *= 1. - u_fade;
@@ -505,6 +512,8 @@ void main() {
     gl.uniform1f(p.u('u_lit'), f.lit);
     gl.uniform3fv(p.u('u_c1'), f.pal.a); gl.uniform3fv(p.u('u_c2'), f.pal.b);
     gl.uniform3fv(p.u('u_c3'), f.pal.c); gl.uniform3fv(p.u('u_bgc'), f.pal.bg);
+    gl.uniform3fv(p.u('u_c4'), f.pal.d); gl.uniform3fv(p.u('u_c5'), f.pal.e);
+    gl.uniform1f(p.u('u_boost'), f.boost || 0);
     fullPass(p, tg.bg);
 
     // 2. trail: fade and shift the old one, then add this frame faintly
