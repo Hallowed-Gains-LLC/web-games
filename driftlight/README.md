@@ -7,15 +7,17 @@ realms. Gather the light drifting there, pour it into sleeping stars to wake
 them, and keep it away from the things that only take. When every star in a
 realm is awake, a way opens to the next one.
 
-There is no way to lose. If your swarm is eaten, a few sparks always find you
-again.
+There is no game over: if your swarm is eaten, a few sparks always find you
+again. The challenge is speed. Every realm has a par time and earns one to
+three stars, and the dark gets more dangerous the deeper you go.
 
 ## How to play
 
 | Action | Mouse | Touch | Keyboard |
 | --- | --- | --- | --- |
 | Move | The swarm follows the pointer | Touch anywhere and drag: a joystick appears under your thumb | Arrows or WASD |
-| Pulse (calls nearby light, scatters wisps) | Click | Quick tap, a second finger, or the Pulse button | Space |
+| Pulse (calls nearby light, scatters wisps, stuns shades) | Click | Quick tap, a second finger, or the Pulse button | Space |
+| Dash (a burst of speed; nothing can touch the swarm) | Right-click | The Dash button | Shift |
 | Pause | II button | II button | P or Esc |
 | Mute | In the pause menu | In the pause menu | M |
 
@@ -31,7 +33,26 @@ thumb, so turning back answers at once. Lift your finger and the swarm stops.
 - **Hollows** bend the sky around themselves and eat any light that crosses
   their edge. A waking star dissolves every hollow near it, and what the hollow
   took comes back.
-- **Wisps** hunt your swarm and bite pieces off. A pulse scatters them.
+- **Wisps** hunt your swarm and bite pieces off. A pulse scatters them, and so
+  does dashing through one.
+- **Dash** to break free of a hollow's pull, cross a wave of dark, or break a
+  stunned shade. It recharges in about two seconds.
+- **Shades** hunt the swarm and shatter part of it on contact into loose
+  light, which they then drink. Pulse to stun one, then dash through it while
+  it's stunned to break it and get everything back. They won't enter a woken
+  star's light.
+- **Knells** ring out waves of dark that eat whatever part of the swarm they
+  pass over. Dash through the wave, or shelter in a woken star's light. Waking
+  a star near a knell silences it. The Eclipse rings too, faster as its stars
+  wake.
+- **Chains.** Gather without a pause and every mote is worth more: ×1.2 after
+  40, ×1.4 after 150, ×1.6 after 400. Anything taking your light breaks the
+  chain.
+- **Leaking stars.** Leave a star half-filled and it sheds light back down to
+  the last quarter it reached. Waking a star draws wisps and shades to you.
+- **Par and stars.** The clock under your light count shows the time against
+  par. Finish at or under par for three stars, within half again of it for
+  two. Your best for each realm is saved.
 - **Surge.** The thin bar under your light count fills as you gather and
   drains all the time, so only gathering quickly fills it. When it's full your
   swarm ignites into a rainbow for a few seconds: faster, reaching farther and
@@ -49,14 +70,14 @@ thumb, so turning back answers at once. Lift your finger and the swarm stops.
 | II | The Drift | Currents that carry light, and you |
 | III | The Hollow | Hollows |
 | IV | Wisps | Wisps, and the rifts they come through |
-| V | Tidewater | Whirlpools around hollows |
-| VI | The Deep | Darkness: you only see as far as your light reaches |
+| V | Tidewater | Whirlpools around hollows, and the first knell |
+| VI | The Deep | Darkness, and shades in it |
 | VII | Comet Road | Comets to chase, and hollows that hunt near their homes |
 | VIII | The Orchard | A rest: flowers of light, almost nothing hostile |
-| IX | Stormglass | A storm that moves everything, hollows included |
-| X | The Long Dark | Darkness, wisps and hollows together |
-| XI | Corona | Four great stars, each guarded by orbiting hollows |
-| XII | Eclipse | One vast hollow. Wake the five stars around it, then its heart |
+| IX | Stormglass | A storm that moves everything, hollows included; two knells |
+| X | The Long Dark | Darkness, wisps, hollows and three shades together |
+| XI | Corona | Four great stars, each guarded by orbiting hollows, two by knells |
+| XII | Eclipse | One vast hollow that rings out waves of dark. Wake the five stars around it, then its heart |
 
 The ending quotes John 1:5 from the World English Bible, which is in the
 public domain.
@@ -109,6 +130,7 @@ resolution and dust count by itself.
 
 - `drift_save`: the realm you're on, the light you carried in, your gifts and stats
 - `drift_done`: stats from a finished journey
+- `drift_best`: the most stars earned in each realm
 - `drift_muted`
 
 ## Changing things
@@ -118,7 +140,7 @@ Everything a designer would touch is in `js/config.js`.
 - **A realm** is a `build(B)` function that places things with a small builder
   API: `B.beacon`, veins of motes (`B.ring`, `B.spiral`, `B.cluster`, `B.river`,
   `B.rose`, `B.star`, `B.drifters`), `B.spring`, `B.hollow`, `B.rift`,
-  `B.comet`. Each realm also has a palette, a musical key, optional currents
+  `B.comet`, `B.shade`, `B.knell`. Each realm also has a palette, a musical key, optional currents
   and fog, and hints. A hint can carry a `touch` wording for phones.
 - **A palette** is `pal(a, b, c, bg, d, e)`: the swarm's colour, the mote and
   star colour, the nebula, the background, then two accents. Pick accents far
@@ -133,6 +155,9 @@ Everything a designer would touch is in `js/config.js`.
   - Put every rift, and every hollow that should go away, within `lightR` of
     a beacon, so waking that star clears it.
   - Give every realm at least one spring, so it can't run out of light.
+  - Put every knell within `lightR` of a star too, and keep its waves away
+    from where you gather and from hollows.
+- **Par** (`par` on each realm) comes from the bot; see below.
 
 ## Testing and pacing
 
@@ -150,16 +175,23 @@ person does.
 
 Measured with the numbers in this commit:
 
-- **Bot, all twelve realms:** about 24 minutes seeing everything and about 29
-  with limited sight. No realm gets stuck. The limited-sight bot surges three
-  to five times a realm; a person gathers more slowly, so expect fewer.
+- **Bot, all twelve realms:** about 26 minutes, seeing everything or with
+  limited sight. No realm gets stuck. The bot dashes through every wave and
+  stuns and breaks every shade it meets, which a person won't; expect more hits
+  and a longer game.
+- **Par** is about 1.3 times the slowest limited-sight bot time for each realm,
+  rounded up to 15 seconds. The bot earns three stars almost everywhere, so
+  three stars is possible but takes clean play.
 - **A person:** the bot never hesitates, reads or explores, so expect roughly
   twice that, about 50 to 60 minutes. That is an estimate; nobody has played it
   through by hand yet.
 
 To make the game longer or shorter, change `moteScale` and `costScale`
 together (whole numbers) and run the bot again. `runBot` also reports
-`surges`, `surgePct` (share of the time spent surging) and `starfalls`.
+`surges`, `surgePct` (share of the time spent surging), `starfalls`,
+`dashes`, `hits`, `waveLost`, `shades` (broken), `bestCombo`, `comboPct`
+(share of light that came from chains) and `stars`. Pass `every: 20` to get a
+`trace` of snapshots every 20 seconds, for finding where it stalls.
 
 The joystick was tested with synthetic touch events in headless Chromium:
 holding still doesn't move the swarm, speed rises with the push, dragging past

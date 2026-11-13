@@ -155,7 +155,7 @@
     fR[i] = r; fG[i] = g; fB[i] = b;
   }
 
-  const WHITE = [1, 1, 1], DARK = [0.55, 0.25, 0.9], RED = [1, 0.25, 0.4];
+  const WHITE = [1, 1, 1], DARK = [0.55, 0.25, 0.9], RED = [1, 0.25, 0.4], STUN = [0.6, 0.85, 1];
 
   /** A puff of sparks flying out from a point. */
   function burst(x, y, n, speed, life, size, col, drag) {
@@ -228,6 +228,7 @@
     W.time = 0;
     W.w = 2400; W.h = 1600; W.startX = 1200; W.startY = 800; W.portalX = 1200; W.portalY = 800;
     W.beacons = []; W.hollows = []; W.vortices = []; W.wisps = []; W.rifts = []; W.comets = []; W.springs = [];
+    W.shades = []; W.knells = []; W.waves = [];
     W.events.length = 0;
     W.lx = W.ly = 0; W.lvx = W.lvy = 0;
     W.swR = 30; W.nFollow = 0;
@@ -239,6 +240,12 @@
     W.heat = 0; W.surge = false; W.surgeT = 0; W.surges = 0;
     W.fallT = T.starfallEvery[0] + Math.random() * (T.starfallEvery[1] - T.starfallEvery[0]);
     W.fallLeft = 0; W.fallAcc = 0; W.fallDir = 1; W.starfalls = 0;
+    // Dash: dashT counts down the burst itself, phaseT the time the swarm is
+    // untouchable (a little longer, so the stragglers make it through too).
+    W.dashT = 0; W.phaseT = 0; W.dashCd = 0; W.dashX = 1; W.dashY = 0; W.dashes = 0;
+    // Combo: motes gathered in a chain, each within comboGap of the last.
+    W.combo = 0; W.comboMul = 1; W.lastCollect = -99; W.bestCombo = 0; W.comboBonus = 0;
+    W.shadesKilled = 0; W.hits = 0; W.waveLost = 0; W.bossT = 6;
     W.flowStr = 0; waves.length = 0;
   }
 
@@ -383,6 +390,14 @@
       /** A tear that lets up to `max` wisps through, one every `every` seconds. */
       rift(x, y, every, max) { W.rifts.push({ x: x * S, y: y * S, every, max, t: every * 0.5, closed: false, mine: 0 }); },
       comet() { W.comets.push(newComet()); },
+      /** A shade: hunts the swarm and shatters it on contact. */
+      shade(x, y) {
+        W.shades.push({ x: x * S, y: y * S, homeX: x * S, homeY: y * S, vx: 0, vy: 0, stun: 0, cool: 0, ph: rnd() * TAU, ate: 0, dead: false });
+      },
+      /** A knell: rings out a wave of dark every `every` seconds, reaching `reach`. */
+      knell(x, y, every, reach) {
+        W.knells.push({ x: x * S, y: y * S, every, reach: reach * S, t: every * 0.6, warned: false, closed: false });
+      },
     };
     return B;
   }
@@ -446,7 +461,16 @@
   /** A mote reaches the swarm. Returns true if slot i now holds another mote. */
   function collectMote(i) {
     const w = mWorth[i], x = mx[i], y = my[i];
-    W.kinAcc += w * W.mul.kin;
+    // Keep the chain going, and climb to the next tier if it's long enough.
+    W.combo = W.time - W.lastCollect < T.comboGap ? W.combo + 1 : 1;
+    W.lastCollect = W.time;
+    if (W.combo > W.bestCombo) W.bestCombo = W.combo;
+    let mul = 1;
+    for (const [at, m] of T.comboTiers) if (W.combo >= at) mul = m;
+    if (mul > W.comboMul) W.events.push({ t: 'combo', mul });
+    W.comboMul = mul;
+    W.kinAcc += w * W.mul.kin * mul;
+    W.comboBonus += w * W.mul.kin * (mul - 1);
     const n = Math.floor(W.kinAcc); W.kinAcc -= n;
     const sp = w >= 25 ? 240 : w >= 5 ? 130 : 60;
     for (let k = 0; k < n; k++) {
@@ -521,6 +545,10 @@
     for (const r of W.rifts) {
       if (!r.closed && Math.hypot(r.x - b.x, r.y - b.y) < b.lightR) { r.closed = true; burst(r.x, r.y, 60, 260, 0.9, 3, RED); }
     }
+    for (const k of W.knells) {
+      if (!k.closed && Math.hypot(k.x - b.x, k.y - b.y) < b.lightR) { k.closed = true; burst(k.x, k.y, 120, 420, 1.2, 3.4, RED); }
+    }
+    for (const sh of W.shades) if (Math.hypot(sh.x - b.x, sh.y - b.y) < b.lightR) killShade(sh);
     if (W.boss && !b.heart) {     // each waking star shrinks the Eclipse
       W.boss.r0 *= 0.9; W.boss.pullR = W.boss.r0 * T.hollowPull;
     }
@@ -539,6 +567,9 @@
       h.dying = 0.0001; h.eaten += 4000;   // the Eclipse gives back a great deal
       for (const w of W.wisps) w.dead = true;
       for (const r of W.rifts) r.closed = true;
+      for (const k of W.knells) k.closed = true;
+      for (const sh of W.shades) killShade(sh);
+      W.waves.length = 0;
       W.events.push({ t: 'heart' });
     } else if (W.finale) {
       W.finished = true;
@@ -548,6 +579,63 @@
       W.events.push({ t: 'portal' });
     }
   }
+
+  /** Something hurt the swarm: the chain is broken. */
+  function breakCombo() { W.combo = 0; W.comboMul = 1; }
+
+  /** Burst forward. The swarm can't be touched until it's through. */
+  function startDash(inp) {
+    let dx = inp.active ? inp.tx - W.lx : W.lvx, dy = inp.active ? inp.ty - W.ly : W.lvy;
+    let d = Math.hypot(dx, dy);
+    if (d < 1) { dx = W.dashX; dy = W.dashY; d = 1; }
+    W.dashX = dx / d; W.dashY = dy / d;
+    W.dashT = T.dashTime; W.phaseT = T.dashTime + T.dashGrace; W.dashCd = T.dashCool; W.dashes++;
+    // Fling the swarm along, so it streams behind the leader.
+    for (let i = 0; i < W.ns; i++) {
+      if (sState[i] !== S_FOLLOW) continue;
+      const k = 0.35 + Math.random() * 0.45;
+      svx[i] += W.dashX * T.dashSpeed * k; svy[i] += W.dashY * T.dashSpeed * k;
+    }
+    burst(W.lx, W.ly, 50, 380, 0.5, 3, WHITE, 2);
+    W.events.push({ t: 'dash' });
+  }
+
+  /** Shatter part of the swarm into loose motes around (x, y). */
+  function shatter(share, x, y) {
+    let n = Math.min(T.shadeHitMax, Math.round(W.nFollow * share));
+    for (let i = W.ns - 1; i >= 0 && n > 0; i--) {
+      if (sState[i] !== S_FOLLOW || Math.random() > 0.6) continue;
+      const k = addMote(sx[i], sy[i], 1, M_LOOSE);
+      if (k >= 0) {
+        const ox = sx[i] - x, oy = sy[i] - y, d = Math.hypot(ox, oy) + 0.01, s = 260 + Math.random() * 380;
+        mvx[k] = ox / d * s + (Math.random() - 0.5) * 160; mvy[k] = oy / d * s + (Math.random() - 0.5) * 160;
+      }
+      removeSwarm(i); n--;
+    }
+    breakCombo(); W.hits++;
+  }
+
+  function killShade(sh) {
+    if (sh.dead) return;
+    sh.dead = true; W.shadesKilled++;
+    scatterMotes(sh.x, sh.y, Math.round(T.shadePrize + sh.ate), 420);
+    burstPal(sh.x, sh.y, 260, 640, 1.4, 3.8, 1.2);
+    burst(sh.x, sh.y, 90, 300, 1.2, 3, RED, 1);
+    W.events.push({ t: 'shadeDie' });
+  }
+
+  /** A wave of dark leaves (x, y) and grows to `reach`. */
+  function ringWave(x, y, reach, boss) {
+    W.waves.push({ x, y, r: 0, reach, boss: !!boss });
+    W.events.push({ t: 'knell', boss: !!boss });
+  }
+
+  /** Is (x, y) inside the light of a woken star? Waves and shades can't touch it there. */
+  function sheltered(x, y) {
+    for (const b of W.beacons) if (b.lit && Math.hypot(b.x - x, b.y - y) < b.lightR * 0.75) return true;
+    return false;
+  }
+  W.sheltered = sheltered;
 
   function killWisp(w, drop) {
     if (w.dead) return;
@@ -571,6 +659,12 @@
   W.step = function (dt, inp) {
     W.time += dt;
     const t = W.time;
+    // Is the player pouring into a star right now? The dark notices.
+    let pouring = -1;
+    const charging = () => {
+      if (pouring < 0) pouring = W.beacons.some(b => !b.lit && b.incoming > 0) ? 1 : 0;
+      return pouring === 1;
+    };
 
     // ---- leader ----
     {
@@ -580,6 +674,17 @@
       if (inp.active && d > 4 && !W.exiting) { const sp = Math.min(max, d * 4.5); wx = ox / d * sp; wy = oy / d * sp; }
       const k = Math.min(1, dt * T.leaderAccel);
       W.lvx += (wx - W.lvx) * k; W.lvy += (wy - W.lvy) * k;
+      // Dash: on request, and while it lasts it overrides steering.
+      W.dashCd = Math.max(0, W.dashCd - dt); W.phaseT = Math.max(0, W.phaseT - dt);
+      if (inp.dash && W.dashCd <= 0 && !W.exiting) startDash(inp);
+      if (W.dashT > 0) {
+        W.dashT -= dt;
+        W.lvx = W.dashX * T.dashSpeed; W.lvy = W.dashY * T.dashSpeed;
+        if (W.dashT <= 0) { W.lvx *= 0.3; W.lvy *= 0.3; }
+        for (let n = 0; n < 4; n++) {
+          addFx(W.lx + (Math.random() - 0.5) * 30, W.ly + (Math.random() - 0.5) * 30, -W.lvx * 0.1, -W.lvy * 0.1, 0.45, 4, 1, 1, 1, 3);
+        }
+      }
       flowAt(W.lx, W.ly);
       W.lx += (W.lvx + FX * 0.5) * dt; W.ly += (W.lvy + FY * 0.5) * dt;
       W.lx = Math.max(40, Math.min(W.w - 40, W.lx)); W.ly = Math.max(40, Math.min(W.h - 40, W.ly));
@@ -596,6 +701,14 @@
       else {
         W.pulseRad = W.pulseMax * (1 - (1 - u) * (1 - u));
         for (const w of W.wisps) if (Math.hypot(w.x - W.pulseX, w.y - W.pulseY) < W.pulseRad) killWisp(w, true);
+        for (const sh of W.shades) {
+          const ox = sh.x - W.pulseX, oy = sh.y - W.pulseY, d = Math.hypot(ox, oy) + 0.01;
+          if (!sh.dead && sh.stun < T.shadeStun - 0.6 && d < W.pulseRad) {
+            sh.stun = T.shadeStun; sh.vx = ox / d * 520; sh.vy = oy / d * 520;
+            burst(sh.x, sh.y, 40, 260, 0.6, 3, STUN, 1.5);
+            W.events.push({ t: 'shadeStun' });
+          }
+        }
       }
     }
 
@@ -683,8 +796,20 @@
         }
         continue;
       }
+      // A star that was poured into, then left, sheds light back down to the
+      // last quarter it reached. So a quarter, once poured, is kept.
+      const keep = Math.floor(b.filled / b.cost * 4) / 4 * b.cost;
+      if (b.filled > (b.keep || 0) + 0.5 && W.time - (b.pourT || 0) > T.leakDelay && b.incoming === 0) {
+        b.leakAcc = (b.leakAcc || 0) + T.leakRate * b.cost * dt;
+        const n = Math.min(Math.floor(b.leakAcc), Math.floor(b.filled - b.keep));
+        if (n > 0) {
+          b.leakAcc -= n; b.filled -= n; scatterMotes(b.x, b.y, n, 240);
+          if (!b.leaked) { b.leaked = true; W.events.push({ t: 'leak' }); }
+        }
+      } else if (b.incoming > 0) b.keep = Math.max(b.keep || 0, keep);
       // Pour light in while the leader stays close.
       if (Math.hypot(b.x - lx, b.y - ly) < T.chargeR && W.nFollow > 0 && b.filled + b.incoming < b.cost) {
+        b.pourT = W.time; b.keep = Math.max(b.keep || 0, keep);
         b.acc += Math.max(T.chargeRate, W.nFollow * T.chargeFrac) * (W.surge ? T.surgeSpeed : 1) * dt;
         let send = Math.min(Math.floor(b.acc), b.cost - b.filled - b.incoming);
         b.acc -= Math.floor(b.acc);
@@ -763,7 +888,7 @@
         addFx(r.x + Math.cos(a) * 46, r.y + Math.sin(a) * 46, -Math.sin(a) * 110, Math.cos(a) * 110, 0.8, 2.6, 1, 0.2, 0.35, 0);
       }
       if (r.t <= 0) {
-        r.t = r.every;
+        r.t = r.every * (charging() ? 0.55 : 1);       // waking a star draws them
         if (r.mine < r.max && Math.hypot(r.x - lx, r.y - ly) > 420 && !W.exiting) {
           W.wisps.push({ x: r.x, y: r.y, vx: 0, vy: 0, ph: Math.random() * TAU, bite: 0, dead: false, rift: r });
           r.mine++;
@@ -782,8 +907,9 @@
         w.x += w.vx * dt; w.y += w.vy * dt;
         addFx(w.x, w.y, -w.vx * 0.3 + (Math.random() - 0.5) * 50, -w.vy * 0.3 + (Math.random() - 0.5) * 50, 0.45, 3.2, 1, 0.15 + Math.random() * 0.2, 0.4, 0);
         for (const b of W.beacons) if (b.lit && Math.hypot(b.x - w.x, b.y - w.y) < b.lightR * 0.8) { killWisp(w, false); break; }
+        if (!w.dead && W.phaseT > 0 && d < W.swR * 0.6 + 50) killWisp(w, true);   // dashed through
         // Bite: eat swarm particles that are close to it.
-        if (!w.dead && d < W.swR + 90 && W.nFollow > 0) {
+        if (!w.dead && W.phaseT <= 0 && d < W.swR + 90 && W.nFollow > 0) {
           w.bite += T.wispBite * dt;
           while (w.bite >= 1) {
             w.bite -= 1;
@@ -791,7 +917,7 @@
               const j = (Math.random() * W.ns) | 0;
               if (sState[j] === S_FOLLOW && Math.hypot(sx[j] - w.x, sy[j] - w.y) < 85) {
                 addFx(sx[j], sy[j], (Math.random() - 0.5) * 120, (Math.random() - 0.5) * 120, 0.5, 3, 1, 0.2, 0.35, 1);
-                removeSwarm(j); W.lost++;
+                removeSwarm(j); W.lost++; breakCombo();
                 W.events.push({ t: 'bite' });
                 break;
               }
@@ -800,6 +926,102 @@
         }
       }
       if (w.dead) { if (w.rift) w.rift.mine--; W.wisps.splice(wi, 1); }
+    }
+
+    // ---- shades ----
+    for (let si = W.shades.length - 1; si >= 0; si--) {
+      const sh = W.shades[si];
+      if (sh.dead) { W.shades.splice(si, 1); continue; }
+      const ox = lx - sh.x, oy = ly - sh.y, d = Math.hypot(ox, oy) + 0.01;
+      sh.cool = Math.max(0, sh.cool - dt);
+      if (sh.stun > 0) {
+        // Stunned: knocked back, crackling, and open to a dash.
+        sh.stun -= dt;
+        const dr = Math.pow(0.08, dt); sh.vx *= dr; sh.vy *= dr;
+        if (Math.random() < dt * 30) {
+          const a = Math.random() * TAU;
+          addFx(sh.x + Math.cos(a) * 30, sh.y + Math.sin(a) * 30, Math.cos(a) * 90, Math.sin(a) * 90, 0.35, 3, STUN[0], STUN[1], STUN[2], 2);
+        }
+      } else {
+        // Hunt you when you're near, or anywhere close while you wake a star.
+        // After a hit it circles for a moment instead.
+        const sense = T.shadeSense * (charging() ? 1.8 : 1);
+        let ax = 0, ay = 0;
+        if (d < sense && !W.exiting) {
+          const wob = sh.cool > 0 ? 1.4 : Math.sin(t * 2.3 + sh.ph) * 0.5;
+          ax = (ox / d - oy / d * wob) * T.shadeSpeed; ay = (oy / d + ox / d * wob) * T.shadeSpeed;
+        } else {
+          const hx = sh.homeX - sh.x, hy = sh.homeY - sh.y, hd = Math.hypot(hx, hy) + 0.01;
+          if (hd > 60) { ax = hx / hd * T.shadeSpeed * 0.4; ay = hy / hd * T.shadeSpeed * 0.4; }
+        }
+        const k = Math.min(1, dt * 1.7);
+        sh.vx += (ax - sh.vx) * k; sh.vy += (ay - sh.vy) * k;
+      }
+      let nx = sh.x + sh.vx * dt, ny = sh.y + sh.vy * dt;
+      // It won't go into a woken star's light.
+      for (const b of W.beacons) {
+        if (!b.lit) continue;
+        const bx = nx - b.x, by = ny - b.y, bd = Math.hypot(bx, by) + 0.01, keep = b.lightR * 0.8;
+        if (bd < keep) { nx = b.x + bx / bd * keep; ny = b.y + by / bd * keep; }
+      }
+      sh.x = Math.max(60, Math.min(W.w - 60, nx)); sh.y = Math.max(60, Math.min(W.h - 60, ny));
+      // It drinks loose light it passes over, and gives it back when it breaks.
+      for (let i = W.nm - 1; i >= 0; i--) {
+        if (mState[i] !== M_LOOSE) continue;
+        const mx2 = mx[i] - sh.x, my2 = my[i] - sh.y;
+        if (mx2 * mx2 + my2 * my2 < 70 * 70) { sh.ate += mWorth[i]; W.lost += mWorth[i]; removeMote(i); }
+      }
+      // A cloak of dark-red embers.
+      if (Math.abs(sh.x - lx) < 1600 && Math.abs(sh.y - ly) < 1200) {
+        for (let n = 0; n < 3; n++) {
+          const a = Math.random() * TAU, rr = 34 + Math.random() * 26, sp = 160;
+          addFx(sh.x + Math.cos(a) * rr, sh.y + Math.sin(a) * rr, -Math.sin(a) * sp + sh.vx * 0.5, Math.cos(a) * sp + sh.vy * 0.5,
+            0.5, 3.2, 0.9, 0.08, 0.25 + Math.random() * 0.25, 0.5);
+        }
+      }
+      // Contact.
+      const reach = W.swR * 0.55 + 46;
+      if (d < reach && W.nFollow > 0) {
+        if (W.phaseT > 0) { if (sh.stun > 0) killShade(sh); }      // dashed through: only a stunned one breaks
+        else if (sh.stun <= 0 && sh.cool <= 0) {
+          shatter(T.shadeHit, sh.x, sh.y);
+          sh.cool = T.shadeCool; sh.vx = -ox / d * 300; sh.vy = -oy / d * 300;
+          W.events.push({ t: 'shadeHit' });
+        }
+      }
+    }
+
+    // ---- knells and waves of dark ----
+    for (const k of W.knells) {
+      if (k.closed || W.exiting) continue;
+      k.t -= dt;
+      if (!k.warned && k.t < T.knellWarn) { k.warned = true; W.events.push({ t: 'knellWarn', x: k.x, y: k.y }); }
+      if (k.t <= 0) { k.t = k.every; k.warned = false; ringWave(k.x, k.y, k.reach, false); }
+    }
+    if (W.boss && !W.boss.dying && !W.exiting) {
+      // The Eclipse rings faster as its stars wake.
+      W.bossT -= dt;
+      const lit = W.beacons.filter(b => b.lit).length;
+      if (W.bossT <= 0) { W.bossT = Math.max(4, T.bossEvery - lit * 0.8); ringWave(W.boss.x, W.boss.y, T.bossReach, true); }
+    }
+    for (let vi = W.waves.length - 1; vi >= 0; vi--) {
+      const v = W.waves[vi];
+      v.r += T.waveSpeed * dt;
+      if (v.r > v.reach + T.waveWidth) { W.waves.splice(vi, 1); continue; }
+      // Most of the swarm is near the leader: skip the wave if it's nowhere close.
+      const ld = Math.hypot(lx - v.x, ly - v.y);
+      if (W.phaseT > 0 || W.exiting || Math.abs(ld - v.r) > W.swR * 2.2 + T.waveWidth || v.r > v.reach) continue;
+      const half = T.waveWidth / 2, p = T.waveBite * dt, fade = 1 - Math.max(0, v.r - v.reach * 0.8) / (v.reach * 0.2);
+      let hit = false;
+      for (let i = W.ns - 1; i >= 0; i--) {
+        const pd = Math.hypot(sx[i] - v.x, sy[i] - v.y);
+        if (Math.abs(pd - v.r) > half || Math.random() > p * fade) continue;
+        if (sheltered(sx[i], sy[i])) continue;
+        if (sState[i] === S_TO_BEACON && W.beacons[sTgt[i]]) W.beacons[sTgt[i]].incoming--;
+        if (Math.random() < 0.3) addFx(sx[i], sy[i], (sx[i] - v.x) / pd * 120, (sy[i] - v.y) / pd * 120, 0.6, 3, RED[0], RED[1], RED[2], 1);
+        removeSwarm(i); W.lost++; W.waveLost++; hit = true;
+      }
+      if (hit) { breakCombo(); if (!v.hit) { v.hit = true; W.hits++; W.events.push({ t: 'waveHit' }); } }
     }
 
     // ---- motes ----
@@ -903,9 +1125,9 @@
           }
           if (done) continue;
         }
-        // Hollows pull, and eat what crosses the edge.
+        // Hollows pull, and eat what crosses the edge. Not while dashing.
         let eaten = false;
-        for (let hi = 0; hi < nh; hi++) {
+        for (let hi = 0; hi < (W.phaseT > 0 ? 0 : nh); hi++) {
           const h = hs[hi];
           if (h.dying) continue;
           const ox = h.x - x, oy = h.y - y, d2 = ox * ox + oy * oy;
@@ -918,7 +1140,7 @@
         if (eaten) {
           if (st === S_TO_BEACON && W.beacons[sTgt[i]]) W.beacons[sTgt[i]].incoming--;
           if (Math.random() < 0.5) addFx(x, y, vx * 0.2, vy * 0.2, 0.5, 2.6, DARK[0], DARK[1], DARK[2], 1);
-          removeSwarm(i); W.lost++;
+          removeSwarm(i); W.lost++; breakCombo();
           if (Math.random() < 0.15) W.events.push({ t: 'lost' });
           continue;
         }

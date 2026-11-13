@@ -37,7 +37,7 @@
     del(key) { try { localStorage.removeItem('drift_' + key); } catch (e) { /* private mode */ } },
   };
 
-  const freshStats = () => ({ time: 0, light: 0, lost: 0, stars: 0, wisps: 0 });
+  const freshStats = () => ({ time: 0, light: 0, lost: 0, stars: 0, wisps: 0, shades: 0, rating: 0 });
   const G = {
     state: 'boot',
     realm: 0,
@@ -51,6 +51,7 @@
     white: 0, whiteTo: 0, whiteRate: 1,
     flash: 0,
     lit: 0, fog: 0, boost: 0,   // smoothed values for the renderer (boost: surging)
+    shake: 0,              // screen shake, in world units; decays by itself
     quality: TOUCH ? 0.75 : 1,
     timer: 0,              // seconds in the current state
     bot: false,
@@ -111,8 +112,8 @@
   const STICK_R = 56;      // CSS px from the centre to full speed
   const STICK_DEAD = 7;    // CSS px that count as "not moved"
   const keys = { l: false, r: false, u: false, d: false };
-  let wantPulse = false;
-  const inp = { tx: 0, ty: 0, active: false, pulse: false, camX: 0, camY: 0, hw: 0, hh: 0 };
+  let wantPulse = false, wantDash = false;
+  const inp = { tx: 0, ty: 0, active: false, pulse: false, dash: false, camX: 0, camY: 0, hw: 0, hh: 0 };
 
   const toWorldX = x => cam.x + (x - view.w / 2) / pxCss();
   const toWorldY = y => cam.y + (y - view.h / 2) / pxCss();
@@ -132,7 +133,8 @@
     audio.init();
     if (e.pointerType === 'mouse') {
       ptr.x = e.clientX; ptr.y = e.clientY; ptr.seen = true;
-      wantPulse = true;                              // mouse: click to pulse
+      if (e.button === 2) wantDash = true;           // mouse: right-click to dash...
+      else wantPulse = true;                         // ...and click to pulse
       return;
     }
     if (stick.on) { wantPulse = true; return; }      // a second finger anywhere pulses
@@ -161,11 +163,13 @@
   };
   canvas.addEventListener('pointerup', release);
   canvas.addEventListener('pointercancel', release);
+  canvas.addEventListener('contextmenu', e => e.preventDefault());   // right-click is dash, not a menu
 
   const KEYMAP = { ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'd' };
   window.addEventListener('keydown', e => {
     if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = true; e.preventDefault(); audio.init(); }
     else if (e.code === 'Space') { wantPulse = true; e.preventDefault(); audio.init(); }
+    else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { if (!e.repeat) wantDash = true; e.preventDefault(); audio.init(); }
     else if (e.code === 'Escape' || e.code === 'KeyP') { if (G.state === 'play') pause(); else if (G.state === 'paused') resume(); }
     else if (e.code === 'KeyM') setMuted(!audio.muted);
   });
@@ -174,6 +178,7 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden && G.state === 'play') pause(); });
 
   $('pulseBtn').addEventListener('pointerdown', e => { e.preventDefault(); audio.init(); wantPulse = true; });
+  $('dashBtn').addEventListener('pointerdown', e => { e.preventDefault(); audio.init(); wantDash = true; });
   $('pauseBtn').addEventListener('click', () => pause());
 
   /** Where is the player steering? Fills `inp` for this step. */
@@ -199,7 +204,8 @@
       inp.tx = toWorldX(ptr.x); inp.ty = toWorldY(ptr.y); inp.active = true;
     } else inp.active = false;
     inp.pulse = wantPulse && steering;
-    wantPulse = false;
+    inp.dash = wantDash && steering;
+    wantPulse = wantDash = false;
     const p = pxCss();
     inp.camX = cam.x; inp.camY = cam.y; inp.hw = view.w / 2 / p; inp.hh = view.h / 2 / p;
   }
@@ -227,7 +233,7 @@
   function hidePanel() { panel.classList.remove('show'); panel.innerHTML = ''; overlay.className = ''; panelClick = null; }
 
   function setHud(on) {
-    $('hud').hidden = !on; $('pulseBtn').hidden = !on;
+    $('hud').hidden = !on; $('pulseBtn').hidden = !on; $('dashBtn').hidden = !on;
     if (!on) { $('arrows').innerHTML = ''; $('beaconLabel').style.opacity = 0; hideHint(); }
   }
 
@@ -257,7 +263,26 @@
     $('pips').innerHTML = W.beacons.map(b => `<i class="${b.heart ? 'heart' : ''}"></i>`).join('');
   }
 
-  const hudCache = { light: -1, name: '', heat: -1, surge: false };
+  const hudCache = { light: -1, name: '', heat: -1, surge: false, secs: -1, combo: '' };
+  const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+  /**
+   * A realm's rating: three stars at or under par, two within half again of
+   * it, one for finishing at all.
+   */
+  const rate = (secs, par) => (secs <= par ? 3 : secs <= par * 1.5 ? 2 : 1);
+  const starText = n => '★'.repeat(n) + '☆'.repeat(3 - n);
+
+  /** Rate the realm just finished, remember the best, and describe it. */
+  function rateRealm() {
+    const par = DL.REALMS[G.realm].par, secs = Math.round(G.realmTime), stars = rate(secs, par);
+    const best = store.get('best', {});
+    const record = stars > (best[G.realm] || 0);
+    if (record) { best[G.realm] = stars; store.set('best', best); }
+    G.stats.rating += stars;
+    return `<p class="rating">${starText(stars)}</p>
+      <p class="caps">${fmtTime(secs)} &middot; par ${fmtTime(par)} &middot; best chain ${W.bestCombo}${record && best[G.realm] > 1 ? ' &middot; new best' : ''}</p>`;
+  }
   function updateHud() {
     if ($('hud').hidden) return;
     if (W.nFollow !== hudCache.light) { hudCache.light = W.nFollow; $('lightNum').textContent = W.nFollow.toLocaleString(); }
@@ -271,6 +296,24 @@
       $('heatFill').style.transform = `scaleX(${heat / 100})`;
       $('heat').classList.toggle('surge', W.surge);
     }
+    // The clock against par: gold while you're under it.
+    const secs = Math.floor(G.realmTime), par = DL.REALMS[G.realm].par;
+    if (secs !== hudCache.secs) {
+      hudCache.secs = secs;
+      $('clock').textContent = `${fmtTime(secs)} / par ${fmtTime(par)}`;
+      $('clock').classList.toggle('over', secs > par);
+    }
+    // The chain: shown once it's worth something, gone when it breaks.
+    const live = W.time - W.lastCollect < T.comboGap && W.combo >= 5;
+    const ctext = live ? (W.comboMul > 1 ? `×${W.comboMul} · ` : '') + `${W.combo} chain` : '';
+    if (ctext !== hudCache.combo) {
+      hudCache.combo = ctext;
+      const el = $('combo');
+      el.textContent = ctext; el.classList.toggle('hot', W.comboMul > 1);
+    }
+    const db = $('dashBtn');
+    db.style.setProperty('--cd', clamp(1 - W.dashCd / T.dashCool, 0, 1).toFixed(3));
+    db.classList.toggle('ready', W.dashCd <= 0);
     const pb = $('pulseBtn'), cd = 1 - W.pulseCd / (T.pulseCooldown / W.mul.echo);
     pb.style.setProperty('--cd', clamp(cd, 0, 1).toFixed(3));
     pb.classList.toggle('ready', W.pulseCd <= 0);
@@ -405,8 +448,9 @@
   /** The realm is done: bank the stats and offer a gift for the next one. */
   function finishRealm() {
     G.stats.light += W.realmLight; G.stats.lost += W.lost; G.stats.wisps += W.wispsKilled;
-    G.stats.stars += W.beacons.length;
-    const crossed = W.exitCount;                    // read before the next realm replaces the world
+    G.stats.stars += W.beacons.length; G.stats.shades += W.shadesKilled;
+    const rating = rateRealm();                     // read before the next realm replaces the world
+    const crossed = W.exitCount;
     G.carry = Math.min(T.carryCap, Math.round(crossed * T.carryFrac) + T.carryBase);
     startRealm(G.realm + 1, true);
     save();
@@ -416,6 +460,7 @@
     while (choices.length < 3 && open.length) choices.push(open.splice((Math.random() * open.length) | 0, 1)[0]);
     const dots = g => '●'.repeat(G.gifts[g.id] || 0) + '○'.repeat(g.max - (G.gifts[g.id] || 0));
     showPanel(`
+      ${rating}
       <p class="caps">${crossed.toLocaleString()} light crossed over &middot; ${G.carry.toLocaleString()} stays with you</p>
       <h2>Choose a gift</h2>
       <div class="gifts">${choices.map(g => `
@@ -438,8 +483,8 @@
       <button class="btn" data-act="sound">${soundLabel()}</button>
       <button class="btn" data-act="restart">Restart realm</button>
       <button class="btn" data-act="quit">Leave</button>
-      <p style="font-size:15px;margin-top:14px">${TOUCH ? 'Touch anywhere and drag to steer: your thumb is the stick. Tap, or touch with a second finger, to pulse.'
-                : 'Move with the mouse or the arrow keys. Click or press space to pulse.'}</p>`,
+      <p style="font-size:15px;margin-top:14px">${TOUCH ? 'Touch anywhere and drag to steer: your thumb is the stick. Tap, or touch with a second finger, to pulse. Tap Dash to dash.'
+                : 'Move with the mouse or the arrow keys. Click or press space to pulse. Right-click or Shift to dash.'}</p>`,
     'dim', act => {
       if (act === 'resume') resume();
       else if (act === 'sound') { setMuted(!audio.muted); panel.querySelector('[data-act=sound]').textContent = soundLabel(); }
@@ -464,6 +509,8 @@
 
   function showEnd() {
     G.stats.light += W.realmLight; G.stats.lost += W.lost; G.stats.wisps += W.wispsKilled; G.stats.stars += W.beacons.length;
+    G.stats.shades += W.shadesKilled;
+    const last = rateRealm();
     const s = G.stats, mins = Math.max(1, Math.round(s.time / 60));
     store.del('save');
     store.set('done', { stats: s });
@@ -475,12 +522,15 @@
       <p class="quote">The light shines in the darkness,<br>and the darkness hasn’t overcome it.</p>
       <p class="caps" style="margin-top:10px">John 1:5</p>
       <div class="stats">
+        <span>Rating</span><span>${s.rating} / ${DL.REALMS.length * 3} ★</span>
         <span>Stars woken</span><span>${s.stars}</span>
         <span>Light gathered</span><span>${s.light.toLocaleString()}</span>
         <span>Light lost to the dark</span><span>${s.lost.toLocaleString()}</span>
         <span>Wisps scattered</span><span>${s.wisps}</span>
+        <span>Shades broken</span><span>${s.shades}</span>
         <span>Time</span><span>${mins} min</span>
       </div>
+      <p class="caps">The Eclipse ${last.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()}</p>
       <button class="btn" data-act="wander">Stay a while</button>
       <button class="btn" data-act="again">New journey</button>
       <div class="links"><a class="link" href="../">All games</a></div>`, 'dim', act => {
@@ -503,6 +553,21 @@
         case 'wispSpawn': audio.wispSpawn(); break;
         case 'returned': audio.returned(); break;
         case 'comet': audio.comet(); break;
+        case 'dash': audio.dash(); break;
+        case 'combo':
+          audio.combo(e.mul);
+          if (!G.told.combo) tell('combo', DL.HINT_COMBO);
+          break;
+        case 'leak': if (!G.told.leak) tell('leak', DL.HINT_LEAK); break;
+        case 'shadeHit': audio.shadeHit(); shake(28); break;
+        case 'shadeStun': audio.shadeStun(); break;
+        case 'shadeDie': audio.shadeDie(); shake(22); G.flash = Math.max(G.flash, REDUCED ? 0.08 : 0.3); break;
+        case 'knellWarn':
+          audio.knellWarn();
+          if (!G.told.knell && Math.hypot(e.x - W.lx, e.y - W.ly) < 1600) tell('knell', TOUCH ? DL.HINT_KNELL.touch : DL.HINT_KNELL.text);
+          break;
+        case 'knell': audio.knell(e.boss); shake(e.boss ? 16 : 8); break;
+        case 'waveHit': audio.waveHit(); shake(18); break;
         case 'surge':
           audio.surge(); G.flash = Math.max(G.flash, REDUCED ? 0.06 : 0.22);
           if (G.state === 'play' && !G.told.surge) { G.told.surge = true; showHint(DL.HINT_SURGE); }
@@ -512,9 +577,9 @@
           if (G.state === 'play' && !G.told.starfall) { G.told.starfall = true; showHint(DL.HINT_STARFALL); }
           break;
         case 'rekindle': audio.rekindle(); if (G.state === 'play') showHint('A few sparks find you again.'); break;
-        case 'ignite': audio.ignite(e.heart); G.flash = REDUCED ? 0.12 : 0.45; break;
+        case 'ignite': audio.ignite(e.heart); G.flash = REDUCED ? 0.12 : 0.45; shake(14); break;
         case 'portal': audio.portal(); break;
-        case 'heart': audio.heart(); G.flash = REDUCED ? 0.15 : 0.6; break;
+        case 'heart': audio.heart(); G.flash = REDUCED ? 0.15 : 0.6; shake(40); break;
         case 'exit':
           if (G.state === 'play') { audio.exit(); setState('exit'); setHud(false); }
           break;
@@ -526,9 +591,22 @@
     ev.length = 0;
   }
 
+  /** A one-time hint for something that can happen in any realm. */
+  function tell(key, text) {
+    if (G.state !== 'play') return;
+    G.told[key] = true; showHint(text);
+  }
+
+  /** Shake the screen (unless the player prefers less motion). */
+  function shake(amount) { if (!REDUCED) G.shake = Math.max(G.shake, amount); }
+
   /** Show the next hint whose moment has come. */
   function updateHints() {
     if (G.state !== 'play' || G.clock - hintShownAt < 3.5) return;
+    if (!G.told.shade && W.shades.some(sh => Math.hypot(sh.x - W.lx, sh.y - W.ly) < 800)) {
+      tell('shade', TOUCH ? DL.HINT_SHADE.touch : DL.HINT_SHADE.text);
+      return;
+    }
     for (const h of DL.REALMS[G.realm].hints || []) {
       if (G.hints.has(h)) continue;
       if (h.when(W, G)) { G.hints.add(h); showHint(TOUCH && h.touch ? h.touch : h.text); }
@@ -595,11 +673,13 @@
 
     // Draw.
     const p = pxCss();
-    const s = scene.fill({ camX: cam.x, camY: cam.y, hw: view.w / 2 / p, hh: view.h / 2 / p });
+    G.shake = Math.max(0, G.shake - dt * Math.max(30, G.shake * 4));
+    const ox = (Math.random() - 0.5) * G.shake, oy = (Math.random() - 0.5) * G.shake;
+    const s = scene.fill({ camX: cam.x + ox, camY: cam.y + oy, hw: view.w / 2 / p, hh: view.h / 2 / p });
     const litTo = W.sandbox ? 0.85 : W.beacons.length ? W.beacons.filter(b => b.lit).length / W.beacons.length : 0;
     G.lit += (litTo - G.lit) * Math.min(1, dt * 0.7);
     G.fog += ((W.fog ? 1 : 0) - G.fog) * Math.min(1, dt * 1.5);
-    frame.camX = cam.x; frame.camY = cam.y; frame.px = p * view.scale;
+    frame.camX = cam.x + ox; frame.camY = cam.y + oy; frame.px = p * view.scale;
     frame.time = G.clock; frame.dt = dt; frame.pal = W.pal;
     frame.lit = G.lit; frame.fog = G.fog;
     G.boost += ((W.surge ? 1 : 0) - G.boost) * Math.min(1, dt * 2.5);
@@ -635,14 +715,16 @@
   //                     nothing (the edge arrows point there): a fairer guess
   const bot = { mx: 0, my: 0, re: 0, committed: null, sight: 0, has: false };
   function botSteer(inp) {
-    inp.active = true; inp.pulse = false;
+    inp.active = true; inp.pulse = false; inp.dash = false;
     let tx, ty, charging = false;
     if (W.portalOpen) { tx = W.portalX; ty = W.portalY; }
     else {
       let b = null, bd = 1e9;
       for (const q of W.beacons) { if (q.lit) continue; const d = Math.hypot(q.x - W.lx, q.y - W.ly); if (d < bd) { bd = d; b = q; } }
       const need = b ? b.cost - b.filled - b.incoming : 0;
-      if (b && (W.nFollow >= need + 15 || (bot.committed === b && W.nFollow > 5))) {
+      // Go when it can afford the rest, or is as big as a swarm gets (a great
+      // star can need more than one trip).
+      if (b && (W.nFollow >= Math.min(need + 15, T.swarmCap * 0.95) || (bot.committed === b && W.nFollow > 5))) {
         tx = b.x; ty = b.y; bot.committed = b; charging = bd < T.chargeR;
       } else {
         bot.committed = null;
@@ -680,6 +762,32 @@
         }
       }
     }
+    inp.dash = false;
+    // Shades: stun with a pulse, then dash through. Keep away otherwise.
+    let shade = null, sd = 520;
+    for (const sh of W.shades) { const d = Math.hypot(sh.x - W.lx, sh.y - W.ly); if (d < sd) { sd = d; shade = sh; } }
+    if (shade) {
+      if (shade.stun > 0.3 && W.dashCd <= 0) {
+        tx = shade.x; ty = shade.y;
+        if (sd < 300) inp.dash = true;
+      } else if (shade.stun <= 0) {
+        if (W.pulseCd <= 0 && sd < W.pulseMax * 0.75) inp.pulse = true;
+        else if (!charging || sd < 260) { tx = W.lx - (shade.x - W.lx) / sd * 300; ty = W.ly - (shade.y - W.ly) / sd * 300; }
+      }
+    }
+    // Waves of dark: dash inward across one that's about to arrive.
+    for (const v of W.waves) {
+      const d = Math.hypot(W.lx - v.x, W.ly - v.y), gap = d - v.r;
+      if (gap > 0 && gap < 70 + W.swR * 0.6 && v.r < v.reach && !W.sheltered(W.lx, W.ly) && W.dashCd <= 0) {
+        tx = v.x; ty = v.y; inp.dash = true;
+      }
+    }
+    // Deep in a hollow's pull: dash out.
+    for (const h of W.hollows) {
+      if (h.dying || W.dashCd > 0) continue;
+      const d = Math.hypot(W.lx - h.x, W.ly - h.y) + 0.01;
+      if (d < h.pullR * 0.45 + W.swR * 0.3) { tx = W.lx + (W.lx - h.x) / d * 400; ty = W.ly + (W.ly - h.y) / d * 400; inp.dash = true; }
+    }
     inp.tx = tx; inp.ty = ty;
     // Pulse when a wisp is surely inside the ring's reach, or when there is a lot of light to call in.
     if (W.pulseCd <= 0 && (W.wisps.some(w => Math.hypot(w.x - W.lx, w.y - W.ly) < W.pulseMax * 0.8) || bot.near >= 14)) inp.pulse = true;
@@ -697,7 +805,14 @@
     G.bot = true;
     const max = (opts.max || 1200) / STEP;
     let steps = 0, surging = 0;
-    while (steps < max && !W.exiting && !W.finished) { stepOnce(); W.events.length = 0; steps++; if (W.surge) surging++; }
+    const trace = [], every = opts.every ? Math.round(opts.every / STEP) : 0;   // optional snapshots, for finding stalls
+    while (steps < max && !W.exiting && !W.finished) {
+      stepOnce(); W.events.length = 0; steps++; if (W.surge) surging++;
+      if (every && steps % every === 0) {
+        trace.push(`${Math.round(steps * STEP)}s light=${W.nFollow} motes=${W.nm} at=${Math.round(W.lx)},${Math.round(W.ly)} hits=${W.hits} ` +
+          W.beacons.map(q => q.lit ? 'LIT' : `${q.filled}/${q.cost}`).join(' '));
+      }
+    }
     G.bot = false;
     const done = W.exiting || W.finished;
     const end = W.exiting ? W.exitCount : W.nFollow;
@@ -705,6 +820,9 @@
       realm: index + 1, done, seconds: Math.round(steps * STEP), need: W.need, gathered: W.realmLight, lost: W.lost,
       end, carry: Math.min(T.carryCap, Math.round(end * T.carryFrac) + T.carryBase),
       surges: W.surges, surgePct: Math.round(100 * surging / Math.max(1, steps)), starfalls: W.starfalls,
+      comboPct: Math.round(100 * W.comboBonus / Math.max(1, W.realmLight)),
+      dashes: W.dashes, hits: W.hits, waveLost: W.waveLost, shades: W.shadesKilled, bestCombo: W.bestCombo,
+      stars: rate(Math.round(steps * STEP), DL.REALMS[index].par || 1e9), trace,
     };
   }
 

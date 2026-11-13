@@ -48,6 +48,11 @@
   #heat.surge #heatFill { background: linear-gradient(90deg, #ff5a8a, #ffd24a, #7affc8, #6ae8ff, #b78cff, #ff5a8a); background-size: 200% 100%; animation: heat 1s linear infinite; }
   @keyframes heat { to { background-position: -200% 0; } }
   @media (prefers-reduced-motion: reduce) { #heat.surge #heatFill { animation: none; } }
+  /* The clock against par, and the current chain of gathered motes. */
+  #clock { margin-top: 6px; font-size: 11px; letter-spacing: .14em; color: var(--gold); font-variant-numeric: tabular-nums; }
+  #clock.over { color: var(--dim); }
+  #combo { margin-top: 4px; min-height: 18px; font-family: var(--serif); font-size: 16px; color: var(--dim); transition: color .2s; }
+  #combo.hot { color: #ffd0f0; text-shadow: 0 0 10px rgba(255, 140, 220, .9); }
   #pips { margin: 4px auto 0; display: flex; gap: 9px; }
   #pips i {
     width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--dim); transition: all .8s;
@@ -68,6 +73,8 @@
     text-shadow: 0 1px 10px rgba(0, 0, 0, .9); opacity: 0; transition: opacity 1s; pointer-events: none;
   }
   #hint.show { opacity: .95; }
+  /* On narrow screens the HUD's four lines sit above the hint, not beside it. */
+  @media (max-width: 700px) { #hint { top: calc(max(14px, env(safe-area-inset-top)) + 128px); } }
 
   /* Arrows at the screen's edge toward stars still sleeping. */
   #arrows i {
@@ -112,7 +119,22 @@
     -webkit-mask: radial-gradient(circle, transparent 64%, #000 66%); mask: radial-gradient(circle, transparent 64%, #000 66%);
   }
   #pulseBtn.ready { color: var(--ink); }
-  @media (pointer: fine) { #pulseBtn { width: 58px; height: 58px; font-size: 8px; } }
+  /* Dash sits up and to the left of Pulse, both in reach of the right thumb. */
+  #dashBtn {
+    position: fixed; right: calc(max(20px, env(safe-area-inset-right)) + 84px); bottom: calc(max(20px, env(safe-area-inset-bottom)) + 46px); z-index: 6;
+    width: 62px; height: 62px; border-radius: 50%;
+    text-transform: uppercase; letter-spacing: .2em; font-size: 9px; color: var(--dim); transition: color .3s;
+  }
+  #dashBtn::before {
+    content: ''; position: absolute; inset: 0; border-radius: 50%;
+    background: conic-gradient(#9fe0ff calc(var(--cd, 1) * 360deg), rgba(255, 255, 255, .14) 0);
+    -webkit-mask: radial-gradient(circle, transparent 62%, #000 65%); mask: radial-gradient(circle, transparent 62%, #000 65%);
+  }
+  #dashBtn.ready { color: #cdeeff; }
+  @media (pointer: fine) {
+    #pulseBtn { width: 58px; height: 58px; font-size: 8px; }
+    #dashBtn { width: 48px; height: 48px; font-size: 7px; right: calc(max(20px, env(safe-area-inset-right)) + 66px); bottom: calc(max(20px, env(safe-area-inset-bottom)) + 30px); }
+  }
 
   /* ---------- Realm title card ---------- */
   #card {
@@ -158,6 +180,7 @@
   .gift b { display: block; font-family: var(--serif); font-weight: 500; font-size: 24px; color: var(--gold); }
   .gift span { display: block; font-family: var(--serif); font-size: 16px; color: var(--dim); margin-top: 6px; line-height: 1.3; }
   .gift small { display: block; margin-top: 10px; letter-spacing: .3em; color: var(--dim); font-size: 10px; }
+  #panel .rating { font-size: 34px; letter-spacing: .2em; color: var(--gold); margin: 0; text-shadow: 0 0 18px rgba(255, 217, 160, .6); }
   .stats { display: grid; grid-template-columns: 1fr auto; gap: 4px 28px; max-width: 320px; margin: 18px auto; text-align: left; font-family: var(--serif); font-size: 18px; color: var(--dim); }
   .stats span:nth-child(even) { color: var(--ink); text-align: right; }
 </style>
@@ -170,6 +193,8 @@
     <div id="realmName"></div>
     <div id="light"><span id="lightNum">0</span>light</div>
     <div id="heat"><div id="heatFill"></div></div>
+    <div id="clock"></div>
+    <div id="combo"></div>
   </div>
   <div id="pips"></div>
   <button id="pauseBtn" aria-label="Pause">II</button>
@@ -179,6 +204,7 @@
 <div id="beaconLabel"></div>
 <div id="stick"><div id="stickKnob"></div></div>
 <button id="pulseBtn" hidden aria-label="Pulse">pulse</button>
+<button id="dashBtn" hidden aria-label="Dash">dash</button>
 
 <div id="card">
   <div id="cardNum"></div>

@@ -185,6 +185,47 @@
       gfx.sprite(W.pulseX, W.pulseY, W.pulseRad / 0.86, 1, 1, 1, (1 - u) * 0.6, gfx.RING);
     }
 
+    // Waves of dark: a crisp crimson ring with a violet shadow inside it.
+    for (const v of W.waves) {
+      const fade = Math.min(1, v.r / 120) * Math.max(0, Math.min(1, (v.reach - v.r) / (v.reach * 0.2) + 0.15));
+      if (fade <= 0) continue;
+      // RING's thickness is (sprite radius / (16 + phase)); pick the phase so
+      // the drawn band is as wide as the band that actually bites.
+      const R1 = v.r / 0.86, R2 = Math.max(1, v.r - 30) / 0.86;
+      gfx.sprite(v.x, v.y, R1, 1, 0.2, 0.32, 0.85 * fade, gfx.RING, Math.max(0, R1 / (DL.TUNE.waveWidth * 0.4) - 16));
+      gfx.sprite(v.x, v.y, R2, 0.5, 0.15, 0.9, 0.45 * fade, gfx.RING, Math.max(0, R2 / 60 - 16));
+    }
+
+    // Knells: a dark bell that swells and brightens before it rings.
+    for (const k of W.knells) {
+      if (k.closed || !seen(k.x, k.y, 300)) continue;
+      const warn = k.t < DL.TUNE.knellWarn ? 1 - k.t / DL.TUNE.knellWarn : 0;
+      gfx.sprite(k.x, k.y, 150 + 90 * warn, 1, 0.18, 0.3, 0.25 + 0.6 * warn, gfx.GLOW);
+      gfx.sprite(k.x, k.y, 70 + 20 * Math.sin(t * 3), 1, 0.3, 0.4, 0.5 + 0.5 * warn, gfx.RING, 20);
+      if (warn > 0) gfx.sprite(k.x, k.y, (60 + 300 * (1 - warn)) / 0.86, 1, 0.3, 0.4, warn * 0.8, gfx.RING, 30);   // gathering inward
+    }
+
+    // Shades: an ember cloak (from world.js) around a dark core, drawn as a
+    // lens below. Stunned ones flicker blue-white.
+    for (const sh of W.shades) {
+      if (!seen(sh.x, sh.y, 120)) continue;
+      if (sh.stun > 0) {
+        const f = 0.6 + 0.4 * Math.sin(t * 40);
+        gfx.sprite(sh.x, sh.y, 110, 0.6, 0.85, 1, 0.5 * f, gfx.GLOW);
+        gfx.sprite(sh.x, sh.y, 70, 0.7, 0.9, 1, 0.9 * f, gfx.RING, 25);
+      } else {
+        gfx.sprite(sh.x, sh.y, 120, 0.9, 0.1, 0.25, 0.35, gfx.GLOW);
+      }
+    }
+
+    // Dash: a streak of light along the burst, and a ring where it began.
+    if (W.dashT > 0 || W.phaseT > 0) {
+      const k = Math.max(0, W.phaseT / (DL.TUNE.dashTime + DL.TUNE.dashGrace)), len = 140 + W.swR * 0.6;
+      gfx.quad(W.lx - W.dashX * len * 0.5, W.ly - W.dashY * len * 0.5, W.dashX * len, W.dashY * len, -W.dashY * 30, W.dashX * 30,
+        1, 1, 1, 0.8 * k, gfx.BEAM);
+      gfx.sprite(W.lx, W.ly, W.swR * 1.1 + 40, 1, 1, 1, 0.5 * k, gfx.RING, 20);
+    }
+
     for (const w of W.wisps) {
       if (!seen(w.x, w.y, 60)) continue;
       const flick = 0.75 + 0.25 * Math.sin(t * 23 + w.ph);
@@ -203,11 +244,15 @@
     // ---- hollows (drawn by the final shader as lenses) ----
     // Up to eight, nearest the camera first.
     hollows.fill(0);
-    const hs = W.hollows.filter(h => seen(h.x, h.y, h.r * 10))
-      .sort((p, q) => Math.hypot(p.x - view.camX, p.y - view.camY) - Math.hypot(q.x - view.camX, q.y - view.camY));
-    for (let i = 0; i < Math.min(8, hs.length); i++) {
-      const h = hs[i];
-      hollows[i * 4] = h.x; hollows[i * 4 + 1] = h.y; hollows[i * 4 + 2] = h.r; hollows[i * 4 + 3] = h.dying ? 1 + h.dying * 2 : 1;
+    // Shades and knells are small dark lenses too, with a weaker rim.
+    const lens = [];
+    for (const h of W.hollows) if (seen(h.x, h.y, h.r * 10)) lens.push({ x: h.x, y: h.y, r: h.r, w: h.dying ? 1 + h.dying * 2 : 1 });
+    for (const sh of W.shades) if (seen(sh.x, sh.y, 200)) lens.push({ x: sh.x, y: sh.y, r: sh.stun > 0 ? 18 : 26 + 3 * Math.sin(t * 5 + sh.ph), w: 0.5 });
+    for (const k of W.knells) if (!k.closed && seen(k.x, k.y, 300)) lens.push({ x: k.x, y: k.y, r: 34, w: 0.7 });
+    lens.sort((p, q) => Math.hypot(p.x - view.camX, p.y - view.camY) - Math.hypot(q.x - view.camX, q.y - view.camY));
+    for (let i = 0; i < Math.min(8, lens.length); i++) {
+      const h = lens[i];
+      hollows[i * 4] = h.x; hollows[i * 4 + 1] = h.y; hollows[i * 4 + 2] = h.r; hollows[i * 4 + 3] = h.w;
     }
 
     // ---- lights that hold back the fog: you, then lit beacons ----

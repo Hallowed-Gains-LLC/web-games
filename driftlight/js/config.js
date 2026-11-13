@@ -21,7 +21,7 @@ DL.TUNE = {
   // bot (see the README) measures the result.
   worldScale: 1.35,      // every position and distance in a realm is multiplied by this
   moteScale: 8,          // every vein has this many times the motes
-  costScale: 8,          // every beacon needs this many times the light
+  costScale: 10,         // every beacon needs this many times the light
 
   leaderSpeed: 340,      // units/s
   leaderAccel: 5.5,      // how quickly the leader reaches its wanted velocity
@@ -54,6 +54,43 @@ DL.TUNE = {
   starfallCount: 46,
   starfallShare: 0.05,       // a whole shower is worth this share of the realm's need
 
+  // Dash: a short burst of speed. The swarm can't be touched while it lasts,
+  // plus a moment of grace so the stragglers make it through too.
+  dashTime: 0.24,        // seconds
+  dashSpeed: 1150,       // units/s
+  dashGrace: 0.3,        // seconds
+  dashCool: 2.2,         // seconds
+
+  // Combo: motes gathered in an unbroken chain are worth more. A chain
+  // breaks after comboGap seconds without gathering, or when the dark takes
+  // any of your swarm.
+  comboGap: 0.4,
+  comboTiers: [[40, 1.2], [150, 1.4], [400, 1.6]],   // [chain length, light multiplier]
+
+  // A sleeping star you stop pouring into sheds light back down to the last
+  // quarter it reached.
+  leakDelay: 2.5,        // seconds after you stop pouring
+  leakRate: 0.05,        // share of the star's cost shed per second
+
+  // Shades hunt the swarm and shatter part of it into loose light, which
+  // they then drink. A pulse stuns one; dashing through a stunned one breaks it.
+  shadeSpeed: 235,       // a little slower than you
+  shadeSense: 900,       // how near you must be before it hunts (more while you wake a star)
+  shadeHit: 0.35,        // share of the swarm one hit shatters...
+  shadeHitMax: 1800,     // ...but never more than this
+  shadeCool: 1.6,        // seconds it circles after a hit
+  shadeStun: 2.8,        // seconds a pulse stuns it
+  shadePrize: 500,       // light a broken shade gives back, plus all it drank
+
+  // Knells ring out waves of dark; so does the Eclipse. A wave eats the swarm
+  // it passes over, unless you dash through it or stand in a woken star's light.
+  knellWarn: 1.4,        // seconds of warning before a knell rings
+  waveSpeed: 300,        // units/s
+  waveWidth: 80,         // units
+  waveBite: 3,           // chance per second that a particle in the wave is taken
+  bossEvery: 8,          // seconds between the Eclipse's waves (sooner as its stars wake)
+  bossReach: 2200,
+
   wispSpeed: 200,
   wispBite: 40,          // light/s one wisp can eat
   wispDrop: 40,          // light a scattered wisp leaves behind
@@ -69,7 +106,7 @@ DL.TUNE = {
   emberGift: 400,        // extra starting light per Ember gift
 
   swarmCap: 9000,
-  moteCap: 11000,
+  moteCap: 14000,       // room for every vein plus loose light from shades and leaking stars
   fxCap: 9000,
   dustCap: 3000,
 };
@@ -96,14 +133,25 @@ const anyLit = W => W.beacons.some(b => b.lit);
 // Shown once per visit, when these first happen (see game.js).
 DL.HINT_SURGE = 'Surge! Gather quickly and your swarm ignites: faster, and reaching farther.';
 DL.HINT_STARFALL = 'A starfall. Catch what you can.';
+DL.HINT_COMBO = 'A chain! Keep gathering without a pause and every mote is worth more.';
+DL.HINT_LEAK = 'A star you leave sheds its light, down to the last quarter you filled.';
+DL.HINT_KNELL = { text: 'A knell is about to ring. Dash through its wave of dark, or shelter in a woken star’s light.',
+  touch: 'A knell is about to ring. Tap Dash to cross its wave of dark, or shelter in a woken star’s light.' };
+DL.HINT_SHADE = { text: 'A shade! Pulse to stun it, then dash through it while it’s stunned.',
+  touch: 'A shade! Pulse to stun it, then tap Dash to break through it while it’s stunned.' };
 
+/*
+ * `par` is a realm's target time in seconds: at or under it earns three
+ * stars, within half again of it two (see `rate` in game.js). Pars are about
+ * 1.3x the slowest time of the limited-sight pacing bot, rounded up to 15 s.
+ */
 DL.REALMS = [
   /* ---------------------------------------------------------------- I */
   {
     name: 'First Light',
     line: 'Gather what glimmers.',
     pal: pal(0xffd08a, 0xfff1c9, 0x3a4f9a, 0x050814, 0xff7eb6, 0x7fd4ff),
-    root: 50, flow: null, fog: false,
+    root: 50, par: 60, flow: null, fog: false,
     build(B) {
       B.size(2600, 1700); B.start(420, 850); B.portal(1300, 850);
       B.spring(420, 850, 3, 40, 1);
@@ -131,7 +179,7 @@ DL.REALMS = [
     name: 'The Drift',
     line: 'Go with the current. Or don’t.',
     pal: pal(0x7ff2e0, 0xd6fff6, 0x1f7a8c, 0x03101a, 0xb78cff, 0xc8ff7a),
-    root: 53, flow: { str: 105, speed: 0.12 }, fog: false,
+    root: 53, par: 195, flow: { str: 105, speed: 0.12 }, fog: false,
     build(B) {
       B.size(3400, 2200); B.start(480, 1100); B.portal(1700, 1100);
       B.spring(480, 1100, 3, 45, 1); B.spring(1750, 1080, 3, 50, 1);
@@ -144,6 +192,8 @@ DL.REALMS = [
     },
     hints: [
       { when: after(2), text: 'The current carries light. It carries you, too.' },
+      { when: after(14), text: 'Shift or right-click to dash: a burst of speed. Nothing can touch your swarm while you dash.',
+        touch: 'Tap Dash for a burst of speed. Nothing can touch your swarm while you dash.' },
       { when: after(40), text: 'Arrows at the edge point to stars still sleeping.' },
     ],
   },
@@ -153,7 +203,7 @@ DL.REALMS = [
     name: 'The Hollow',
     line: 'Some things only take.',
     pal: pal(0xc9a2ff, 0xf0dcff, 0x5b2a86, 0x0a0514, 0xff6ad5, 0x6ae8ff),
-    root: 52, minor: true, flow: null, fog: false,
+    root: 52, minor: true, par: 90, flow: null, fog: false,
     build(B) {
       B.size(3400, 2400); B.start(450, 1200); B.portal(1700, 1200);
       B.spring(450, 1200, 3, 45, 1); B.spring(1250, 1400, 3, 50, 1);
@@ -168,7 +218,7 @@ DL.REALMS = [
       B.cluster(2600, 2080, 120, 80, 1);
     },
     hints: [
-      { when: nearHollow, text: 'A hollow. It only takes. Keep your distance.' },
+      { when: nearHollow, text: 'A hollow. It only takes. Keep your distance, or dash to break free of its pull.' },
       { when: W => W.returned > 0, text: 'Light undoes a hollow. What it took comes back.' },
     ],
   },
@@ -178,7 +228,7 @@ DL.REALMS = [
     name: 'Wisps',
     line: 'They are drawn to you. Answer them.',
     pal: pal(0xffb38a, 0xffe9d6, 0x8a2f4a, 0x12060c, 0xffd24a, 0x5ff0d0),
-    root: 55, minor: true, flow: null, fog: false,
+    root: 55, minor: true, par: 195, flow: null, fog: false,
     build(B) {
       B.size(3600, 2400); B.start(500, 1200); B.portal(1800, 1200);
       B.spring(500, 1200, 3, 45, 1); B.spring(1800, 1200, 3, 60, 1);
@@ -194,7 +244,7 @@ DL.REALMS = [
       B.cluster(1700, 2000, 140, 120, 1);
     },
     hints: [
-      { when: W => W.wisps.length > 0, text: 'Wisps hunger for your light. Pulse to scatter them.' },
+      { when: W => W.wisps.length > 0, text: 'Wisps hunger for your light. Pulse to scatter them, or dash right through.' },
       { when: W => W.wispsKilled > 0, text: 'A scattered wisp leaves its light behind.' },
     ],
   },
@@ -204,7 +254,7 @@ DL.REALMS = [
     name: 'Tidewater',
     line: 'Everything here is circling something.',
     pal: pal(0x8affc1, 0xe2fff0, 0x0f6e6a, 0x021210, 0x5aa8ff, 0xfff07a),
-    root: 48, flow: { str: 140, speed: 0.1 }, fog: false,
+    root: 48, par: 180, flow: { str: 140, speed: 0.1 }, fog: false,
     build(B) {
       B.size(3800, 2600); B.start(500, 1300); B.portal(1900, 1300);
       B.spring(500, 1300, 4, 50, 1); B.spring(1900, 1300, 4, 60, 1);
@@ -217,6 +267,7 @@ DL.REALMS = [
       B.ring(1500, 900, 310, 140, 1);
       B.cluster(900, 1900, 150, 60, 5); B.cluster(3100, 2100, 150, 70, 5);
       B.spiral(1900, 1300, 40, 200, 2, 120, 1);
+      B.knell(1700, 2200, 7, 700);       // clear of the whirlpools; the star at (2100, 1950) silences it
     },
     hints: [
       { when: nearHollow, text: 'The water turns around a hollow. Ride the edge, not the middle.' },
@@ -228,7 +279,7 @@ DL.REALMS = [
     name: 'The Deep',
     line: 'You are the only lamp down here.',
     pal: pal(0xa8c7ff, 0xffffff, 0x1b2a6b, 0x02030c, 0xe07aff, 0x7affc8),
-    root: 45, minor: true, flow: null, fog: true,
+    root: 45, minor: true, par: 135, flow: null, fog: true,
     build(B) {
       B.size(3800, 2600); B.start(500, 1300); B.portal(1900, 1300);
       B.spring(500, 1300, 4, 60, 1); B.spring(1900, 1300, 4, 60, 1);
@@ -246,6 +297,7 @@ DL.REALMS = [
       B.hollow(1750, 1130, 60); B.hollow(2600, 650, 70); B.hollow(3380, 1520, 60);
       B.hollow(0, 0, 55, { orbit: { cx: 2900, cy: 2000, r: 330, spd: 0.35 } });
       B.rift(2500, 2100, 9, 2);
+      B.shade(1700, 600); B.shade(2700, 1500);
     },
     hints: [
       { when: after(2), text: 'The dark is thick here. The more light you carry, the farther you see.' },
@@ -258,7 +310,7 @@ DL.REALMS = [
     name: 'Comet Road',
     line: 'Some light won’t wait for you.',
     pal: pal(0xbfe9ff, 0xffffff, 0x2a5d9f, 0x030a16, 0xffb05a, 0xff8ad0),
-    root: 50, flow: null, fog: false,
+    root: 50, par: 285, flow: null, fog: false,
     build(B) {
       B.size(4400, 2600); B.start(500, 1300); B.portal(2200, 1300);
       B.spring(500, 1300, 4, 60, 1); B.spring(2200, 1300, 4, 60, 1);
@@ -274,6 +326,7 @@ DL.REALMS = [
       B.hollow(2800, 1400, 65, { roam: 35 });
       B.hollow(3700, 900, 60, { roam: 30 });
       B.rift(3900, 2300, 9, 2);
+      B.shade(3400, 1500);
       B.comet(); B.comet(); B.comet();
     },
     hints: [
@@ -288,7 +341,7 @@ DL.REALMS = [
     name: 'The Orchard',
     line: 'Not every place is trying to take from you.',
     pal: pal(0xd7ff8a, 0xfff3b0, 0x2f7d32, 0x061006, 0xff8fb8, 0xffc24a),
-    root: 55, flow: { str: 32, speed: 0.06 }, fog: false,
+    root: 55, par: 150, flow: { str: 32, speed: 0.06 }, fog: false,
     build(B) {
       B.size(4000, 3000); B.start(600, 1500); B.portal(2000, 1500);
       B.spring(600, 1500, 5, 70, 1);
@@ -314,7 +367,7 @@ DL.REALMS = [
     name: 'Stormglass',
     line: 'Hold on to what you have.',
     pal: pal(0x8ab4ff, 0xe0d4ff, 0x4b2aa8, 0x05051a, 0xffe75a, 0xff5ad0),
-    root: 47, minor: true, flow: { str: 185, speed: 0.5 }, fog: false,
+    root: 47, minor: true, par: 300, flow: { str: 185, speed: 0.5 }, fog: false,
     build(B) {
       B.size(4200, 2800); B.start(500, 1400); B.portal(2100, 1400);
       B.spring(500, 1400, 3, 50, 5); B.spring(2100, 1400, 3, 50, 5);
@@ -326,9 +379,12 @@ DL.REALMS = [
       B.hollow(1700, 1300, 62, { drift: true }); B.hollow(2700, 800, 66, { drift: true });
       B.hollow(2500, 2300, 62, { drift: true }); B.hollow(3400, 1500, 70, { drift: true });
       B.rift(1500, 2350, 9, 2); B.rift(3300, 500, 9, 2);
+      B.knell(1500, 1700, 8, 650); B.knell(3250, 900, 8, 650);   // near the stars at (1300, 2150) and (3550, 700)
+      B.shade(3500, 2000);
     },
     hints: [
       { when: after(3), text: 'The storm moves everything, hollows too. Watch where they are going.' },
+      { when: W => W.beacons.filter(b => b.lit).length >= 2, text: 'Every knell falls silent when a star near it wakes.' },
     ],
   },
 
@@ -337,7 +393,7 @@ DL.REALMS = [
     name: 'The Long Dark',
     line: 'Keep going.',
     pal: pal(0xff9a8a, 0xffe0c2, 0x6b1420, 0x0a0304, 0xffc94a, 0xb08aff),
-    root: 49, minor: true, flow: null, fog: true,
+    root: 49, minor: true, par: 285, flow: null, fog: true,
     build(B) {
       B.size(4200, 2800); B.start(500, 1400); B.portal(2100, 1400);
       B.spring(500, 1400, 3, 50, 5); B.spring(2100, 1400, 3, 50, 5); B.spring(3600, 1400, 3, 50, 5);
@@ -355,6 +411,8 @@ DL.REALMS = [
       B.hollow(0, 0, 58, { orbit: { cx: 3000, cy: 2150, r: 320, spd: 0.35 } });
       B.hollow(0, 0, 58, { orbit: { cx: 3650, cy: 750, r: 300, spd: -0.4 } });
       B.rift(1350, 480, 9, 2); B.rift(2550, 2350, 9, 2); B.rift(3900, 1000, 9, 2);
+      B.shade(1800, 1900); B.shade(2600, 700); B.shade(3500, 1500);
+      B.knell(2700, 1800, 9, 700);
       B.comet();
     },
     hints: [
@@ -367,7 +425,7 @@ DL.REALMS = [
     name: 'Corona',
     line: 'Stand in the middle of it.',
     pal: pal(0xfff0b8, 0xffffff, 0xb8791f, 0x100a02, 0xff9a3c, 0xff6a8a),
-    root: 48, flow: { str: 28, speed: 0.05 }, fog: false,
+    root: 48, par: 345, flow: { str: 28, speed: 0.05 }, fog: false,
     build(B) {
       const cx = 2200, cy = 1600;
       B.size(4400, 3200); B.start(cx, cy); B.portal(cx, cy);
@@ -389,10 +447,18 @@ DL.REALMS = [
         const a = deg * Math.PI / 180;
         B.rift(cx + Math.cos(a) * 1400, cy + Math.sin(a) * 1400, 9, 2);
       }
+      // Two knells just beyond two of the great stars: their waves reach the
+      // star but not the middle, and waking the star silences them.
+      for (const deg of [135, 315]) {
+        const a = deg * Math.PI / 180;
+        B.knell(cx + Math.cos(a) * 1420, cy + Math.sin(a) * 1420, 9, 600);
+      }
+      B.shade(cx - 1500, cy); B.shade(cx + 1500, cy);
       B.comet(); B.comet();
     },
     hints: [
       { when: after(3), text: 'Four great stars, each one guarded. Time your approach.' },
+      { when: anyLit, text: 'Waking a star sends the shades near it away for good.' },
     ],
   },
 
@@ -401,7 +467,7 @@ DL.REALMS = [
     name: 'Eclipse',
     line: 'The light shines in the darkness.',
     pal: pal(0xfff6e0, 0xffe9a8, 0x4a3f7a, 0x020108, 0xffd24a, 0xa08aff),
-    root: 50, minor: true, flow: { str: 55, speed: 0.08 }, fog: false, finale: true,
+    root: 50, minor: true, par: 300, flow: { str: 55, speed: 0.08 }, fog: false, finale: true,
     build(B) {
       const cx = 2400, cy = 1800;
       B.size(4800, 3600); B.start(cx, 3300); B.portal(cx, cy);
@@ -415,10 +481,12 @@ DL.REALMS = [
         B.beacon(bx, by, 900);
         B.cluster(cx + Math.cos(a) * 1650, cy + Math.sin(a) * 1650, 140, 70, 5);
         if (k === 1 || k === 3) B.rift(cx + Math.cos(a + 0.2) * 1500, cy + Math.sin(a + 0.2) * 1500, 9, 2);
+        if (k === 0 || k === 2 || k === 4) B.shade(cx + Math.cos(a + 0.6) * 1550, cy + Math.sin(a + 0.6) * 1550);
       }
     },
     hints: [
       { when: after(3), text: 'The Eclipse. Wake the five stars around it.' },
+      { when: W => W.waves.length > 0, text: 'It rings out waves of dark. Dash through them, or shelter in a woken star’s light.' },
       { when: anyLit, text: 'Each waking star makes it smaller.' },
       { when: W => W.heart, text: 'It is breaking. Pour everything you have into its heart.' },
     ],
