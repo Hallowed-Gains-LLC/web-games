@@ -95,6 +95,12 @@ without end, made up as you go, and harder the deeper you go.
   pulse twice with Double Echo, never break a chain with Unbroken, and so on.
   Some are trade-offs (Glass Heart, Tithe). Perilous doors and eclipses give
   one; the full list is `DL.BOONS` in `js/boons.js`.
+- **Events.** From depth 3, there's a 40% chance something is waiting
+  between depths: a shrine that trades an ember for a boon, a wisp's wager
+  (double your light or lose half), a mirror pool that swaps a boon, an ember
+  in the ash that sends you through a Perilous door, and so on. Each is a
+  choice with a price; a choice you can't pay for is greyed out. They're
+  `DL.EVENTS` in `js/boons.js`, written so new ones are easy to add.
 - **Starlight and the Constellation.** Every depth cleared earns starlight
   (more for Perilous doors and eclipses), banked when the run ends. Spend it in
   the Constellation, from the title screen, on permanent upgrades: more
@@ -131,7 +137,7 @@ game and add a line here, so you can tell whether a change is live.
 
 | Version | What changed |
 | --- | --- |
-| 1.4 | Endless, a roguelite opened by finishing the twelve realms: generated depths, embers, doors, boons, starlight and the Constellation |
+| 1.4 | Endless, a roguelite opened by finishing the twelve realms: generated depths, embers, doors, boons, events, starlight and the Constellation |
 | 1.3 | Swarm holds 12,000 light (was 9,000), shown in the HUD; a full or nearly full swarm takes only what fits and leaves the rest where it is |
 | 1.2 | Dash, shades, knells, chains, leaking stars, par times and star ratings |
 | 1.1 | Touch joystick, four-colour palettes, surges and starfalls |
@@ -150,7 +156,7 @@ needs WebGL (every current browser has it; the game says so if it's off).
 | --- | --- |
 | `index.html` | The page, the interface's markup and all the CSS |
 | `js/config.js` | Tuning numbers, the twelve realms, gifts and all the writing |
-| `js/boons.js` | Endless's boons, doors and the Constellation's upgrades |
+| `js/boons.js` | Endless's boons, doors, events and the Constellation's upgrades |
 | `js/endless.js` | Endless mode's realm generator and its difficulty curve (`DL.ENDLESS`) |
 | `js/world.js` | The simulation: swarm, motes, hollows, wisps, beacons. No DOM, WebGL or audio |
 | `js/gfx.js` | The WebGL renderer. Knows nothing about the game |

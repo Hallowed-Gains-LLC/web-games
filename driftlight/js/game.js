@@ -48,6 +48,7 @@
     door: 'wild',          // Endless: the door chosen into the current depth
     runStar: 0,            // Endless: starlight this run has earned so far
     rerolled: false,       // Endless: the Second Look reroll is used up for this depth
+    forceDoor: null,       // Endless: an event decided the next door (see DL.EVENTS)
     realm: 0,              // index of the realm (in Endless, depth - 1)
     gifts: {},
     told: {},              // one-time hints already shown this visit (surge, starfall)
@@ -439,7 +440,7 @@
       return;
     }
     // A new run, with whatever the Constellation adds.
-    G.seed = (Math.random() * 1e9) | 0; G.realm = 0; G.door = 'wild'; G.gifts = {}; G.boons = {}; G.runStar = 0;
+    G.seed = (Math.random() * 1e9) | 0; G.realm = 0; G.door = 'wild'; G.gifts = {}; G.boons = {}; G.runStar = 0; G.forceDoor = null;
     G.carry = DL.ENDLESS.startLight + 300 * upLevel('light');
     G.embers = DL.ENDLESS.embers + upLevel('embers'); G.emberMax = DL.ENDLESS.emberMax + upLevel('embers');
     G.stats = freshStats();
@@ -493,14 +494,16 @@
 
   /** Choose the door into the next depth, then go through it. */
   function offerDoors() {
-    const depth = G.realm + 1, doors = DL.endless.doors(depth, G.seed, upLevel('doors') ? 3 : 2);
+    const depth = G.realm + 1;
+    const forced = G.forceDoor && DL.endless.kind(depth) === 'wild' ? [G.forceDoor] : null;
+    const doors = forced || DL.endless.doors(depth, G.seed, upLevel('doors') ? 3 : 2);
     showPanel(`
       <p class="caps">Depth ${depth}</p>
       <h2>${doors.length > 1 ? 'Choose a door' : 'The way on'}</h2>
       <div class="gifts">${doors.map(id => { const d = DL.DOORS[id]; return `
         <button class="gift door ${id}" data-act="${id}"><b>${d.name}</b><span>${d.desc}</span><small>${d.reward}</small></button>`; }).join('')}
       </div>`, 'dim', id => {
-      G.door = id; G.rerolled = false;
+      G.door = id; G.rerolled = false; G.forceDoor = null;
       hidePanel();
       G.fadeTo = 1;
       setTimeout(() => { startRealm(G.realm, false); G.fadeTo = 0; }, 700);
@@ -536,8 +539,57 @@
     setState('gift'); setHud(false);
     loadRestSky();
     G.whiteTo = 0; G.whiteRate = 0.9;
-    const gift = () => offerGift(header, offerDoors);
+    const gift = () => offerGift(header, maybeEvent);
     if (boonDue) offerBoon(header, gift); else gift();
+  }
+
+  /** Sometimes, between depths, something is waiting. Then on to the doors. */
+  function maybeEvent() {
+    if (G.realm < 2 || Math.random() > DL.EVENT_CHANCE) { offerDoors(); return; }
+    showEvent(DL.EVENTS[(Math.random() * DL.EVENTS.length) | 0]);
+  }
+
+  /** Show an event's choices; afterwards, what came of it; then the doors. */
+  function showEvent(ev) {
+    let wantBoon = false;
+    // The run, as an event sees it (see DL.EVENTS for what it may touch).
+    const R = {
+      get embers() { return G.embers; }, set embers(v) { G.embers = Math.max(0, Math.min(G.emberMax, v)); },
+      get emberMax() { return G.emberMax; },
+      get carry() { return G.carry; }, set carry(v) { G.carry = Math.max(0, Math.min(T.swarmCap, Math.round(v))); },
+      get runStar() { return G.runStar; }, set runStar(v) { G.runStar = v; },
+      boons: G.boons,
+      boon() { wantBoon = true; },
+      door(id) { G.forceDoor = id; },
+      loseBoon() {
+        const held = Object.keys(G.boons), id = held[(Math.random() * held.length) | 0];
+        delete G.boons[id];
+        if (id === 'kindling') { G.emberMax--; G.embers = Math.min(G.embers, G.emberMax); }
+        return DL.BOONS.find(b => b.id === id).name;
+      },
+    };
+    const status = () => `<p class="caps">${emberText()} &middot; ${G.carry.toLocaleString()} light &middot; ✧ ${G.runStar} this run</p>`;
+    showPanel(`
+      <p class="caps">Between depths</p>
+      <h2>${ev.title}</h2>
+      <p>${ev.text}</p>
+      ${status()}
+      <div class="gifts">${ev.choices.map((c, i) => `
+        <button class="gift event" data-act="${i}" ${c.can && !c.can(R) ? 'disabled' : ''}><b>${c.label}</b>${c.note ? `<span>${c.note}</span>` : ''}</button>`).join('')}
+      </div>`, 'dim', i => {
+      const c = ev.choices[+i];
+      if (!c || (c.can && !c.can(R))) return;
+      const result = c.act(R);
+      audio.portal();
+      showPanel(`
+        <h2>${ev.title}</h2>
+        <p class="quote">${result}</p>
+        ${status()}
+        <button class="btn main" data-act="on">Go on</button>`, 'dim', () => {
+        hidePanel();
+        if (wantBoon) offerBoon('', offerDoors); else offerDoors();
+      });
+    });
   }
 
   /** The last ember went out: the Endless run is over. */
@@ -1095,7 +1147,7 @@
     W.loadSandbox({ w: 2400, h: 1400, pal: DL.TITLE_PAL, points: [], swarm: 0 });   // something to draw until fonts load
     resize();
 
-    if (DEBUG) window.__dl = { G, W, cam, view, runBot, startRealm, showEnd, finishRealm, beginEndless, runOver, showConstellation, gfx };
+    if (DEBUG) window.__dl = { G, W, cam, view, runBot, startRealm, showEnd, finishRealm, beginEndless, runOver, showConstellation, showEvent, gfx };
     const jump = parseInt(params.get('realm'), 10), deep = parseInt(params.get('endless'), 10);
     const go = () => {
       if (DEBUG && deep >= 1) {
