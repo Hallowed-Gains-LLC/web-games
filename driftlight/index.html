@@ -38,6 +38,9 @@
   #realmName { text-transform: uppercase; letter-spacing: .3em; font-size: 11px; color: var(--dim); }
   #light { font-family: var(--serif); font-size: 15px; color: var(--dim); margin-top: 2px; }
   #lightNum { font-weight: 500; font-size: 26px; color: var(--ink); margin-right: 4px; }
+  #lightCap { font-size: 13px; opacity: .7; }
+  #light.full #lightNum, #light.full #lightCap { color: var(--gold); opacity: 1; text-shadow: 0 0 10px rgba(255, 217, 160, .7); }
+  #light.full #lightCap { text-transform: uppercase; letter-spacing: .2em; font-size: 11px; }
   /* The surge meter under the light count. It fills as you gather. */
   #heat { width: 92px; height: 3px; margin-top: 7px; border-radius: 2px; background: rgba(255, 255, 255, .14); overflow: hidden; }
   #heatFill {
@@ -192,7 +195,7 @@
 <div id="hud" hidden>
   <div>
     <div id="realmName"></div>
-    <div id="light"><span id="lightNum">0</span>light</div>
+    <div id="light"><span id="lightNum">0</span>light <span id="lightCap"></span></div>
     <div id="heat"><div id="heatFill"></div></div>
     <div id="clock"></div>
     <div id="combo"></div>

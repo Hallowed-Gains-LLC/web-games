@@ -263,7 +263,7 @@
     $('pips').innerHTML = W.beacons.map(b => `<i class="${b.heart ? 'heart' : ''}"></i>`).join('');
   }
 
-  const hudCache = { light: -1, name: '', heat: -1, surge: false, secs: -1, combo: '' };
+  const hudCache = { light: -1, name: '', heat: -1, surge: false, secs: -1, combo: '', full: null };
   const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
   /**
@@ -286,6 +286,13 @@
   function updateHud() {
     if ($('hud').hidden) return;
     if (W.nFollow !== hudCache.light) { hudCache.light = W.nFollow; $('lightNum').textContent = W.nFollow.toLocaleString(); }
+    // The cap is always shown; a full swarm turns gold and says so.
+    if (W.full !== hudCache.full) {
+      hudCache.full = W.full;
+      $('light').classList.toggle('full', W.full);
+      $('lightCap').textContent = W.full ? 'full' : `/ ${T.swarmCap.toLocaleString()}`;
+      if (W.full && !G.told.full) tell('full', DL.HINT_FULL);
+    }
     const pips = $('pips').children;
     if (pips.length !== W.beacons.length) buildPips();
     for (let i = 0; i < pips.length; i++) pips[i].classList.toggle('lit', W.beacons[i].lit);

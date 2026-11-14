@@ -245,6 +245,7 @@
     W.dashT = 0; W.phaseT = 0; W.dashCd = 0; W.dashX = 1; W.dashY = 0; W.dashes = 0;
     // Combo: motes gathered in a chain, each within comboGap of the last.
     W.combo = 0; W.comboMul = 1; W.lastCollect = -99; W.bestCombo = 0; W.comboBonus = 0;
+    W.full = false;           // the swarm is at swarmCap
     W.shadesKilled = 0; W.hits = 0; W.waveLost = 0; W.bossT = 6;
     W.flowStr = 0; waves.length = 0;
   }
@@ -473,11 +474,12 @@
     W.comboBonus += w * W.mul.kin * (mul - 1);
     const n = Math.floor(W.kinAcc); W.kinAcc -= n;
     const sp = w >= 25 ? 240 : w >= 5 ? 130 : 60;
+    let added = 0;
     for (let k = 0; k < n; k++) {
       const a = Math.random() * TAU, s = Math.random() * sp;
-      addSwarm(x, y, Math.cos(a) * s + W.lvx * 0.5, Math.sin(a) * s + W.lvy * 0.5);
+      if (addSwarm(x, y, Math.cos(a) * s + W.lvx * 0.5, Math.sin(a) * s + W.lvy * 0.5) >= 0) added++;
     }
-    W.realmLight += n;
+    W.realmLight += added;
     W.events.push({ t: 'collect', w, n });
     burst(x, y, w >= 25 ? 30 : w >= 5 ? 7 : 3, sp + 60, 0.55, 3, moteCol(i));
     // Gathering fills the surge meter, which also drains all the time: only
@@ -520,8 +522,8 @@
       const d = Math.hypot(ox, oy) + 0.01, s = 260 + Math.random() * 420;
       svx[i] += ox / d * s; svy[i] += oy / d * s;
     }
-    // Every mote in reach comes to you.
-    const r2 = W.pulseMax * W.pulseMax;
+    // Every mote in reach comes to you (unless the swarm is already full).
+    const r2 = W.full ? 0 : W.pulseMax * W.pulseMax;
     for (let i = 0; i < W.nm; i++) {
       const st = mState[i];
       if (st === M_HIDDEN || st === M_PULLED) continue;
@@ -1026,7 +1028,9 @@
 
     // ---- motes ----
     {
-      const R = W.swR, magnet = (T.magnetR + R * 0.35) * W.mul.reach * (W.surge ? T.surgeReach : 1), m2 = magnet * magnet;
+      // A full swarm can't take any more: light stays where it is for later.
+      W.full = W.ns >= SMAX;
+      const R = W.swR, magnet = W.full ? 0 : (T.magnetR + R * 0.35) * W.mul.reach * (W.surge ? T.surgeReach : 1), m2 = magnet * magnet;
       const grab = 22 + R * 0.3, g2 = grab * grab;
       for (let i = W.nm - 1; i >= 0; i--) {
         const st = mState[i];
@@ -1040,6 +1044,11 @@
           if (mLife[i] <= 0 && st !== M_PULLED) { removeMote(i); continue; }
         }
         const ox = lx - mx[i], oy = ly - my[i], d2 = ox * ox + oy * oy;
+        if (st === M_PULLED && W.full) {
+          // On its way in when the swarm filled up: let it drift off again.
+          mState[i] = M_LOOSE; mAge[i] = 0; mvx[i] *= -0.4; mvy[i] *= -0.4;
+          continue;
+        }
         if (st === M_PULLED) {
           mAge[i] += dt;
           const d = Math.sqrt(d2) + 0.01, sp = 280 + mAge[i] * 1100;

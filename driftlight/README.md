@@ -59,6 +59,9 @@ thumb, so turning back answers at once. Lift your finger and the swarm stops.
   pouring into stars quicker.
 - **Starfalls.** Every so often a shower of bright motes streaks across the
   screen. Catch what you can before they're gone.
+- **Your swarm holds up to 12,000 light**, shown next to the count. When
+  it's full, light stays where it is (nothing is wasted) until you pour some
+  into a star.
 - After each realm you keep part of your swarm and choose one of three **gifts**.
 - Your place is saved at the start of each realm.
 
@@ -90,6 +93,7 @@ game and add a line here, so you can tell whether a change is live.
 
 | Version | What changed |
 | --- | --- |
+| 1.3 | Swarm holds 12,000 light (was 9,000), shown in the HUD; a full swarm leaves light where it is instead of wasting it |
 | 1.2 | Dash, shades, knells, chains, leaking stars, par times and star ratings |
 | 1.1 | Touch joystick, four-colour palettes, surges and starfalls |
 | 1.0 | First release |

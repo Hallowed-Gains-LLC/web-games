@@ -18,7 +18,7 @@ window.DL = {};
  * you can tell at a glance whether a change is live. Bump it with every
  * change to the game, and add a line to the changelog in the README.
  */
-DL.VERSION = '1.2';
+DL.VERSION = '1.3';
 
 DL.TUNE = {
   viewUnits: 720,        // world units across the screen's smaller side at zoom 1
@@ -112,7 +112,11 @@ DL.TUNE = {
   carryCap: 4000,
   emberGift: 400,        // extra starting light per Ember gift
 
-  swarmCap: 9000,
+  // The most light your swarm can hold. Each point of light is one particle
+  // simulated and drawn every frame, so this is a performance limit: it's
+  // set for phones. When the swarm is full, light is left where it is
+  // rather than wasted, and the HUD says so.
+  swarmCap: 12000,
   moteCap: 14000,       // room for every vein plus loose light from shades and leaking stars
   fxCap: 9000,
   dustCap: 3000,
@@ -140,6 +144,7 @@ const anyLit = W => W.beacons.some(b => b.lit);
 // Shown once per visit, when these first happen (see game.js).
 DL.HINT_SURGE = 'Surge! Gather quickly and your swarm ignites: faster, and reaching farther.';
 DL.HINT_STARFALL = 'A starfall. Catch what you can.';
+DL.HINT_FULL = 'Your swarm is full. Pour light into a star to make room for more.';
 DL.HINT_COMBO = 'A chain! Keep gathering without a pause and every mote is worth more.';
 DL.HINT_LEAK = 'A star you leave sheds its light, down to the last quarter you filled.';
 DL.HINT_KNELL = { text: 'A knell is about to ring. Dash through its wave of dark, or shelter in a woken star’s light.',
