@@ -20,7 +20,8 @@
 (function () {
   const gfx = DL.gfx = {};
 
-  const POINT_STRIDE = 7, MAX_POINTS = 30000;
+  // Enough for a full swarm plus every spark, the dust and the motes on screen.
+  const POINT_STRIDE = 7, MAX_POINTS = 40000;
   const SPRITE_STRIDE = 10, MAX_SPRITES = 600;
   gfx.MAX_POINTS = MAX_POINTS;
   gfx.points = new Float32Array(MAX_POINTS * POINT_STRIDE);
