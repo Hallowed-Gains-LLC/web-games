@@ -460,8 +460,18 @@
   /* ------------------------------------------------------------------ */
 
   /** A mote reaches the swarm. Returns true if slot i now holds another mote. */
+  /** Let a mote drift away from the swarm again (it's full). */
+  function releaseMote(i) {
+    mState[i] = M_LOOSE; mAge[i] = 0;
+    const ox = mx[i] - W.lx, oy = my[i] - W.ly, d = Math.hypot(ox, oy) + 0.01;
+    mvx[i] = ox / d * 180; mvy[i] = oy / d * 180;
+  }
+
   function collectMote(i) {
     const w = mWorth[i], x = mx[i], y = my[i];
+    // A full swarm can't take it: it stays in the world for later.
+    const room = SMAX - W.ns;
+    if (room <= 0) { releaseMote(i); return false; }
     // Keep the chain going, and climb to the next tier if it's long enough.
     W.combo = W.time - W.lastCollect < T.comboGap ? W.combo + 1 : 1;
     W.lastCollect = W.time;
@@ -472,7 +482,10 @@
     W.comboMul = mul;
     W.kinAcc += w * W.mul.kin * mul;
     W.comboBonus += w * W.mul.kin * (mul - 1);
-    const n = Math.floor(W.kinAcc); W.kinAcc -= n;
+    let n = Math.floor(W.kinAcc); W.kinAcc -= n;
+    // Only part of it fits: take what fits and leave the rest in the mote.
+    let leftover = 0;
+    if (n > room) { leftover = Math.max(1, Math.round(w * (n - room) / n)); n = room; }
     const sp = w >= 25 ? 240 : w >= 5 ? 130 : 60;
     let added = 0;
     for (let k = 0; k < n; k++) {
@@ -486,6 +499,7 @@
     // gathering quickly fills it. A full meter is a share of what the realm
     // asks for, so it is as hard to earn in the last realm as in the first.
     if (!W.surge && (W.heat += n / Math.max(T.surgeMin, W.need * T.surgeFrac)) >= 1) startSurge();
+    if (leftover > 0) { mWorth[i] = leftover; releaseMote(i); return false; }
     if (mRegrow[i]) {             // title screen: the mote grows back at home
       mState[i] = M_HIDDEN; mAge[i] = 5 + Math.random() * 5; mx[i] = mhx[i]; my[i] = mhy[i];
       return false;
@@ -1044,11 +1058,7 @@
           if (mLife[i] <= 0 && st !== M_PULLED) { removeMote(i); continue; }
         }
         const ox = lx - mx[i], oy = ly - my[i], d2 = ox * ox + oy * oy;
-        if (st === M_PULLED && W.full) {
-          // On its way in when the swarm filled up: let it drift off again.
-          mState[i] = M_LOOSE; mAge[i] = 0; mvx[i] *= -0.4; mvy[i] *= -0.4;
-          continue;
-        }
+        if (st === M_PULLED && W.full) { releaseMote(i); continue; }   // on its way in when the swarm filled up
         if (st === M_PULLED) {
           mAge[i] += dt;
           const d = Math.sqrt(d2) + 0.01, sp = 280 + mAge[i] * 1100;

@@ -93,7 +93,7 @@ game and add a line here, so you can tell whether a change is live.
 
 | Version | What changed |
 | --- | --- |
-| 1.3 | Swarm holds 12,000 light (was 9,000), shown in the HUD; a full swarm leaves light where it is instead of wasting it |
+| 1.3 | Swarm holds 12,000 light (was 9,000), shown in the HUD; a full or nearly full swarm takes only what fits and leaves the rest where it is |
 | 1.2 | Dash, shades, knells, chains, leaking stars, par times and star ratings |
 | 1.1 | Touch joystick, four-colour palettes, surges and starfalls |
 | 1.0 | First release |
