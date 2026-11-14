@@ -40,7 +40,10 @@
   const freshStats = () => ({ time: 0, light: 0, lost: 0, stars: 0, wisps: 0, shades: 0, rating: 0 });
   const G = {
     state: 'boot',
-    realm: 0,
+    mode: 'story',         // 'story' (the twelve realms) or 'endless'
+    seed: 0,               // Endless: the run's seed; with the depth it decides each realm
+    embers: 0,             // Endless: lives left; losing all your light burns one
+    realm: 0,              // index of the realm (in Endless, depth - 1)
     gifts: {},
     told: {},              // one-time hints already shown this visit (surge, starfall)
     carry: 0,              // light that follows you into the next realm
@@ -275,9 +278,9 @@
 
   /** Rate the realm just finished, remember the best, and describe it. */
   function rateRealm() {
-    const par = DL.REALMS[G.realm].par, secs = Math.round(G.realmTime), stars = rate(secs, par);
+    const par = cur().par, secs = Math.round(G.realmTime), stars = rate(secs, par);
     const best = store.get('best', {});
-    const record = stars > (best[G.realm] || 0);
+    const record = G.mode === 'story' && stars > (best[G.realm] || 0);
     if (record) { best[G.realm] = stars; store.set('best', best); }
     G.stats.rating += stars;
     return `<p class="rating">${starText(stars)}</p>
@@ -304,7 +307,7 @@
       $('heat').classList.toggle('surge', W.surge);
     }
     // The clock against par: gold while you're under it.
-    const secs = Math.floor(G.realmTime), par = DL.REALMS[G.realm].par;
+    const secs = Math.floor(G.realmTime), par = cur().par;
     if (secs !== hudCache.secs) {
       hudCache.secs = secs;
       $('clock').textContent = `${fmtTime(secs)} / par ${fmtTime(par)}`;
@@ -365,8 +368,70 @@
 
   function setState(s) { G.state = s; G.timer = 0; }
 
+  /* ------------------------------------------------------------------ */
+  /* Realms: the twelve, or Endless's generated ones                     */
+  /* ------------------------------------------------------------------ */
+
+  // Generating a realm is cheap but not free, and the HUD asks every frame.
+  let endlessCache = { key: '', realm: null };
+  /** The realm at `index`: one of the twelve, or in Endless, depth index + 1. */
+  function realmAt(index) {
+    if (G.mode !== 'endless') return DL.REALMS[index];
+    const key = `${G.seed}:${index}`;
+    if (endlessCache.key !== key) endlessCache = { key, realm: DL.endless.realm(index + 1, G.seed) };
+    return endlessCache.realm;
+  }
+  const cur = () => realmAt(G.realm);
+  /** "IV" in the story, "Depth 17" in Endless. */
+  const label = index => (G.mode === 'endless' ? `Depth ${index + 1}` : DL.ROMAN[index]);
+
   function save() {
-    store.set('save', { v: 1, realm: G.realm, carry: G.carry, gifts: G.gifts, stats: G.stats });
+    if (G.mode === 'endless') {
+      store.set('esave', { v: 1, seed: G.seed, realm: G.realm, carry: G.carry, gifts: G.gifts, stats: G.stats, embers: G.embers });
+    } else store.set('save', { v: 1, realm: G.realm, carry: G.carry, gifts: G.gifts, stats: G.stats });
+  }
+
+  /** Start a new Endless run, or carry on a saved one. */
+  function beginEndless(saved) {
+    G.mode = 'endless';
+    if (saved) {
+      G.seed = saved.seed; G.realm = saved.realm; G.carry = saved.carry; G.gifts = saved.gifts || {};
+      G.stats = saved.stats || freshStats(); G.embers = saved.embers;
+    } else {
+      G.seed = (Math.random() * 1e9) | 0; G.realm = 0; G.carry = DL.ENDLESS.startLight; G.gifts = {};
+      G.stats = freshStats(); G.embers = DL.ENDLESS.embers;
+      store.del('esave');
+    }
+    beginFrom(G.realm);
+  }
+
+  /** The last ember went out: the Endless run is over. */
+  function runOver() {
+    G.stats.light += W.realmLight; G.stats.lost += W.lost; G.stats.wisps += W.wispsKilled; G.stats.shades += W.shadesKilled;
+    const depth = G.realm + 1, cleared = G.realm, s = G.stats, mins = Math.max(1, Math.round(s.time / 60));
+    const best = store.get('ebest', { depth: 0 });
+    const record = cleared > best.depth;
+    if (record) store.set('ebest', { depth: cleared, light: s.light });
+    store.del('esave');
+    setState('over'); setHud(false); dropStick();
+    G.fadeTo = 0.55;
+    showPanel(`
+      <p class="caps">Your light went out at depth ${depth}</p>
+      <h2>${cleared} ${cleared === 1 ? 'depth' : 'depths'} cleared</h2>
+      <p>${record ? 'A new best.' : `Your best is ${best.depth}.`}</p>
+      <div class="stats">
+        <span>Rating</span><span>${s.rating} ★</span>
+        <span>Light gathered</span><span>${s.light.toLocaleString()}</span>
+        <span>Light lost to the dark</span><span>${s.lost.toLocaleString()}</span>
+        <span>Shades broken</span><span>${s.shades}</span>
+        <span>Time</span><span>${mins} min</span>
+      </div>
+      <button class="btn main" data-act="again">New run</button>
+      <button class="btn" data-act="title">Title</button>`, 'dim', act => {
+      hidePanel(); G.fadeTo = 1;
+      if (act === 'again') setTimeout(() => beginEndless(null), 800);
+      else setTimeout(showTitle, 800);
+    });
   }
 
   /** Points that spell `lines` in motes, `width` world units wide, centred on (cx, cy). */
@@ -407,19 +472,28 @@
     loadTitleSky();
     audio.setRealm(50, false);
     G.fadeTo = 0; G.whiteTo = 0;
+    G.mode = 'story';
     const sv = store.get('save', null);
     const cont = sv && sv.realm > 0 && sv.realm < DL.REALMS.length;
+    // Endless opens once the twelve realms are done.
+    const open = !!store.get('done', null), esv = store.get('esave', null), best = store.get('ebest', { depth: 0 });
+    const endless = !open ? '' : `<br>
+      ${esv ? `<button class="btn" data-act="econtinue">Continue Endless &middot; Depth ${esv.realm + 1}</button>` : ''}
+      <button class="btn" data-act="endless">${esv ? 'New Endless run' : 'Endless'}</button>
+      ${best.depth ? `<p class="caps" style="margin:4px 0 0">Endless best &middot; depth ${best.depth}</p>` : ''}`;
     showPanel(`
       <p class="caps" style="margin-bottom:14px">A game of light &middot; about an hour</p>
       ${cont ? `<button class="btn main" data-act="continue">Continue &middot; ${DL.ROMAN[sv.realm]}</button><br>
                 <button class="btn" data-act="new">New journey</button>`
-             : '<button class="btn main" data-act="new">Begin</button>'}
+             : `<button class="btn main" data-act="new">${open ? 'New journey' : 'Begin'}</button>`}
+      ${endless}
       <div class="links">
         <button class="link" data-act="sound">${soundLabel()}</button>
         <a class="link" href="../">All games</a>
       </div>
       <p class="version">v${DL.VERSION}</p>`, 'low', act => {
       if (act === 'sound') { setMuted(!audio.muted); panel.querySelector('[data-act=sound]').textContent = soundLabel(); return; }
+      if (act === 'endless' || act === 'econtinue') { hidePanel(); beginEndless(act === 'econtinue' ? esv : null); return; }
       if (act === 'continue') { G.realm = sv.realm; G.carry = sv.carry; G.gifts = sv.gifts || {}; G.stats = sv.stats || freshStats(); }
       else { G.realm = 0; G.carry = 0; G.gifts = {}; G.stats = freshStats(); store.del('save'); }
       beginFrom(G.realm);
@@ -438,18 +512,20 @@
    * is alive but the player isn't steering yet.
    */
   function startRealm(index, preview) {
-    const realm = DL.REALMS[index];
     G.realm = index;
-    W.load(index, { carry: G.carry, gifts: G.gifts });
+    const realm = cur(), endless = G.mode === 'endless';
+    W.load(index, { carry: G.carry, gifts: G.gifts, realm,
+      seed: endless ? (G.seed + index * 977) | 0 : undefined, keep: endless ? 25 : 0 });
     updateCamera(0, true); gfx.cut();
     G.realmTime = 0; G.hints = new Set(); hideHint();
     audio.setRealm(realm.root, !!realm.minor);
-    $('realmName').textContent = `${DL.ROMAN[index]} · ${realm.name}`;
+    $('realmName').textContent = `${label(index)} · ${realm.name}`;
+    $('embers').textContent = endless ? '✦'.repeat(G.embers) + '✧'.repeat(Math.max(0, DL.ENDLESS.embers - G.embers)) : '';
     buildPips();
     if (preview) { setState('gift'); setHud(false); }
     else {
       setState('play'); setHud(true);
-      showCard(DL.ROMAN[index], realm.name, realm.line);
+      showCard(label(index), realm.name, realm.line);
     }
   }
 
@@ -460,6 +536,12 @@
     const rating = rateRealm();                     // read before the next realm replaces the world
     const crossed = W.exitCount;
     G.carry = Math.min(T.carryCap, Math.round(crossed * T.carryFrac) + T.carryBase);
+    // Endless: a sanctuary gives back an ember.
+    let ember = '';
+    if (G.mode === 'endless' && cur().kind === 'sanctuary' && G.embers < DL.ENDLESS.emberMax) {
+      G.embers++; ember = `<p class="caps">An ember returns &middot; ${G.embers} left</p>`;
+    }
+    const cleared = G.mode === 'endless' ? `<p class="caps">Depth ${G.realm + 1} cleared</p>` : '';
     startRealm(G.realm + 1, true);
     save();
     G.whiteTo = 0; G.whiteRate = 0.9;
@@ -467,14 +549,16 @@
     const choices = [];
     while (choices.length < 3 && open.length) choices.push(open.splice((Math.random() * open.length) | 0, 1)[0]);
     const dots = g => '●'.repeat(G.gifts[g.id] || 0) + '○'.repeat(g.max - (G.gifts[g.id] || 0));
-    showPanel(`
-      ${rating}
-      <p class="caps">${crossed.toLocaleString()} light crossed over &middot; ${G.carry.toLocaleString()} stays with you</p>
-      <h2>Choose a gift</h2>
+    // Every gift taken as often as it can be (deep in Endless): just go on.
+    const pickOne = choices.length ? `<h2>Choose a gift</h2>
       <div class="gifts">${choices.map(g => `
         <button class="gift" data-act="${g.id}"><b>${g.name}</b><span>${g.desc}</span><small>${dots(g)}</small></button>`).join('')}
-      </div>`, 'dim', id => {
-      G.gifts[id] = (G.gifts[id] || 0) + 1;
+      </div>` : '<button class="btn main" data-act="go">Go on</button>';
+    showPanel(`
+      ${cleared}${rating}${ember}
+      <p class="caps">${crossed.toLocaleString()} light crossed over &middot; ${G.carry.toLocaleString()} stays with you</p>
+      ${pickOne}`, 'dim', id => {
+      if (id !== 'go') G.gifts[id] = (G.gifts[id] || 0) + 1;
       hidePanel();
       startRealm(G.realm, false);       // reload so the gift applies from the first moment
       save();
@@ -486,10 +570,10 @@
     setState('paused'); dropStick();
     showPanel(`
       <h2>Paused</h2>
-      <p>${DL.ROMAN[G.realm]} &middot; ${DL.REALMS[G.realm].name}</p>
+      <p>${label(G.realm)} &middot; ${cur().name}</p>
       <button class="btn main" data-act="resume">Resume</button><br>
       <button class="btn" data-act="sound">${soundLabel()}</button>
-      <button class="btn" data-act="restart">Restart realm</button>
+      <button class="btn" data-act="restart">Restart ${G.mode === 'endless' ? 'depth' : 'realm'}</button>
       <button class="btn" data-act="quit">Leave</button>
       <p class="version">v${DL.VERSION}</p>
       <p style="font-size:15px;margin-top:14px">${TOUCH ? 'Touch anywhere and drag to steer: your thumb is the stick. Tap, or touch with a second finger, to pulse. Tap Dash to dash.'
@@ -540,10 +624,13 @@
         <span>Time</span><span>${mins} min</span>
       </div>
       <p class="caps">The Eclipse ${last.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()}</p>
+      <p class="caps">Endless is open: realms without end, harder the deeper you go</p>
+      <button class="btn main" data-act="endless">Begin Endless</button><br>
       <button class="btn" data-act="wander">Stay a while</button>
-      <button class="btn" data-act="again">New journey</button>
+      <button class="btn" data-act="again">Title</button>
       <div class="links"><a class="link" href="../">All games</a></div>`, 'dim', act => {
       if (act === 'wander') hidePanel();
+      else if (act === 'endless') { hidePanel(); G.fadeTo = 1; setTimeout(() => beginEndless(null), 800); }
       else { hidePanel(); G.fadeTo = 1; setTimeout(showTitle, 800); }
     }), 4200);
   }
@@ -585,7 +672,17 @@
           audio.starfall();
           if (G.state === 'play' && !G.told.starfall) { G.told.starfall = true; showHint(DL.HINT_STARFALL); }
           break;
-        case 'rekindle': audio.rekindle(); if (G.state === 'play') showHint('A few sparks find you again.'); break;
+        case 'rekindle':
+          audio.rekindle();
+          if (G.state !== 'play') break;
+          if (G.mode !== 'endless' || W.portalOpen) showHint('A few sparks find you again.');
+          else if (G.embers > 0) {
+            G.embers--;
+            $('embers').textContent = '✦'.repeat(G.embers) + '✧'.repeat(Math.max(0, DL.ENDLESS.embers - G.embers));
+            showHint(G.embers ? `An ember rekindles your light. ${G.embers} left.` : 'Your last ember rekindles your light. Don’t lose it again.');
+            shake(20);
+          } else runOver();
+          break;
         case 'ignite': audio.ignite(e.heart); G.flash = REDUCED ? 0.12 : 0.45; shake(14); break;
         case 'portal': audio.portal(); break;
         case 'heart': audio.heart(); G.flash = REDUCED ? 0.15 : 0.6; shake(40); break;
@@ -616,7 +713,7 @@
       tell('shade', TOUCH ? DL.HINT_SHADE.touch : DL.HINT_SHADE.text);
       return;
     }
-    for (const h of DL.REALMS[G.realm].hints || []) {
+    for (const h of cur().hints || []) {
       if (G.hints.has(h)) continue;
       if (h.when(W, G)) { G.hints.add(h); showHint(TOUCH && h.touch ? h.touch : h.text); }
       return;                             // hints come in order, one at a time
@@ -808,6 +905,8 @@
    */
   function runBot(index, opts) {
     opts = opts || {};
+    G.mode = opts.endless ? 'endless' : 'story';
+    if (opts.endless) G.seed = opts.seed || 1;
     bot.sight = opts.sight || 0; bot.committed = null; bot.re = 0;
     G.gifts = opts.gifts || {}; G.carry = opts.carry || 0;
     startRealm(index, false);
@@ -831,7 +930,7 @@
       surges: W.surges, surgePct: Math.round(100 * surging / Math.max(1, steps)), starfalls: W.starfalls,
       comboPct: Math.round(100 * W.comboBonus / Math.max(1, W.realmLight)),
       dashes: W.dashes, hits: W.hits, waveLost: W.waveLost, shades: W.shadesKilled, bestCombo: W.bestCombo,
-      stars: rate(Math.round(steps * STEP), DL.REALMS[index].par || 1e9), trace,
+      stars: rate(Math.round(steps * STEP), cur().par || 1e9), trace, par: cur().par, name: cur().name, rekindles: W.rekindles,
     };
   }
 
@@ -853,10 +952,14 @@
     W.loadSandbox({ w: 2400, h: 1400, pal: DL.TITLE_PAL, points: [], swarm: 0 });   // something to draw until fonts load
     resize();
 
-    if (DEBUG) window.__dl = { G, W, cam, view, runBot, startRealm, showEnd, finishRealm, gfx };
-    const jump = parseInt(params.get('realm'), 10);
+    if (DEBUG) window.__dl = { G, W, cam, view, runBot, startRealm, showEnd, finishRealm, beginEndless, runOver, gfx };
+    const jump = parseInt(params.get('realm'), 10), deep = parseInt(params.get('endless'), 10);
     const go = () => {
-      if (DEBUG && jump >= 1 && jump <= DL.REALMS.length) {
+      if (DEBUG && deep >= 1) {
+        G.mode = 'endless'; G.seed = parseInt(params.get('seed'), 10) || 1; G.embers = DL.ENDLESS.embers;
+        G.carry = parseInt(params.get('carry'), 10) || DL.ENDLESS.startLight;
+        startRealm(deep - 1, false); G.fadeTo = 0;
+      } else if (DEBUG && jump >= 1 && jump <= DL.REALMS.length) {
         G.carry = parseInt(params.get('carry'), 10) || 60 + jump * 60;
         startRealm(jump - 1, false); G.fadeTo = 0;
       } else showTitle();

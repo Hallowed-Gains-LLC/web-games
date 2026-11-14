@@ -65,6 +65,30 @@ thumb, so turning back answers at once. Lift your finger and the swarm stops.
 - After each realm you keep part of your swarm and choose one of three **gifts**.
 - Your place is saved at the start of each realm.
 
+## Endless
+
+Finishing the twelve realms opens **Endless** on the title screen: realms
+without end, made up as you go, and harder the deeper you go.
+
+- **Every depth is new.** Its name, colours, musical key, layout and hazards
+  come from the run's seed and the depth, so a saved run comes back exactly
+  as it was.
+- **It gets harder.** Each depth has more sleeping stars needing more light,
+  and a growing budget of hazards: hollows (still, orbiting, hunting,
+  drifting, whirlpools), rifts, shades and knells, with the nastier ones
+  likelier deeper in. Fog and currents turn up at random. Once costs and
+  hazard counts reach their ceilings (around depth 20), shades, wisps and
+  waves keep getting quicker, up to 1.4 times at depth 50.
+- **Embers.** You start a run with three. Losing all your light burns one
+  and rekindles you; with none left, the run ends. Pouring into a star always
+  leaves you 25 light, so waking a star never puts you out by itself.
+- **Milestones.** Every 5th depth is a **Sanctuary**: calm, and clearing it
+  gives back an ember (up to five). Every 10th is an **Eclipse**: a vast
+  hollow that rings waves of dark and breaks when its stars wake.
+- **Progression.** Gifts stack through the run (when every gift is maxed,
+  you just go on), each depth has a par time and earns stars, and your best
+  depth is saved and shown on the title screen.
+
 ## The realms
 
 | | Realm | What's new |
@@ -93,6 +117,7 @@ game and add a line here, so you can tell whether a change is live.
 
 | Version | What changed |
 | --- | --- |
+| 1.4 | Endless mode, opened by finishing the twelve realms |
 | 1.3 | Swarm holds 12,000 light (was 9,000), shown in the HUD; a full or nearly full swarm takes only what fits and leaves the rest where it is |
 | 1.2 | Dash, shades, knells, chains, leaking stars, par times and star ratings |
 | 1.1 | Touch joystick, four-colour palettes, surges and starfalls |
@@ -111,6 +136,7 @@ needs WebGL (every current browser has it; the game says so if it's off).
 | --- | --- |
 | `index.html` | The page, the interface's markup and all the CSS |
 | `js/config.js` | Tuning numbers, the twelve realms, gifts and all the writing |
+| `js/endless.js` | Endless mode's realm generator and its difficulty curve (`DL.ENDLESS`) |
 | `js/world.js` | The simulation: swarm, motes, hollows, wisps, beacons. No DOM, WebGL or audio |
 | `js/gfx.js` | The WebGL renderer. Knows nothing about the game |
 | `js/scene.js` | Turns the world into particles and shapes for the renderer: every colour, size and brightness choice |
@@ -151,6 +177,8 @@ resolution and dust count by itself.
 - `drift_save`: the realm you're on, the light you carried in, your gifts and stats
 - `drift_done`: stats from a finished journey
 - `drift_best`: the most stars earned in each realm
+- `drift_esave`: an Endless run in progress (seed, depth, light, gifts, embers, stats)
+- `drift_ebest`: the deepest Endless depth cleared
 - `drift_muted`
 
 ## Changing things
@@ -185,6 +213,7 @@ Add `?debug` to the URL to expose `window.__dl`. Also:
 
 - `?debug&realm=N` starts in realm N (`&carry=K` sets the starting light).
 - `?debug&speed=N` runs the simulation N times faster.
+- `?debug&endless=N&seed=S` starts Endless at depth N with seed S.
 - `__dl.runBot(index, { carry, gifts, sight })` plays a realm with a simple
   bot, without drawing, and returns how long it took in game seconds.
 
@@ -205,6 +234,14 @@ Measured with the numbers in this commit:
 - **A person:** the bot never hesitates, reads or explores, so expect roughly
   twice that, about 50 to 60 minutes. That is an estimate; nobody has played it
   through by hand yet.
+
+**Endless:** `runBot(index, { endless: true, seed })` plays depth index + 1.
+Measured with seed 7 and limited sight, the bot clears depths 1 to 30 in
+about 38 minutes, roughly a minute each at every depth (what a depth asks for
+grows, but so do your gifts and carried light). It never lost an ember: it
+dodges perfectly, which a person won't, so the danger is in the hazards, not
+the light. Endless pars are about 1.3 times the bot's time
+(`plan` in `endless.js`).
 
 To make the game longer or shorter, change `moteScale` and `costScale`
 together (whole numbers) and run the bot again. `runBot` also reports

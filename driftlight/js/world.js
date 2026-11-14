@@ -246,6 +246,7 @@
     // Combo: motes gathered in a chain, each within comboGap of the last.
     W.combo = 0; W.comboMul = 1; W.lastCollect = -99; W.bestCombo = 0; W.comboBonus = 0;
     W.full = false;           // the swarm is at swarmCap
+    W.keepSparks = 0; W.rekindles = 0; W.danger = 1;
     W.shadesKilled = 0; W.hits = 0; W.waveLost = 0; W.bossT = 6;
     W.flowStr = 0; waves.length = 0;
   }
@@ -419,14 +420,23 @@
   }
 
   /**
-   * Load realm `index`. opts: { carry: light brought along, gifts: {id: n} }.
+   * Load realm `index`. opts: {
+   *   carry   light brought along
+   *   gifts   {id: n}
+   *   realm   a realm to use instead of DL.REALMS[index] (Endless makes its own)
+   *   seed    for the realm's random layout details
+   *   keep    light that pouring into a star always leaves you (Endless: so
+   *           waking a star never puts your light out by itself)
+   * }
    */
   W.load = function (index, opts) {
     reset();
-    const realm = DL.REALMS[index];
+    const realm = opts.realm || DL.REALMS[index];
     W.realm = realm; W.index = index; W.finale = !!realm.finale; W.fog = !!realm.fog; W.pal = realm.pal;
+    W.keepSparks = opts.keep || 0;
+    W.danger = realm.danger || 1;     // Endless: how much quicker shades, wisps and waves are
     applyGifts(opts.gifts);
-    const rnd = mulberry32(1234 + index * 977);
+    const rnd = mulberry32(opts.seed !== undefined ? opts.seed : 1234 + index * 977);
     setupFlow(realm.flow, rnd);
     realm.build(makeBuilder(rnd));
     W.lx = W.startX; W.ly = W.startY;
@@ -591,6 +601,8 @@
       W.finished = true;
       W.events.push({ t: 'finale' });
     } else {
+      // An eclipse outside the finale (Endless) breaks when its stars wake.
+      if (W.boss && !W.boss.dying) W.boss.dying = 0.0001;
       W.portalOpen = true;
       W.events.push({ t: 'portal' });
     }
@@ -802,6 +814,7 @@
     }
 
     // ---- beacons ----
+    let spare = W.nFollow - W.keepSparks;       // light that may still be poured this step
     for (let bi = 0; bi < W.beacons.length; bi++) {
       const b = W.beacons[bi];
       if (b.lit) {
@@ -827,7 +840,8 @@
       if (Math.hypot(b.x - lx, b.y - ly) < T.chargeR && W.nFollow > 0 && b.filled + b.incoming < b.cost) {
         b.pourT = W.time; b.keep = Math.max(b.keep || 0, keep);
         b.acc += Math.max(T.chargeRate, W.nFollow * T.chargeFrac) * (W.surge ? T.surgeSpeed : 1) * dt;
-        let send = Math.min(Math.floor(b.acc), b.cost - b.filled - b.incoming);
+        let send = Math.max(0, Math.min(Math.floor(b.acc), b.cost - b.filled - b.incoming, spare));
+        spare -= send;
         b.acc -= Math.floor(b.acc);
         while (send-- > 0) {
           let found = -1;
@@ -919,7 +933,7 @@
         const ox = lx - w.x, oy = ly - w.y, d = Math.hypot(ox, oy) + 0.01;
         const wob = Math.sin(t * 3 + w.ph) * 0.6;
         const ax = ox / d - oy / d * wob, ay = oy / d + ox / d * wob;
-        w.vx += (ax * T.wispSpeed - w.vx) * dt * 2.2; w.vy += (ay * T.wispSpeed - w.vy) * dt * 2.2;
+        w.vx += (ax * T.wispSpeed * W.danger - w.vx) * dt * 2.2; w.vy += (ay * T.wispSpeed * W.danger - w.vy) * dt * 2.2;
         w.x += w.vx * dt; w.y += w.vy * dt;
         addFx(w.x, w.y, -w.vx * 0.3 + (Math.random() - 0.5) * 50, -w.vy * 0.3 + (Math.random() - 0.5) * 50, 0.45, 3.2, 1, 0.15 + Math.random() * 0.2, 0.4, 0);
         for (const b of W.beacons) if (b.lit && Math.hypot(b.x - w.x, b.y - w.y) < b.lightR * 0.8) { killWisp(w, false); break; }
@@ -965,7 +979,7 @@
         let ax = 0, ay = 0;
         if (d < sense && !W.exiting) {
           const wob = sh.cool > 0 ? 1.4 : Math.sin(t * 2.3 + sh.ph) * 0.5;
-          ax = (ox / d - oy / d * wob) * T.shadeSpeed; ay = (oy / d + ox / d * wob) * T.shadeSpeed;
+          ax = (ox / d - oy / d * wob) * T.shadeSpeed * W.danger; ay = (oy / d + ox / d * wob) * T.shadeSpeed * W.danger;
         } else {
           const hx = sh.homeX - sh.x, hy = sh.homeY - sh.y, hd = Math.hypot(hx, hy) + 0.01;
           if (hd > 60) { ax = hx / hd * T.shadeSpeed * 0.4; ay = hy / hd * T.shadeSpeed * 0.4; }
@@ -1022,7 +1036,7 @@
     }
     for (let vi = W.waves.length - 1; vi >= 0; vi--) {
       const v = W.waves[vi];
-      v.r += T.waveSpeed * dt;
+      v.r += T.waveSpeed * W.danger * dt;
       if (v.r > v.reach + T.waveWidth) { W.waves.splice(vi, 1); continue; }
       // Most of the swarm is near the leader: skip the wave if it's nowhere close.
       const ld = Math.hypot(lx - v.x, ly - v.y);
@@ -1173,7 +1187,7 @@
     if (!W.exiting && !W.finished) {
       if (W.ns === 0) {
         W.emptyT += dt;
-        if (W.emptyT > 2.2) { spawnSwarm(60, lx, ly); W.emptyT = 0; W.events.push({ t: 'rekindle' }); }
+        if (W.emptyT > 2.2) { spawnSwarm(60, lx, ly); W.emptyT = 0; W.rekindles++; W.events.push({ t: 'rekindle' }); }
       } else W.emptyT = 0;
     }
 

@@ -18,7 +18,7 @@ window.DL = {};
  * you can tell at a glance whether a change is live. Bump it with every
  * change to the game, and add a line to the changelog in the README.
  */
-DL.VERSION = '1.3';
+DL.VERSION = '1.4';
 
 DL.TUNE = {
   viewUnits: 720,        // world units across the screen's smaller side at zoom 1
@@ -132,6 +132,7 @@ const rgb = h => [(h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255];
  * fireworks, shockwaves and clouds in the sky.
  */
 const pal = (a, b, c, bg, d, e) => ({ a: rgb(a), b: rgb(b), c: rgb(c), bg: rgb(bg), d: rgb(d), e: rgb(e) });
+DL.pal = pal;            // endless.js makes palettes too
 
 DL.ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 

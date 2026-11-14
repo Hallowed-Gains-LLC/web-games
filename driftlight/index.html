@@ -36,6 +36,9 @@
     text-shadow: 0 1px 8px rgba(0, 0, 0, .8);
   }
   #realmName { text-transform: uppercase; letter-spacing: .3em; font-size: 11px; color: var(--dim); }
+  /* Endless: lives left, as embers. */
+  #embers { margin-top: 3px; font-size: 13px; letter-spacing: .3em; color: var(--gold); text-shadow: 0 0 8px rgba(255, 217, 160, .7); }
+  #embers:empty { display: none; }
   #light { font-family: var(--serif); font-size: 15px; color: var(--dim); margin-top: 2px; }
   #lightNum { font-weight: 500; font-size: 26px; color: var(--ink); margin-right: 4px; }
   #lightCap { font-size: 13px; opacity: .7; }
@@ -194,7 +197,7 @@
 
 <div id="hud" hidden>
   <div>
-    <div id="realmName"></div>
+    <div id="realmName"></div><div id="embers"></div>
     <div id="light"><span id="lightNum">0</span>light <span id="lightCap"></span></div>
     <div id="heat"><div id="heatFill"></div></div>
     <div id="clock"></div>
@@ -220,6 +223,7 @@
 
 <!-- Plain scripts in order (no modules), so the game also runs from a file. -->
 <script src="js/config.js"></script>
+<script src="js/endless.js"></script>
 <script src="js/world.js"></script>
 <script src="js/gfx.js"></script>
 <script src="js/scene.js"></script>
