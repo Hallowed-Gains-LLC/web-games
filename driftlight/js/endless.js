@@ -6,8 +6,13 @@
  * generated from the run's seed and the depth, in the same shape as an entry
  * of DL.REALMS, so the rest of the game treats it like any other realm.
  *
- *   DL.endless.realm(depth, seed)   the realm for that depth (1, 2, 3...)
- *   DL.endless.kind(depth)          'wild', 'sanctuary' (every 5th) or 'eclipse' (every 10th)
+ *   DL.endless.realm(depth, seed, door)   the realm for that depth (1, 2, 3...)
+ *   DL.endless.kind(depth)                'wild', 'sanctuary' (every 5th) or 'eclipse' (every 10th)
+ *   DL.endless.doors(depth, seed, n)      the doors offered into that depth
+ *
+ * Doors (see DL.DOORS in boons.js) change an ordinary depth: a Rich one has
+ * fewer dangers and more light, a Perilous one more dangers, and quicker.
+ * Sanctuaries and eclipses come at fixed depths and have only their own door.
  *
  * How depth makes it harder (all in DL.ENDLESS below):
  *   - more sleeping stars, each needing more light, up to a ceiling
@@ -94,18 +99,29 @@
   ];
 
   const kind = d => (d % 10 === 0 ? 'eclipse' : d % 5 === 0 ? 'sanctuary' : 'wild');
+  const DOOR_SALT = { wild: 0, rich: 31337, perilous: 271828 };
+
+  /** The doors into `depth`: its own for a sanctuary or eclipse, else `n` of the three. */
+  function doors(depth, seed, n) {
+    if (kind(depth) !== 'wild') return [kind(depth)];
+    const rnd = mulberry32((seed * 31 + depth * 7727) | 0), all = ['wild', 'rich', 'perilous'];
+    for (let i = all.length - 1; i > 0; i--) { const j = (rnd() * (i + 1)) | 0; [all[i], all[j]] = [all[j], all[i]]; }
+    return all.slice(0, n);
+  }
 
   /**
    * Plan a depth: everything about it, decided up front from the seed, so
    * the same seed and depth always make the same realm (a saved run comes
    * back exactly as it was).
    */
-  function plan(depth, seed) {
-    const rnd = mulberry32((seed * 7919 + depth * 104729) | 0);
+  function plan(depth, seed, door) {
+    const k = kind(depth), dd = Math.min(depth, 24);
+    door = k === 'wild' ? door || 'wild' : k;
+    const rnd = mulberry32((seed * 7919 + depth * 104729 + (DOOR_SALT[door] || 0)) | 0);
     const range = (a, b) => a + (b - a) * rnd();
     const pick = list => list[(rnd() * list.length) | 0];
-    const k = kind(depth), dd = Math.min(depth, 24);
-    const P = { depth, kind: k, ops: [], hazards: 0 };
+    const P = { depth, kind: k, door, ops: [], hazards: 0 };
+    const rich = door === 'rich', perilous = door === 'perilous';
 
     // ---- the realm's character ----
     P.w = 3200 + dd * 70; P.h = 2200 + dd * 45;
@@ -116,7 +132,7 @@
       : rnd() < 0.45 ? { str: Math.round(range(35, 60 + dd * 4)), speed: range(0.05, 0.25) } : null;
     if (k === 'eclipse') { P.name = `The ${pick(ADJ)} Eclipse`; P.line = 'It rings for you.'; }
     else if (k === 'sanctuary') { P.name = `Sanctuary of the ${pick(NOUN)}`; P.line = 'Rest here. An ember waits for you.'; }
-    else { P.name = `The ${pick(ADJ)} ${pick(NOUN)}`; P.line = pick(LINES); }
+    else { P.name = `The ${pick(ADJ)} ${pick(NOUN)}`; P.line = rich ? 'Light lies thick here.' : perilous ? 'Twice the dark, and quicker.' : pick(LINES); }
 
     // ---- start, portal and stars ----
     const cx = P.w / 2, cy = P.h / 2;
@@ -150,7 +166,7 @@
     // Many wide veins rather than a few dense ones: dense light is gathered
     // in one sweep, and the realm is over before it starts.
     const veins = stars.length * 3 + 2;
-    let perVein = need * E.supply / veins;
+    let perVein = need * E.supply * (rich ? 1.7 : 1) / veins;
     const motesPer = w => perVein / w;                                    // motes one vein makes
     if (motesPer(worth) * veins > E.maxMotes) worth = 5;
     if (motesPer(worth) * veins > E.maxMotes) perVein = E.maxMotes * worth / veins;
@@ -210,7 +226,19 @@
         case 'hollow': at = near(300, 450); if (at) op('hollow', at[0], at[1], hollowR()); break;
         case 'vortex': at = near(320, 450); if (at) op('hollow', at[0], at[1], hollowR(), { vortex: true }); break;
         case 'drift': at = near(300, 450); if (at) op('hollow', at[0], at[1], hollowR(), { drift: true }); break;
-        case 'roam': at = near(380, 470); if (at) op('hollow', at[0], at[1], hollowR(), { roam: Math.round(range(28, 32 + dd * 0.4)) }); break;
+        case 'roam': {
+          // A hunting hollow follows you anywhere within roamLeash of its home,
+          // so its home must be far enough from every star that it can't
+          // follow you to one and sit on it. (It isn't cleared by a star; it
+          // just guards its patch.)
+          const away = (DL.TUNE.roamLeash + DL.TUNE.chargeR) / DL.TUNE.worldScale + 60;
+          for (let tries = 0; tries < 80 && !at; tries++) {
+            const x = range(250, P.w - 250), y = range(250, P.h - 250);
+            if (far(x, y, stars, away) && far(x, y, placed, 420) && Math.hypot(x - sx, y - sy) > 900) at = [x, y];
+          }
+          if (at) op('hollow', at[0], at[1], hollowR(), { roam: Math.round(range(28, 32 + dd * 0.4)) });
+          break;
+        }
         case 'orbit': {
           const s = pick(stars);
           op('hollow', 0, 0, 56, { orbit: { cx: s[0], cy: s[1], r: range(280, 340), spd: (rnd() < 0.5 ? -1 : 1) * range(0.3, 0.5) } });
@@ -237,7 +265,7 @@
         op('hollow', cx, cy, Math.round(150 + Math.min(depth, 60) * 1.5), { boss: true, vortex: true });
         placed.push([cx, cy]);
       }
-      let budget = E.budget(depth) * (k === 'eclipse' ? 0.5 : 1);
+      let budget = E.budget(depth) * (k === 'eclipse' ? 0.5 : rich ? 0.5 : perilous ? 1.7 : 1);
       const count = {};
       for (let guard = 0; guard < 200 && budget > 0.9; guard++) {
         const open = HAZARDS.filter(h => depth >= h.from && (count[h.id] || 0) < h.max && h.cost <= budget && (!h.flow || P.flow));
@@ -258,22 +286,22 @@
     P.par = Math.ceil(1.3 * (70 + need / 1500 + P.hazards + (P.fog ? 15 : 0)) / 15) * 15;
     // Deeper in, shades, wisps and waves are quicker. This keeps climbing after
     // star costs and hazard counts have reached their ceilings.
-    P.danger = 1 + Math.min(depth, 50) * 0.008;     // 1.4 at depth 50: shades then nearly as fast as you
+    P.danger = 1 + Math.min(depth, 50) * 0.008 + (perilous ? 0.15 : 0);     // 1.4 at depth 50: shades then nearly as fast as you
     return P;
   }
 
   /** The realm for `depth`, shaped like an entry of DL.REALMS. */
-  function realm(depth, seed) {
-    const P = plan(depth, seed);
+  function realm(depth, seed, door) {
+    const P = plan(depth, seed, door);
     return {
       name: P.name, line: P.line, pal: P.pal, root: P.root, minor: P.minor, flow: P.flow, fog: P.fog, par: P.par,
-      endless: true, depth, kind: P.kind, danger: P.danger,
+      endless: true, depth, kind: P.kind, door: P.door, danger: P.danger,
       build(B) {
         B.size(P.w, P.h); B.start(P.start[0], P.start[1]); B.portal(P.portal[0], P.portal[1]);
         for (const [fn, ...args] of P.ops) B[fn](...args);
       },
       hints: depth === 1 ? [
-        { when: (W, G) => G.realmTime > 2, text: 'Endless. Every depth is new, and each one is harder. Lose all your light three times and the run ends.' },
+        { when: (W, G) => G.realmTime > 2, text: 'Endless. Every depth is new, and each one is harder. Losing all your light burns an ember; with none left, the run ends.' },
       ] : P.kind === 'sanctuary' ? [
         { when: (W, G) => G.realmTime > 2, text: 'A sanctuary. Wake its stars to win back an ember.' },
       ] : P.kind === 'eclipse' ? [
@@ -282,5 +310,5 @@
     };
   }
 
-  DL.endless = { realm, plan, kind };
+  DL.endless = { realm, plan, kind, doors };
 })();

@@ -177,7 +177,8 @@
   #panel .version { font-family: var(--sans); font-size: 10px; letter-spacing: .25em; color: var(--dim); opacity: .6; margin: 10px 0 0; }
   .link { color: var(--dim); text-transform: uppercase; letter-spacing: .25em; font-size: 10px; text-decoration: none; padding: 8px 10px; }
   .link:hover { color: var(--ink); }
-  .gifts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+  /* Cards stay a sensible width and centre, whether there are two or six. */
+  .gifts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 216px)); justify-content: center; gap: 12px; margin-top: 18px; }
   @media (max-width: 620px) { .gifts { grid-template-columns: 1fr; } }
   .gift {
     padding: 20px 16px; border: 1px solid var(--line); border-radius: 14px; background: rgba(4, 6, 15, .5);
@@ -187,6 +188,17 @@
   .gift b { display: block; font-family: var(--serif); font-weight: 500; font-size: 24px; color: var(--gold); }
   .gift span { display: block; font-family: var(--serif); font-size: 16px; color: var(--dim); margin-top: 6px; line-height: 1.3; }
   .gift small { display: block; margin-top: 10px; letter-spacing: .3em; color: var(--dim); font-size: 10px; }
+  /* Endless: boons, doors and the Constellation's upgrades reuse the gift card. */
+  .gift.boon b { color: #cdeeff; }
+  .gift.trade b { color: #ffb3cc; }
+  .gift.door small { letter-spacing: .08em; text-transform: none; font-family: var(--serif); font-size: 14px; color: var(--ink); }
+  .gift.door.rich b { color: #c9ffa3; }
+  .gift.door.perilous b { color: #ff8f9f; }
+  .gift.door.sanctuary b { color: #a8e6ff; }
+  .gift.door.eclipse b { color: #d5b3ff; }
+  .gift[disabled] { opacity: .42; cursor: default; }
+  .gift[disabled]:hover { transform: none; border-color: var(--line); background: rgba(4, 6, 15, .5); }
+  .ups { margin-bottom: 14px; }
   #panel .rating { font-size: 34px; letter-spacing: .2em; color: var(--gold); margin: 0; text-shadow: 0 0 18px rgba(255, 217, 160, .6); }
   .stats { display: grid; grid-template-columns: 1fr auto; gap: 4px 28px; max-width: 320px; margin: 18px auto; text-align: left; font-family: var(--serif); font-size: 18px; color: var(--dim); }
   .stats span:nth-child(even) { color: var(--ink); text-align: right; }
@@ -223,6 +235,7 @@
 
 <!-- Plain scripts in order (no modules), so the game also runs from a file. -->
 <script src="js/config.js"></script>
+<script src="js/boons.js"></script>
 <script src="js/endless.js"></script>
 <script src="js/world.js"></script>
 <script src="js/gfx.js"></script>

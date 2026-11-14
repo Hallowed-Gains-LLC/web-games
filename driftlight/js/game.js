@@ -43,6 +43,11 @@
     mode: 'story',         // 'story' (the twelve realms) or 'endless'
     seed: 0,               // Endless: the run's seed; with the depth it decides each realm
     embers: 0,             // Endless: lives left; losing all your light burns one
+    emberMax: 0,           // Endless: the most embers you can hold
+    boons: {},             // Endless: {id: true} for each boon this run holds (boons.js)
+    door: 'wild',          // Endless: the door chosen into the current depth
+    runStar: 0,            // Endless: starlight this run has earned so far
+    rerolled: false,       // Endless: the Second Look reroll is used up for this depth
     realm: 0,              // index of the realm (in Endless, depth - 1)
     gifts: {},
     told: {},              // one-time hints already shown this visit (surge, starfall)
@@ -229,6 +234,7 @@
   /** Show a panel. mode: 'dim' (centred over a dimmed game) or 'low' (bottom, game visible). */
   function showPanel(html, mode, onClick) {
     panel.innerHTML = html; panelClick = onClick;
+    if (mode === 'dim') $('card').classList.remove('show');    // a realm's title card shouldn't show through
     overlay.className = mode;
     // Next frame, so the fade-in transition runs.
     requestAnimationFrame(() => panel.classList.add('show'));
@@ -377,8 +383,8 @@
   /** The realm at `index`: one of the twelve, or in Endless, depth index + 1. */
   function realmAt(index) {
     if (G.mode !== 'endless') return DL.REALMS[index];
-    const key = `${G.seed}:${index}`;
-    if (endlessCache.key !== key) endlessCache = { key, realm: DL.endless.realm(index + 1, G.seed) };
+    const key = `${G.seed}:${index}:${G.door}`;
+    if (endlessCache.key !== key) endlessCache = { key, realm: DL.endless.realm(index + 1, G.seed, G.door) };
     return endlessCache.realm;
   }
   const cur = () => realmAt(G.realm);
@@ -387,22 +393,151 @@
 
   function save() {
     if (G.mode === 'endless') {
-      store.set('esave', { v: 1, seed: G.seed, realm: G.realm, carry: G.carry, gifts: G.gifts, stats: G.stats, embers: G.embers });
+      store.set('esave', { v: 2, seed: G.seed, realm: G.realm, door: G.door, carry: G.carry, gifts: G.gifts, stats: G.stats,
+        embers: G.embers, emberMax: G.emberMax, boons: G.boons, runStar: G.runStar });
     } else store.set('save', { v: 1, realm: G.realm, carry: G.carry, gifts: G.gifts, stats: G.stats });
+  }
+
+  /* ---- The Constellation: starlight and permanent upgrades (boons.js) ---- */
+
+  const meta = () => store.get('meta', { starlight: 0, ups: {} });
+  const upLevel = id => meta().ups[id] || 0;
+  const emberText = () => '✦'.repeat(G.embers) + '✧'.repeat(Math.max(0, G.emberMax - G.embers));
+
+  /** Spend starlight on upgrades. `back` returns to where it was opened from. */
+  function showConstellation(back) {
+    const m = meta();
+    const rows = DL.UPGRADES.map(u => {
+      const lvl = m.ups[u.id] || 0, max = lvl >= u.costs.length, cost = u.costs[lvl];
+      const dots = '●'.repeat(lvl) + '○'.repeat(u.costs.length - lvl);
+      return `<button class="gift up" data-act="${u.id}" ${max || m.starlight < cost ? 'disabled' : ''}>
+        <b>${u.name}</b><span>${u.desc}</span><small>${dots} &middot; ${max ? 'complete' : `✧ ${cost}`}</small></button>`;
+    }).join('');
+    showPanel(`
+      <h2>The Constellation</h2>
+      <p>Every Endless run earns starlight. Spend it here, for good.</p>
+      <p class="caps">✧ ${m.starlight} starlight</p>
+      <div class="gifts ups">${rows}</div>
+      <button class="btn" data-act="back">Back</button>`, 'dim', act => {
+      if (act === 'back') { hidePanel(); back(); return; }
+      const u = DL.UPGRADES.find(x => x.id === act), lvl = m.ups[act] || 0;
+      if (!u || lvl >= u.costs.length || m.starlight < u.costs[lvl]) return;
+      m.starlight -= u.costs[lvl]; m.ups[act] = lvl + 1; store.set('meta', m);
+      audio.ignite(false);
+      showConstellation(back);
+    });
   }
 
   /** Start a new Endless run, or carry on a saved one. */
   function beginEndless(saved) {
-    G.mode = 'endless';
+    G.mode = 'endless'; G.rerolled = false;
     if (saved) {
-      G.seed = saved.seed; G.realm = saved.realm; G.carry = saved.carry; G.gifts = saved.gifts || {};
-      G.stats = saved.stats || freshStats(); G.embers = saved.embers;
-    } else {
-      G.seed = (Math.random() * 1e9) | 0; G.realm = 0; G.carry = DL.ENDLESS.startLight; G.gifts = {};
-      G.stats = freshStats(); G.embers = DL.ENDLESS.embers;
-      store.del('esave');
+      G.seed = saved.seed; G.realm = saved.realm; G.door = saved.door || 'wild'; G.carry = saved.carry; G.gifts = saved.gifts || {};
+      G.stats = saved.stats || freshStats(); G.embers = saved.embers; G.emberMax = saved.emberMax || DL.ENDLESS.emberMax;
+      G.boons = saved.boons || {}; G.runStar = saved.runStar || 0;
+      beginFrom(G.realm);
+      return;
     }
-    beginFrom(G.realm);
+    // A new run, with whatever the Constellation adds.
+    G.seed = (Math.random() * 1e9) | 0; G.realm = 0; G.door = 'wild'; G.gifts = {}; G.boons = {}; G.runStar = 0;
+    G.carry = DL.ENDLESS.startLight + 300 * upLevel('light');
+    G.embers = DL.ENDLESS.embers + upLevel('embers'); G.emberMax = DL.ENDLESS.emberMax + upLevel('embers');
+    G.stats = freshStats();
+    store.del('esave');
+    if (upLevel('boon')) offerBoon('<p class="caps">A blessing for the road</p>', () => beginFrom(0));
+    else beginFrom(0);
+  }
+
+  /** Three boons the run doesn't hold yet, from what the Vault allows. */
+  function boonChoices() {
+    const open = DL.boonPool(upLevel('vault')).filter(b => !G.boons[b.id]), out = [];
+    while (out.length < 3 && open.length) out.push(open.splice((Math.random() * open.length) | 0, 1)[0]);
+    return out;
+  }
+  const rerollButton = () => (upLevel('reroll') && !G.rerolled ? '<br><button class="link" data-act="reroll">Reroll (once a depth)</button>' : '');
+
+  /** Offer a boon, then carry on with `next`. */
+  function offerBoon(header, next) {
+    const choices = boonChoices();
+    if (!choices.length) { next(); return; }
+    showPanel(`
+      ${header}
+      <h2>Choose a boon</h2>
+      <div class="gifts">${choices.map(b => `
+        <button class="gift boon${b.trade ? ' trade' : ''}" data-act="${b.id}"><b>${b.name}</b><span>${b.desc}</span><small>${b.trade ? 'boon &middot; at a cost' : 'boon'}</small></button>`).join('')}
+      </div>${rerollButton()}`, 'dim', id => {
+      if (id === 'reroll') { G.rerolled = true; offerBoon(header, next); return; }
+      G.boons[id] = true;
+      if (id === 'kindling') { G.emberMax++; G.embers++; }
+      hidePanel(); next();
+    });
+  }
+
+  /** Offer a gift (if any are left to take), then carry on with `next`. */
+  function offerGift(header, next) {
+    const open = DL.GIFTS.filter(g => (G.gifts[g.id] || 0) < g.max), choices = [];
+    while (choices.length < 3 && open.length) choices.push(open.splice((Math.random() * open.length) | 0, 1)[0]);
+    if (!choices.length) { next(); return; }                 // every gift maxed: just go on
+    const dots = g => '●'.repeat(G.gifts[g.id] || 0) + '○'.repeat(g.max - (G.gifts[g.id] || 0));
+    showPanel(`
+      ${header}
+      <h2>Choose a gift</h2>
+      <div class="gifts">${choices.map(g => `
+        <button class="gift" data-act="${g.id}"><b>${g.name}</b><span>${g.desc}</span><small>${dots(g)}</small></button>`).join('')}
+      </div>${rerollButton()}`, 'dim', id => {
+      if (id === 'reroll') { G.rerolled = true; offerGift(header, next); return; }
+      G.gifts[id] = (G.gifts[id] || 0) + 1;
+      hidePanel(); next();
+    });
+  }
+
+  /** Choose the door into the next depth, then go through it. */
+  function offerDoors() {
+    const depth = G.realm + 1, doors = DL.endless.doors(depth, G.seed, upLevel('doors') ? 3 : 2);
+    showPanel(`
+      <p class="caps">Depth ${depth}</p>
+      <h2>${doors.length > 1 ? 'Choose a door' : 'The way on'}</h2>
+      <div class="gifts">${doors.map(id => { const d = DL.DOORS[id]; return `
+        <button class="gift door ${id}" data-act="${id}"><b>${d.name}</b><span>${d.desc}</span><small>${d.reward}</small></button>`; }).join('')}
+      </div>`, 'dim', id => {
+      G.door = id; G.rerolled = false;
+      hidePanel();
+      G.fadeTo = 1;
+      setTimeout(() => { startRealm(G.realm, false); G.fadeTo = 0; }, 700);
+    });
+  }
+
+  /** A calm sky in the depth's colours, behind the choices between depths. */
+  function loadRestSky() {
+    W.loadSandbox({ w: 2400, h: 1500, pal: cur().pal, flow: { str: 18, speed: 0.06 }, points: [], swarm: Math.min(1500, G.carry) });
+    fitSandbox(); gfx.cut();
+  }
+
+  /**
+   * An Endless depth is done: bank it, give its rewards, then boon (if one
+   * is due), gift and door, one panel at a time.
+   */
+  function finishDepth() {
+    G.stats.light += W.realmLight; G.stats.lost += W.lost; G.stats.wisps += W.wispsKilled;
+    G.stats.stars += W.beacons.length; G.stats.shades += W.shadesKilled;
+    const rating = rateRealm(), r = cur(), crossed = W.exitCount;
+    // Light carried on: more through a Rich door, half with Tithe.
+    const rich = r.door === 'rich' ? 1.5 : 1;
+    G.carry = Math.round(Math.min(T.carryCap * rich, (crossed * T.carryFrac + T.carryBase) * rich) * (G.boons.tithe ? 0.5 : 1));
+    const notes = [];
+    if (r.kind === 'sanctuary' && G.embers < G.emberMax) { G.embers++; notes.push(`An ember returns &middot; ${G.embers} left`); }
+    const star = DL.STARLIGHT.depth + (r.door === 'perilous' ? DL.STARLIGHT.perilous : 0) + (r.kind === 'eclipse' ? DL.STARLIGHT.eclipse : 0);
+    G.runStar += star; notes.push(`+${star} starlight &middot; ${G.runStar} this run`);
+    const boonDue = r.door === 'perilous' || r.kind === 'eclipse';
+    const header = `<p class="caps">Depth ${G.realm + 1} cleared</p>${rating}
+      ${notes.map(n => `<p class="caps">${n}</p>`).join('')}
+      <p class="caps">${crossed.toLocaleString()} light crossed over &middot; ${G.carry.toLocaleString()} stays with you</p>`;
+    G.realm++; G.rerolled = false;
+    setState('gift'); setHud(false);
+    loadRestSky();
+    G.whiteTo = 0; G.whiteRate = 0.9;
+    const gift = () => offerGift(header, offerDoors);
+    if (boonDue) offerBoon(header, gift); else gift();
   }
 
   /** The last ember went out: the Endless run is over. */
@@ -413,6 +548,9 @@
     const record = cleared > best.depth;
     if (record) store.set('ebest', { depth: cleared, light: s.light });
     store.del('esave');
+    // Bank the run's starlight in the Constellation.
+    const m = meta(); m.starlight += G.runStar; store.set('meta', m);
+    const boons = DL.BOONS.filter(b => G.boons[b.id]).map(b => b.name);
     setState('over'); setHud(false); dropStick();
     G.fadeTo = 0.55;
     showPanel(`
@@ -426,8 +564,12 @@
         <span>Shades broken</span><span>${s.shades}</span>
         <span>Time</span><span>${mins} min</span>
       </div>
+      ${boons.length ? `<p class="caps">Boons &middot; ${boons.join(' &middot; ')}</p>` : ''}
+      <p class="caps">+${G.runStar} starlight &middot; ✧ ${m.starlight} to spend</p>
       <button class="btn main" data-act="again">New run</button>
+      <button class="btn" data-act="stars">Constellation</button>
       <button class="btn" data-act="title">Title</button>`, 'dim', act => {
+      if (act === 'stars') { showConstellation(() => { G.fadeTo = 1; setTimeout(showTitle, 800); }); return; }
       hidePanel(); G.fadeTo = 1;
       if (act === 'again') setTimeout(() => beginEndless(null), 800);
       else setTimeout(showTitle, 800);
@@ -480,6 +622,7 @@
     const endless = !open ? '' : `<br>
       ${esv ? `<button class="btn" data-act="econtinue">Continue Endless &middot; Depth ${esv.realm + 1}</button>` : ''}
       <button class="btn" data-act="endless">${esv ? 'New Endless run' : 'Endless'}</button>
+      <button class="btn" data-act="stars">Constellation &middot; ✧ ${meta().starlight}</button>
       ${best.depth ? `<p class="caps" style="margin:4px 0 0">Endless best &middot; depth ${best.depth}</p>` : ''}`;
     showPanel(`
       <p class="caps" style="margin-bottom:14px">A game of light &middot; about an hour</p>
@@ -494,6 +637,7 @@
       <p class="version">v${DL.VERSION}</p>`, 'low', act => {
       if (act === 'sound') { setMuted(!audio.muted); panel.querySelector('[data-act=sound]').textContent = soundLabel(); return; }
       if (act === 'endless' || act === 'econtinue') { hidePanel(); beginEndless(act === 'econtinue' ? esv : null); return; }
+      if (act === 'stars') { showConstellation(showTitle); return; }
       if (act === 'continue') { G.realm = sv.realm; G.carry = sv.carry; G.gifts = sv.gifts || {}; G.stats = sv.stats || freshStats(); }
       else { G.realm = 0; G.carry = 0; G.gifts = {}; G.stats = freshStats(); store.del('save'); }
       beginFrom(G.realm);
@@ -514,13 +658,14 @@
   function startRealm(index, preview) {
     G.realm = index;
     const realm = cur(), endless = G.mode === 'endless';
-    W.load(index, { carry: G.carry, gifts: G.gifts, realm,
+    W.load(index, { carry: G.carry, gifts: G.gifts, realm, boons: endless ? G.boons : undefined,
       seed: endless ? (G.seed + index * 977) | 0 : undefined, keep: endless ? 25 : 0 });
+    if (endless && !preview && !G.bot) save();          // a run saves at the start of every depth
     updateCamera(0, true); gfx.cut();
     G.realmTime = 0; G.hints = new Set(); hideHint();
     audio.setRealm(realm.root, !!realm.minor);
     $('realmName').textContent = `${label(index)} · ${realm.name}`;
-    $('embers').textContent = endless ? '✦'.repeat(G.embers) + '✧'.repeat(Math.max(0, DL.ENDLESS.embers - G.embers)) : '';
+    $('embers').textContent = endless ? emberText() : '';
     buildPips();
     if (preview) { setState('gift'); setHud(false); }
     else {
@@ -531,17 +676,12 @@
 
   /** The realm is done: bank the stats and offer a gift for the next one. */
   function finishRealm() {
+    if (G.mode === 'endless') { finishDepth(); return; }
     G.stats.light += W.realmLight; G.stats.lost += W.lost; G.stats.wisps += W.wispsKilled;
     G.stats.stars += W.beacons.length; G.stats.shades += W.shadesKilled;
     const rating = rateRealm();                     // read before the next realm replaces the world
     const crossed = W.exitCount;
     G.carry = Math.min(T.carryCap, Math.round(crossed * T.carryFrac) + T.carryBase);
-    // Endless: a sanctuary gives back an ember.
-    let ember = '';
-    if (G.mode === 'endless' && cur().kind === 'sanctuary' && G.embers < DL.ENDLESS.emberMax) {
-      G.embers++; ember = `<p class="caps">An ember returns &middot; ${G.embers} left</p>`;
-    }
-    const cleared = G.mode === 'endless' ? `<p class="caps">Depth ${G.realm + 1} cleared</p>` : '';
     startRealm(G.realm + 1, true);
     save();
     G.whiteTo = 0; G.whiteRate = 0.9;
@@ -555,7 +695,7 @@
         <button class="gift" data-act="${g.id}"><b>${g.name}</b><span>${g.desc}</span><small>${dots(g)}</small></button>`).join('')}
       </div>` : '<button class="btn main" data-act="go">Go on</button>';
     showPanel(`
-      ${cleared}${rating}${ember}
+      ${rating}
       <p class="caps">${crossed.toLocaleString()} light crossed over &middot; ${G.carry.toLocaleString()} stays with you</p>
       ${pickOne}`, 'dim', id => {
       if (id !== 'go') G.gifts[id] = (G.gifts[id] || 0) + 1;
@@ -571,6 +711,8 @@
     showPanel(`
       <h2>Paused</h2>
       <p>${label(G.realm)} &middot; ${cur().name}</p>
+      ${G.mode === 'endless' && Object.keys(G.boons).length
+        ? `<p class="caps">Boons &middot; ${DL.BOONS.filter(b => G.boons[b.id]).map(b => b.name).join(' &middot; ')}</p>` : ''}
       <button class="btn main" data-act="resume">Resume</button><br>
       <button class="btn" data-act="sound">${soundLabel()}</button>
       <button class="btn" data-act="restart">Restart ${G.mode === 'endless' ? 'depth' : 'realm'}</button>
@@ -678,7 +820,8 @@
           if (G.mode !== 'endless' || W.portalOpen) showHint('A few sparks find you again.');
           else if (G.embers > 0) {
             G.embers--;
-            $('embers').textContent = '✦'.repeat(G.embers) + '✧'.repeat(Math.max(0, DL.ENDLESS.embers - G.embers));
+            $('embers').textContent = emberText();
+            if (G.boons.phoenix) W.spawnSwarm(940, W.lx, W.ly);           // Phoenix
             showHint(G.embers ? `An ember rekindles your light. ${G.embers} left.` : 'Your last ember rekindles your light. Don’t lose it again.');
             shake(20);
           } else runOver();
@@ -906,7 +1049,7 @@
   function runBot(index, opts) {
     opts = opts || {};
     G.mode = opts.endless ? 'endless' : 'story';
-    if (opts.endless) G.seed = opts.seed || 1;
+    if (opts.endless) { G.seed = opts.seed || 1; G.door = opts.door || 'wild'; G.boons = opts.boons || {}; }
     bot.sight = opts.sight || 0; bot.committed = null; bot.re = 0;
     G.gifts = opts.gifts || {}; G.carry = opts.carry || 0;
     startRealm(index, false);
@@ -952,11 +1095,13 @@
     W.loadSandbox({ w: 2400, h: 1400, pal: DL.TITLE_PAL, points: [], swarm: 0 });   // something to draw until fonts load
     resize();
 
-    if (DEBUG) window.__dl = { G, W, cam, view, runBot, startRealm, showEnd, finishRealm, beginEndless, runOver, gfx };
+    if (DEBUG) window.__dl = { G, W, cam, view, runBot, startRealm, showEnd, finishRealm, beginEndless, runOver, showConstellation, gfx };
     const jump = parseInt(params.get('realm'), 10), deep = parseInt(params.get('endless'), 10);
     const go = () => {
       if (DEBUG && deep >= 1) {
-        G.mode = 'endless'; G.seed = parseInt(params.get('seed'), 10) || 1; G.embers = DL.ENDLESS.embers;
+        G.mode = 'endless'; G.seed = parseInt(params.get('seed'), 10) || 1; G.embers = G.emberMax = DL.ENDLESS.embers;
+        G.door = params.get('door') || 'wild'; G.boons = {};
+        for (const id of (params.get('boons') || '').split(',')) if (id) G.boons[id] = true;
         G.carry = parseInt(params.get('carry'), 10) || DL.ENDLESS.startLight;
         startRealm(deep - 1, false); G.fadeTo = 0;
       } else if (DEBUG && jump >= 1 && jump <= DL.REALMS.length) {
