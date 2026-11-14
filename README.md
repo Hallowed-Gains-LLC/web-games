@@ -7,13 +7,19 @@ anyone with the link can play.
 
 | Folder | Game | Live at |
 | --- | --- | --- |
-| [`driftlight/`](driftlight/) | Driftlight, a particle game about an hour long: steer a swarm of light through twelve dark realms | [/games/driftlight/](https://hallowedgains.com/games/driftlight/) |
 | [`fitz-season/`](fitz-season/) | Fitz Season: It Ain't Christmas Yet, a six-minute game about a boat holding back Christmas on Lake Superior | [/games/fitz-season/](https://hallowedgains.com/games/fitz-season/) |
 | [`first-trinity/`](first-trinity/) | First Trinity Oktoberfest, a pixel-art stroll around the church's Oktoberfest | [/games/first-trinity/](https://hallowedgains.com/games/first-trinity/) |
 | [`lily/`](lily/) | Lily's games: Unicorn Quest and Walk Me Home | [/games/lily/](https://hallowedgains.com/games/lily/) |
 
-Both were imported from their old repos (`brandonadamprice/first_trinity` and
-`brandonadamprice/lily`) with their full commit history.
+First Trinity and Lily's games were imported from their old repos
+(`brandonadamprice/first_trinity` and `brandonadamprice/lily`) with their full
+commit history.
+
+Driftlight, which used to live here, has its own repo now,
+[Hallowed-Gains-LLC/DriftLight](https://github.com/Hallowed-Gains-LLC/DriftLight),
+because it's also built as a phone app. It's still at
+[/games/driftlight/](https://hallowedgains.com/games/driftlight/); the site
+pulls it from there.
 
 ## How a game goes live
 
