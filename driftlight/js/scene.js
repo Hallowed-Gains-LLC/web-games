@@ -258,7 +258,7 @@
     // ---- lights that hold back the fog: you, then lit beacons ----
     lights.fill(0);
     if (W.fog) {
-      lights[0] = W.lx; lights[1] = W.ly; lights[2] = 330 + W.swR * 2.4; lights[3] = 1;
+      lights[0] = W.lx; lights[1] = W.ly; lights[2] = (330 + W.swR * 2.4) * (W.boon.lantern ? 1.4 : 1); lights[3] = 1;
       let k = 1;
       for (const b of W.beacons) {
         if (!b.lit || k >= 8 || !seen(b.x, b.y, b.lightR * 1.5)) continue;
