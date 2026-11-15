@@ -12,6 +12,9 @@ Live at [hallowedgains.com/games/moonflower/](https://hallowedgains.com/games/mo
 
 ## Made for 3am
 
+- **Pairs line up.** The board is 6 across and 5 down (30 places): an even
+  row, so two alike can always sit side by side. (It was 5 across, which left
+  one in every row to pair with a neighbour above or below.)
 - **One thumb.** Everything you touch is in the bottom half of the screen:
   the board, the seed pouch, the basket and undo. New seeds land close to the
   pouch. Tapping one item then its twin works as well as dragging.
