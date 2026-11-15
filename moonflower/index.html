@@ -74,6 +74,7 @@
   .title { font-size: 30px !important; text-align: center; margin-top: 6px !important; }
   .lede { text-align: center; opacity: .75; margin-top: -4px !important; }
   .how { list-style: none; padding: 0; margin: 18px 0 10px; }
+  .endmoon { display: block; width: 112px; height: 112px; margin: 4px auto 6px; }
   .how li { display: flex; gap: 14px; align-items: center; padding: 9px 0; line-height: 1.45; }
   .how canvas, .how .glyph { flex: 0 0 44px; width: 44px; height: 44px; }
   .how .glyph { display: flex; align-items: center; justify-content: center; font-size: 26px; color: #efd9a8; }
@@ -119,7 +120,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '1.1';
+const VERSION = '1.2';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 const COLS = 5, ROWS = 6, N = COLS * ROWS;
 const MAX_TIER = 12;
@@ -534,6 +535,8 @@ function freshState() {
   board[25] = 1; board[26] = 1; board[28] = 1; board[29] = 1; board[22] = 2;
   return {
     v: 1, board, glow: 0, peak: 0, best: 2, decor: 0, wishes: [],
+    skyMoons: 0,      // Little moons grown and risen into the sky (the end of the chain)
+    ended: false,     // the "Goodnight, moon" card has been shown
     visits: 1, last: Date.now(), intro: false,
     stats: { seeds: 0, merges: 0, wishes: 0 },
     set: { dim: 1, warm: false, sound: false, buzz: false },
@@ -617,7 +620,7 @@ function layout() {
    ============================================================ */
 const skyC = document.createElement('canvas');
 const landC = document.createElement('canvas');
-let stars = [], constellations = [], shoot = null, nextShoot = 8;
+let stars = [], skySlots = [], shoot = null, nextShoot = 8;
 
 const has = id => DECOR.findIndex(d => d.id === id) < S.decor;
 function sceneView() {
@@ -639,15 +642,27 @@ function makeStars() {
     if (Math.hypot(x - m.x, y - m.y) < 22) continue;
     stars.push({ x, y, r: .35 + rnd() * rnd() * 1.1, ph: rnd() * TAU, sp: .4 + rnd() * 1.2 });
   }
-  constellations = [];
-  const crnd = mulberry32(31);
-  for (let i = 0; i < 16; i++) {
-    const cx = lerp(V.xl + 20, V.xr - 20, crnd()), cy = 8 + crnd() * Math.max(10, V.G - 80);
-    const pts = []; let x = cx, y = cy;
-    const n = 4 + Math.floor(crnd() * 3);
-    for (let k = 0; k < n; k++) { pts.push([x, y]); x += (crnd() - .4) * 18; y += (crnd() - .5) * 12; }
-    constellations.push(pts);
+  // The constellations' places: a jittered grid over the open sky left of
+  // the big moon, two rows if the sky is tall enough, filled middle first.
+  // Grown moons take places from the front (drawConstellations), the glow
+  // constellations after every wonder from the back, so they never overlap.
+  // Each place also carries a loose random shape for a glow constellation.
+  skySlots = [];
+  const srnd = mulberry32(31), top = V.top + 16, bot = V.G - 58;
+  const rows = bot - top >= 36 ? 2 : 1, cols = 8, x0 = V.xl + 24, x1 = m.x - 32;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = lerp(x0, x1, (c + .5) / cols) + (srnd() - .5) * 10;
+      const y = (rows === 1 ? (top + bot) / 2 : r ? bot : top) + (c % 2 ? 5 : -5) + (srnd() - .5) * 6;
+      const glow = []; let gx = 0, gy = 0;
+      const n = 4 + Math.floor(srnd() * 3);
+      for (let k = 0; k < n; k++) { glow.push([gx, gy]); gx += (srnd() - .4) * 9; gy += (srnd() - .5) * 7; }
+      const mx = glow.reduce((a, q) => a + q[0], 0) / n, my = glow.reduce((a, q) => a + q[1], 0) / n;
+      skySlots.push({ x, y: Math.max(V.top + 10, y), glow: glow.map(([a, b]) => [a - mx, b - my]) });
+    }
   }
+  const cx = (x0 + x1) / 2, cy = (top + bot) / 2;
+  skySlots.sort((a, b) => Math.hypot(a.x - cx, (a.y - cy) * 2) - Math.hypot(b.x - cx, (b.y - cy) * 2));
 }
 
 function prepCanvas(cvs) {
@@ -865,15 +880,7 @@ function drawScene(c, ms) {
     c.fillStyle = '#f1ead2'; c.fillRect(s.x - s.r / 2, s.y - s.r / 2, s.r, s.r);
   }
   c.globalAlpha = 1;
-  if (S.decor >= DECOR.length) {
-    const n = Math.min(constellations.length, 1 + Math.floor((S.peak - decorAt(DECOR.length)) / STAR_STEP));
-    for (let i = 0; i < n; i++) {
-      const pts = constellations[i];
-      c.strokeStyle = 'rgba(220,210,255,.16)'; c.lineWidth = .5; c.beginPath();
-      pts.forEach(([x, y], k) => k ? c.lineTo(x, y) : c.moveTo(x, y)); c.stroke();
-      for (const [x, y] of pts) { drawGlow(c, x, y, 4, '#f3ecd0', .5 + .2 * Math.sin(t + x)); c.fillStyle = '#f7f0d8'; c.fillRect(x - .6, y - .6, 1.2, 1.2); }
-    }
-  }
+  drawConstellations(c, t, ms);
   if (has('shooting')) {
     if (!shoot && t > nextShoot) shoot = { t0: t, x: lerp(V.xl + 40, V.xr - 60, Math.random()), y: 6 + Math.random() * Math.max(6, V.G - 90) };
     if (shoot) {
@@ -1064,6 +1071,8 @@ const sfx = {
   gather: () => chime(NOTES[2], 0, .06, 1.1),
   undo: () => chime(NOTES[1], 0, .045, .7),
   wonder: () => [5, 7, 9, 12].forEach((n, i) => chime(NOTES[n], i * .22, .06, 2.4)),
+  // A moon rising: a slow climb and a settle, about as long as the flight.
+  rise: () => [2, 4, 5, 7, 9, 7, 12].forEach((n, i) => chime(NOTES[n], i * .3, .055, 2.6)),
 };
 function buzz(ms) { if (S.set.buzz && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} }
 
@@ -1099,11 +1108,13 @@ function discover(t, at) {
   S.best = t;
   retireUnreachableWishes();
   if (t < 3) return;
-  toast({ title: `New: ${ITEMS[t].name}`, sub: ITEMS[t].blurb, tier: t, dur: 3400 });
-  later(120, sfx.discover);
-  if (at) later(150, () => burst(at.x, at.y, 26, 1.5));
+  if (t < MAX_TIER) {   // a moon gets the ending instead (riseMoon)
+    toast({ title: `New: ${ITEMS[t].name}`, sub: ITEMS[t].blurb, tier: t, dur: 3400 });
+    later(120, sfx.discover);
+    if (at) later(150, () => burst(at.x, at.y, 26, 1.5));
+  }
   const pouch = pouchTier();
-  if (pouch > pouchBefore) toast({ title: 'The seed pouch has grown', sub: `It gives ${ITEMS[pouch].many.toLowerCase()} now.`, tier: pouch, dur: 3400 });
+  if (pouch > pouchBefore && t < MAX_TIER) toast({ title: 'The seed pouch has grown', sub: `It gives ${ITEMS[pouch].many.toLowerCase()} now.`, tier: pouch, dur: 3400 });
 }
 /** What the seed pouch gives: POUCH_LAG steps behind your best, a Seed at least. */
 function pouchTier() { return Math.max(1, S.best - POUCH_LAG); }
@@ -1152,6 +1163,7 @@ function doMerge(src, dst, from) {
   gain(t + 1, c, delay);
   discover(t + 1, c);
   later(delay, () => { burst(c.x, c.y, 8 + t); sfx.merge(t + 1); buzz(8); });
+  if (t + 1 === MAX_TIER) later(delay + MOON_PAUSE_MS, () => riseMoon(dst));
   save();
 }
 function deliver(wi, cell, from) {
@@ -1179,6 +1191,118 @@ function gather(cell, from) {
 function hintWish(wi) {
   const w = S.wishes[wi], it = ITEMS[w.tier];
   toast({ title: `${w.who} would love a ${it.name}`, sub: w.tier > 1 ? `Merge two ${ITEMS[w.tier - 1].many} to grow one.` : '', tier: w.tier });
+}
+
+/* ============================================================
+   The end of the chain: moons rise into the sky
+   ============================================================ */
+// A Little moon can't merge any further, so it doesn't stay on the board:
+// a moment after it's grown it floats up into the garden sky, shrinks to a
+// point of light, and becomes a constellation shaped like something from
+// the garden, its stars appearing one by one. The first one, the Sleeping
+// Moon, ends the game's story with the "Goodnight, moon" card; every one
+// after adds the next shape, so the sky fills up with what you've grown.
+const MOON_PAUSE_MS = 700;      // a beat on the board first, to see what you made
+const MOON_RISE_MS = 2400;      // the flight up, slow on purpose
+const STAR_STEP_MS = 170;       // between one star of a new constellation and the next
+const SHAPE_R = 14;             // a moon constellation's half-size, in scene units
+
+// The moon constellations, in the order they're earned. Points are in a box
+// from -1 to 1 (y down); `lines` join points by index; a point no line
+// touches is a lone star (an owl's eye, a firefly, a lit window).
+const MOON_SHAPES = [
+  { name: 'The Sleeping Moon', pts: [[.35, -.95], [-.25, -.8], [-.7, -.35], [-.75, .2], [-.4, .7], [.25, .9], [-.1, .35], [-.2, -.25]],
+    lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 0]] },
+  { name: 'The Luna Moth', pts: [[0, -.5], [0, .55], [-.95, -.75], [-.45, .05], [-.65, .95], [.95, -.75], [.45, .05], [.65, .95]],
+    lines: [[0, 1], [0, 2], [2, 3], [3, 0], [3, 4], [4, 1], [0, 5], [5, 6], [6, 0], [6, 7], [7, 1]] },
+  { name: 'The Moonflower', pts: [[0, -.95], [.9, -.29], [.56, .77], [-.56, .77], [-.9, -.29]],
+    lines: [[0, 2], [2, 4], [4, 1], [1, 3], [3, 0]] },
+  { name: 'The Owl', pts: [[-.6, -.95], [.6, -.95], [-.7, -.25], [.7, -.25], [-.3, -.35], [.3, -.35], [-.4, .9], [.4, .9]],
+    lines: [[0, 2], [2, 6], [6, 7], [7, 3], [3, 1], [0, 1]] },
+  { name: 'The Lantern', pts: [[0, -1], [0, -.65], [-.55, -.05], [0, .85], [.55, -.05], [0, .08]],
+    lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 1]] },
+  { name: 'The Fox', pts: [[-.75, -.9], [.75, -.9], [-.3, -.35], [.3, -.35], [-.85, .05], [.85, .05], [0, .9]],
+    lines: [[0, 2], [2, 3], [3, 1], [0, 4], [4, 6], [6, 5], [5, 1]] },
+  { name: 'The Firefly Jar', pts: [[-.45, -.9], [.45, -.9], [-.6, -.45], [.6, -.45], [-.6, .9], [.6, .9], [-.1, .15], [.25, .5]],
+    lines: [[0, 1], [0, 2], [1, 3], [2, 4], [4, 5], [5, 3]] },
+  { name: 'The Rabbit', pts: [[-.45, -1], [.15, -.95], [-.3, -.25], [.05, -.25], [-.7, .25], [.45, .3], [-.1, .75]],
+    lines: [[0, 2], [1, 3], [2, 4], [4, 6], [6, 5], [5, 3], [3, 2]] },
+  { name: 'The Wishing Tree', pts: [[0, .95], [0, .25], [-.9, .25], [0, -.95], [.9, .25], [-.4, -.3], [.4, -.15]],
+    lines: [[0, 1], [2, 3], [3, 4], [4, 2]] },
+  { name: 'The Hedgehog', pts: [[-.95, .55], [-.75, -.15], [-.35, -.6], [.15, -.65], [.55, -.3], [.95, .35], [-.05, .6]],
+    lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 0]] },
+  { name: 'The Sprout', pts: [[0, .95], [0, 0], [-.85, -.55], [.8, -.8], [0, -.55]],
+    lines: [[0, 1], [1, 2], [1, 3], [1, 4]] },
+  { name: 'The Cottage', pts: [[-.75, .9], [.75, .9], [-.75, 0], [.75, 0], [0, -.8], [.45, -.75], [.45, -.4], [-.2, .45]],
+    lines: [[0, 1], [0, 2], [1, 3], [2, 4], [4, 3], [5, 6]] },
+];
+const moonShape = k => MOON_SHAPES[k % MOON_SHAPES.length];
+let risingMoons = 0;            // on their way up: counted, not drawn in the sky yet
+let newest = null;              // { k, t0 }: the constellation whose stars are still appearing
+
+function riseMoon(cell) {
+  // It may have been moved (or undone) during the pause: find it.
+  if (S.board[cell] !== MAX_TIER) cell = S.board.findIndex((t, i) => t === MAX_TIER && !busy(i));
+  if (cell < 0) return;
+  if (drag && drag.src === cell) drag = null;
+  if (sel === cell) sel = -1;
+  // A risen moon can't be undone (undo would hand back the two Wishing trees
+  // and keep the moon), so the undo history ends here, as it does on a visit.
+  undoStack = [];
+  const V = sceneView(), k = S.skyMoons, slot = skySlots[k];
+  // With the sky full, it rises toward the big moon instead.
+  const at = slot || moonPos(V), to = { x: V.ox + at.x * V.s, y: at.y * V.s };
+  S.board[cell] = 0; S.skyMoons++; risingMoons++;
+  fly(MAX_TIER, cellCenter(cell), to, MOON_RISE_MS, { s1: .12, arc: L.cell * .6 });
+  sfx.rise(); buzz(10);
+  later(MOON_RISE_MS, () => {
+    risingMoons--;
+    newest = { k, t0: now() };
+    burst(to.x, to.y, 10, .6);
+    // What the basket would have paid. Given on landing, not before, so the
+    // wonders it brings don't cover the sky while the moon is on its way.
+    gain(value(MAX_TIER), to);
+    if (!S.ended) later(1600, openEnding);   // after its stars have come out
+    else if (slot) toast({ title: moonShape(k).name, sub: 'A new constellation, from the moon you grew', tier: MAX_TIER, dur: 3600 });
+    else toast({ title: 'Another moon for the sky', sub: `${fmt(S.skyMoons)} moons, and the sky is full of them.`, tier: MAX_TIER, dur: 3600 });
+  });
+  save();
+}
+
+/**
+ * The sky's constellations, in scene units: one per grown moon (named shapes,
+ * brighter, from the front of skySlots) and, once every wonder has come, one
+ * per STAR_STEP glow (faint loose shapes, from the back). A new moon's stars
+ * come out one by one, then its lines.
+ */
+function drawConstellations(c, t, ms) {
+  const n = skySlots.length;
+  const moons = Math.min(S.skyMoons - risingMoons, n);
+  const glows = S.decor >= DECOR.length ? Math.min(n - moons, 1 + Math.floor((S.peak - decorAt(DECOR.length)) / STAR_STEP)) : 0;
+  for (let i = 0; i < glows; i++) {
+    const { x, y, glow } = skySlots[n - 1 - i];
+    c.strokeStyle = 'rgba(220,210,255,.16)'; c.lineWidth = .5; c.beginPath();
+    glow.forEach(([dx, dy], k) => k ? c.lineTo(x + dx, y + dy) : c.moveTo(x + dx, y + dy)); c.stroke();
+    for (const [dx, dy] of glow) { drawGlow(c, x + dx, y + dy, 4, '#f3ecd0', .5 + .2 * Math.sin(t + x + dx)); c.fillStyle = '#f7f0d8'; c.fillRect(x + dx - .6, y + dy - .6, 1.2, 1.2); }
+  }
+  for (let k = 0; k < moons; k++) {
+    const { x, y } = skySlots[k], shape = moonShape(k);
+    const since = newest && newest.k === k ? ms - newest.t0 : 1e9;
+    const shown = i => clamp((since - i * STAR_STEP_MS) / 400, 0, 1);
+    const linesIn = clamp((since - shape.pts.length * STAR_STEP_MS) / 900, 0, 1);
+    const P = shape.pts.map(([a, b]) => [x + a * SHAPE_R, y + b * SHAPE_R]);
+    if (linesIn > 0) {
+      c.strokeStyle = `rgba(232,222,255,${.3 * linesIn})`; c.lineWidth = .6; c.beginPath();
+      for (const [a, b] of shape.lines) { c.moveTo(P[a][0], P[a][1]); c.lineTo(P[b][0], P[b][1]); }
+      c.stroke();
+    }
+    P.forEach(([px, py], i) => {
+      const a = shown(i); if (!a) return;
+      drawGlow(c, px, py, 5, '#f6ecc8', a * (.6 + .2 * Math.sin(t * 1.3 + i * 1.7 + k)));
+      c.globalAlpha = a; c.fillStyle = '#fff7de'; c.fillRect(px - .8, py - .8, 1.6, 1.6); c.globalAlpha = 1;
+    });
+  }
+  if (newest && ms - newest.t0 > 6000) newest = null;
 }
 
 /* ============================================================
@@ -1651,6 +1775,30 @@ function openIntro() {
     () => { S.intro = true; save(); });
 }
 
+/**
+ * The end of the story, once the first moon has risen: a quiet card with
+ * what it took, and an invitation to keep going. Shown once (S.ended); a
+ * save with a moon in the sky but no ending yet gets it at start-up.
+ */
+function openEnding() {
+  if (S.ended) return;
+  if (wrap.classList.contains('open')) { later(1500, openEnding); return; }   // never on top of another sheet
+  S.ended = true; save();
+  openSheet(`
+    <h2 class="title">Goodnight, moon</h2>
+    <canvas class="endmoon" data-t="${MAX_TIER}"></canvas>
+    <p class="lede">You grew a moon, one seed at a time, in the small hours.<br>It has gone up into the stars as the Sleeping Moon, to keep watch over the garden.</p>
+    <div class="stats">
+      <span>Visits to the garden</span><span>${fmt(S.visits)}</span>
+      <span>From the pouch</span><span>${fmt(S.stats.seeds)}</span>
+      <span>Things grown</span><span>${fmt(S.stats.merges)}</span>
+      <span>Wishes granted</span><span>${fmt(S.stats.wishes)}</span>
+      <span>Glow, all told</span><span>${fmt(S.peak)} ✦</span>
+    </div>
+    <p><small>The garden isn't finished with you. Every moon you grow from now on rises to make a new constellation${S.decor < DECOR.length ? ', and the wonders keep coming' : ''}. The seed pouch gives ${ITEMS[pouchTier()].many.toLowerCase()} now. Rest well.</small></p>
+    <button class="btn done" data-close>Keep growing</button>`);
+}
+
 function toggleRow(k, title, note) {
   return `<div class="row"><div><b>${title}</b><small>${note}</small></div>
     <button class="tog" data-tog="${k}" aria-pressed="${!!S.set[k]}">${S.set[k] ? 'On' : 'Off'}</button></div>`;
@@ -1683,7 +1831,8 @@ function openBook() {
   const next = S.decor < DECOR.length
     ? `Next: <b>${DECOR[S.decor].name}</b>, in ${fmt(decorAt(S.decor + 1) - S.peak)} ✦.`
     : `Every wonder has come. Each ${fmt(STAR_STEP)} ✦ now adds a constellation to the sky.`;
-  const nextItem = S.best < MAX_TIER ? `<p><small>Merge two ${ITEMS[S.best].many} to find out what comes next.</small></p>` : `<p><small>You grew a moon. There's nothing left to find, only more to grow.</small></p>`;
+  const nextItem = S.best < MAX_TIER ? `<p><small>Merge two ${ITEMS[S.best].many} to find out what comes next.</small></p>`
+    : `<p><small>You grew a moon. There's nothing left to find, only more to grow: every moon rises into the sky as a new constellation.</small></p>`;
   openSheet(`
     <h2>Garden book</h2>
     <div class="book">${items}</div>
@@ -1697,8 +1846,10 @@ function openBook() {
       <span>From the pouch</span><span>${fmt(S.stats.seeds)}</span>
       <span>Things grown</span><span>${fmt(S.stats.merges)}</span>
       <span>Wishes granted</span><span>${fmt(S.stats.wishes)}</span>
+      ${S.skyMoons ? `<span>Moons grown</span><span>${fmt(S.skyMoons)}</span>` : ''}
       <span>Glow, all told</span><span>${fmt(S.peak)} ✦</span>
     </div>
+    ${S.skyMoons ? `<h3>In the stars</h3><ul class="wonders">${MOON_SHAPES.slice(0, Math.min(S.skyMoons, MOON_SHAPES.length)).map(m => `<li>✦ ${m.name}</li>`).join('')}</ul>` : ''}
     <button class="btn done" data-close>Back to the garden</button>`);
 }
 
@@ -1721,6 +1872,13 @@ layout();
 if (document.fonts && document.fonts.load) document.fonts.load(font(16, 700)).then(() => { lastInput = now(); }).catch(() => {});
 onReturn();
 if (!S.intro) openIntro();
+else {
+  // A save from before 1.2 can hold moons on the board: send them up now,
+  // one after another. One that rose but whose ending was never seen (the
+  // app closed mid-flight) gets its ending.
+  S.board.forEach((t, i) => { if (t === MAX_TIER) later(1200 + 900 * S.board.slice(0, i).filter(x => x === MAX_TIER).length, () => riseMoon(i)); });
+  if (S.skyMoons && !S.ended) later(1500, openEnding);
+}
 requestAnimationFrame(frame);
 </script>
 </body>
