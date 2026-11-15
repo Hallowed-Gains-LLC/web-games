@@ -55,6 +55,18 @@ a visitor wishing for something it can no longer make wishes for something
 else (`retireUnreachableWishes`), and the welcome-back gift is always a step
 better than the pouch.
 
+**The end: Goodnight, moon.** A Little moon can't merge any further, so it
+doesn't stay on the board. A moment after it's grown it floats up into the
+garden sky to a slow lullaby, and stays there; it pays its basket value
+(2,048 ✦) when it lands. The first one opens a "Goodnight, moon" card with
+what it took (visits, pouch taps, things grown, wishes granted, glow), and
+every moon after joins it, so the sky slowly fills up with what you've grown
+(up to 12 drawn; the garden book counts them all). A risen moon clears the
+undo history, since undoing the merge would hand back the two Wishing trees
+and keep the moon. Saves from before 1.2 send any moons on the board up at
+start-up, and get the card if they haven't seen it (`riseMoon`,
+`openEnding`, `S.skyMoons`, `S.ended`).
+
 **Garden wonders** arrive at 40k² + 40k glow for the k-th one (80, 240, 480,
 …, 24,000): fireflies, a pond, a birch with an owl in it, a cottage whose
 window lights up, sleeping animals, and finally the Milky Way. After all 24,
