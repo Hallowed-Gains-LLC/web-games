@@ -1566,7 +1566,17 @@ const wrap = document.getElementById('wrap'), sheetEl = document.getElementById(
 let sheetClose = null, resetArmed = false, installPrompt = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; });
 
+// A finger tap on the canvas opens a sheet from `pointerup`, and then the
+// browser fires its own `click` at the same spot a moment later. By then the
+// sheet's backdrop (or one of its buttons) is under the finger, so that
+// leftover click would close the sheet straight away. Swallow it.
+let sheetOpenedAt = -1e9;
+document.addEventListener('click', e => {
+  if (now() - sheetOpenedAt < 450) { e.stopPropagation(); e.preventDefault(); }
+}, true);
+
 function openSheet(html, onClose) {
+  if (!wrap.classList.contains('open')) sheetOpenedAt = now();
   sheetEl.innerHTML = html; sheetEl.scrollTop = 0;
   wrap.classList.add('open'); sheetClose = onClose || null; resetArmed = false;
   for (const el of sheetEl.querySelectorAll('canvas[data-t]')) paintItem(el, +el.dataset.t, el.dataset.k !== '0');
