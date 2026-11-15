@@ -119,11 +119,20 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '1.0';
+const VERSION = '1.1';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 const COLS = 5, ROWS = 6, N = COLS * ROWS;
 const MAX_TIER = 12;
 const AWAY_MS = 45 * 60 * 1000;              // gone this long = a new visit (and a small gift)
+// The seed pouch trails your best item by this many steps, never giving less
+// than a Seed: it gives Seeds until you grow a Lantern bloom (tier 8), then
+// Sprouts from the first Luna moth, Seedlings from the first Firefly jar,
+// Buds from the first Wishing tree and Moonflowers once you have a moon.
+// Without it every new item took twice the taps of the one before (a first
+// moon was ~1,570 pouch taps, 1,480 of them after the first Moonflower); with
+// it each late item costs about the same, ~100 taps, and a first moon ~490.
+// 8 would make that ~780; 6, ~290.
+const POUCH_LAG = 7;
 const TAU = Math.PI * 2;
 const FONT = "'Quicksand', system-ui, -apple-system, 'Segoe UI', sans-serif";
 
@@ -962,6 +971,14 @@ function newWish(slot, born) {
   return { tier: t, who, reward: 3 * value(t) + 2 * t, born };
 }
 function ensureWishes() { for (let i = 0; i < 3; i++) if (!S.wishes[i]) S.wishes[i] = newWish(i, 0); }
+/**
+ * A wish for something below what the pouch now gives may be impossible to
+ * grant (nothing on the board makes it any more), so its visitor makes a
+ * new wish. Runs when the pouch grows and when a save is loaded.
+ */
+function retireUnreachableWishes() {
+  for (let i = 0; i < 3; i++) if (S.wishes[i] && S.wishes[i].tier < pouchTier()) S.wishes[i] = newWish(i, 0);
+}
 
 /* ============================================================
    Animation bits
@@ -1078,13 +1095,20 @@ function gain(n, at, delay = 0) {
 }
 function discover(t, at) {
   if (t <= S.best) return;
+  const pouchBefore = pouchTier();
   S.best = t;
+  retireUnreachableWishes();
   if (t < 3) return;
   toast({ title: `New: ${ITEMS[t].name}`, sub: ITEMS[t].blurb, tier: t, dur: 3400 });
   later(120, sfx.discover);
   if (at) later(150, () => burst(at.x, at.y, 26, 1.5));
+  const pouch = pouchTier();
+  if (pouch > pouchBefore) toast({ title: 'The seed pouch has grown', sub: `It gives ${ITEMS[pouch].many.toLowerCase()} now.`, tier: pouch, dur: 3400 });
 }
-function sproutChance() { return Math.min(.3, S.decor * .012 + (S.best >= 6 ? .04 : 0)); }
+/** What the seed pouch gives: POUCH_LAG steps behind your best, a Seed at least. */
+function pouchTier() { return Math.max(1, S.best - POUCH_LAG); }
+/** The chance a pouch tap gives one step better than pouchTier(): rises with the garden, to 30%. */
+function pouchUpChance() { return Math.min(.3, S.decor * .012 + (S.best >= 6 ? .04 : 0)); }
 
 function pickSpawnCell() {
   let best = -1, bs = 1e9;
@@ -1104,7 +1128,7 @@ function plantSeed() {
     return;
   }
   pushUndo();
-  const t = Math.random() < sproutChance() ? 2 : 1;
+  const t = pouchTier() + (Math.random() < pouchUpChance() ? 1 : 0);
   S.board[i] = t; S.stats.seeds++;
   fly(t, { x: L.pouch.x, y: L.pouch.y - 12 }, cellCenter(i), 280, { s0: .35, s1: 1, arc: 30, hide: i });
   sfx.seed(); save();
@@ -1170,7 +1194,8 @@ function onReturn() {
   const away = Date.now() - (S.last || Date.now());
   if (S.intro && away > AWAY_MS) {
     S.visits++;
-    const tier = S.best >= 8 ? 3 : S.best >= 5 ? 2 : 1;
+    // A gift is a step or two better than the pouch.
+    const tier = Math.max(S.best >= 8 ? 3 : S.best >= 5 ? 2 : 1, pouchTier() + 1);
     const n = Math.min(3, emptyCount());
     undoStack = [];
     for (let k = 0; k < n; k++) later(500 + k * 220, () => {
@@ -1669,7 +1694,7 @@ function openBook() {
     <h3>So far</h3>
     <div class="stats">
       <span>Visits to the garden</span><span>${fmt(S.visits)}</span>
-      <span>Seeds planted</span><span>${fmt(S.stats.seeds)}</span>
+      <span>From the pouch</span><span>${fmt(S.stats.seeds)}</span>
       <span>Things grown</span><span>${fmt(S.stats.merges)}</span>
       <span>Wishes granted</span><span>${fmt(S.stats.wishes)}</span>
       <span>Glow, all told</span><span>${fmt(S.peak)} ✦</span>
@@ -1690,6 +1715,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 }
 
 ensureWishes();
+retireUnreachableWishes();   // a save from before the pouch grew, or from 1.0
 applySettings();
 layout();
 if (document.fonts && document.fonts.load) document.fonts.load(font(16, 700)).then(() => { lastInput = now(); }).catch(() => {});
