@@ -120,7 +120,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '1.2';
+const VERSION = '1.3';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 const COLS = 5, ROWS = 6, N = COLS * ROWS;
 const MAX_TIER = 12;
@@ -519,6 +519,16 @@ function sprite(t) {
   ART[t](c);
   return sprites[t] = cv;
 }
+// An item's shape in shadow, for a wish card asking for something not yet grown.
+let silhouettes = [];
+function silhouette(t) {
+  if (silhouettes[t]) return silhouettes[t];
+  const src = sprite(t), cv = document.createElement('canvas');
+  cv.width = src.width; cv.height = src.height;
+  const c = cv.getContext('2d');
+  c.drawImage(src, 0, 0); c.globalCompositeOperation = 'source-atop'; c.fillStyle = '#2a3156'; c.fillRect(0, 0, cv.width, cv.height);
+  return silhouettes[t] = cv;
+}
 // A standalone picture of an item, for the HTML sheet.
 function paintItem(cv, t, known = true) {
   const px = cv.width = cv.height = 128;
@@ -539,7 +549,9 @@ function freshState() {
     ended: false,     // the "Goodnight, moon" card has been shown
     visits: 1, last: Date.now(), intro: false,
     stats: { seeds: 0, merges: 0, wishes: 0 },
-    set: { dim: 1, warm: false, sound: false, buzz: false },
+    nightOf: '',      // the morning after the last night you played in (dayKey), for "You made it to morning"
+    morningOf: '',    // the last morning that was said
+    set: { dim: 1, warm: false, sound: false, buzz: false, hush: true, breathe: false, weather: true },
   };
 }
 function load() {
@@ -558,6 +570,9 @@ function load() {
 }
 function save() {
   S.last = Date.now();
+  // Playing between 10pm and 5am counts toward that night's morning.
+  const d = new Date(S.last), h = d.getHours();
+  if (h >= 22) S.nightOf = dayKey(new Date(S.last + 864e5)); else if (h < 5) S.nightOf = dayKey(d);
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(S, (k, v) => (k === 'prev' || k === 'born') ? undefined : v));
   } catch (e) { /* private mode: still playable, just not kept */ }
@@ -572,12 +587,16 @@ const cv = document.getElementById('c');
 const ctx = cv.getContext('2d');
 const safeIn = document.getElementById('safeIn');
 let W = 0, H = 0, dpr = 1;
+// Everything but the garden is drawn here while it fades out (hush), so it
+// can be faded as one layer; the rest of the time it's drawn straight on.
+const uiC = document.createElement('canvas'), uiCtx = uiC.getContext('2d');
 const L = {};
 let sceneDirty = true;
 
 function layout() {
   W = innerWidth; H = innerHeight; dpr = Math.min(2, window.devicePixelRatio || 1);
   cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  uiC.width = cv.width; uiC.height = cv.height;
   const sr = safeIn.getBoundingClientRect();
   const st = sr.top, sb = H - sr.bottom;
   L.st = st; L.headerH = 44;
@@ -610,7 +629,7 @@ function layout() {
   L.gear = { x: L.cx + L.cw - 18, y: hy, r: 22 };
   L.book = { x: L.cx + L.cw - 62, y: hy, r: 22 };
 
-  sprites = [];
+  sprites = []; silhouettes = [];
   sceneDirty = true;
   makeStars();
 }
@@ -873,10 +892,13 @@ function drawScene(c, ms) {
   if (sceneDirty) { renderSky(); renderLand(); sceneDirty = false; }
   const V = sceneView(), t = ms / 1000, w = L.scene.w, h = L.scene.h;
   c.drawImage(skyC, 0, 0, w, h);
+  const clk = nightClock(), wx = weather();
+  drawHorizon(c, V, clk);
+  const starMul = (1 - .5 * Math.max(clk.dawn, clk.day * .8)) * (wx === 'rain' ? .45 : 1);
 
   c.save(); c.translate(V.ox, 0); c.scale(V.s, V.s);
   for (const s of stars) {
-    c.globalAlpha = .35 + .4 * (.5 + .5 * Math.sin(t * s.sp + s.ph));
+    c.globalAlpha = (.35 + .4 * (.5 + .5 * Math.sin(t * s.sp + s.ph))) * starMul;
     c.fillStyle = '#f1ead2'; c.fillRect(s.x - s.r / 2, s.y - s.r / 2, s.r, s.r);
   }
   c.globalAlpha = 1;
@@ -905,6 +927,7 @@ function drawScene(c, ms) {
       c.beginPath(); c.ellipse(x, y, 24, 5, 0, 0, TAU); c.ellipse(x - 8, y - 3, 11, 5, 0, 0, TAU); c.ellipse(x + 7, y - 4, 13, 6, 0, 0, TAU); c.fill();
     }
   }
+  if (wx === 'rain') drawRainClouds(c, V, t);
   c.restore();
 
   c.drawImage(landC, 0, 0, w, h);
@@ -953,6 +976,8 @@ function drawScene(c, ms) {
     drawGlow(c, x, y, 6, COL.fly, a * .8);
     c.globalAlpha = a; c.fillStyle = '#fff6c8'; c.fillRect(x - .5, y - .5, 1, 1); c.globalAlpha = 1;
   }
+  drawVisitors(c, V, t, ms);
+  if (wx) drawWeather(c, V, t, wx);
   c.restore();
 
   const fade = c.createLinearGradient(0, h - 26, 0, h);
@@ -961,19 +986,257 @@ function drawScene(c, ms) {
 }
 
 /* ============================================================
+   The real night: the sky follows the clock
+   ============================================================ */
+const dayKey = d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+const smooth = (a, b, x) => { const u = clamp((x - a) / (b - a), 0, 1); return u * u * (3 - 2 * u); };
+let clockCache = { at: -1e9, v: null };
+/**
+ * How far into the real night it is, from the phone's clock (worked out at
+ * most once a minute). The garden stays a night garden; only the horizon
+ * and the stars change: `dusk` (5pm to 9:30pm, rose), deep night (nothing),
+ * `dawn` (from 4:45am, warm, fading out by noon) and `day` (a faint haze).
+ */
+function nightClock() {
+  if (now() - clockCache.at < 60000 && clockCache.v) return clockCache.v;
+  const d = new Date(), m = d.getHours() * 60 + d.getMinutes();
+  const dawn = smooth(285, 420, m) * (1 - smooth(600, 720, m));
+  const dusk = smooth(1020, 1140, m) * (1 - smooth(1170, 1290, m));
+  const day = smooth(600, 720, m) * (1 - smooth(1020, 1140, m));
+  clockCache = { at: now(), v: { dawn, dusk, day } };
+  later(0, checkMorning);
+  return clockCache.v;
+}
+/** The glow along the hills: warm at dawn, rose at dusk, a pale haze by day. */
+function drawHorizon(c, V, clk) {
+  for (const [amt, col, a] of [[clk.dawn, '233,163,107', .34], [clk.dusk, '176,106,138', .3], [clk.day, '143,163,199', .16]]) {
+    if (amt < .01) continue;
+    const y1 = (V.G - 20) * V.s, y0 = Math.max(0, (V.G - 110) * V.s);
+    const g = c.createLinearGradient(0, y0, 0, y1);
+    g.addColorStop(0, `rgba(${col},0)`); g.addColorStop(1, `rgba(${col},${a * amt})`);
+    c.fillStyle = g; c.fillRect(0, y0, L.scene.w, y1 - y0);
+  }
+}
+/**
+ * Once a morning, the first time you're in the garden between 5 and 10am
+ * after playing in the night (10pm to 5am, recorded by save()), a quiet
+ * well done. Night feeds are long; it's nice to be told you got through one.
+ */
+function checkMorning() {
+  const d = new Date(), h = d.getHours(), key = dayKey(d);
+  if (!S.intro || h < 5 || h >= 10 || S.nightOf !== key || S.morningOf === key) return;
+  if (wrap.classList.contains('open')) { later(4000, checkMorning); return; }
+  S.morningOf = key; save();
+  toast({ title: 'You made it to morning.', sub: 'Well done, you. Rest when you can.', dur: 5600 });
+}
+
+/* ============================================================
+   Weather, by the date
+   ============================================================ */
+/**
+ * Tonight's weather, the same all day for everyone on that date: snow on
+ * about half of winter nights (December to February), gentle rain on about
+ * one night in five otherwise (more in spring), clear the rest. Off in
+ * Settings, it's always clear.
+ */
+function weather() {
+  if (!S.set.weather) return null;
+  const d = new Date(), mo = d.getMonth();
+  const r = mulberry32(d.getFullYear() * 400 + mo * 31 + d.getDate())();
+  if (mo === 11 || mo <= 1) return r < .45 ? 'snow' : null;
+  return r < (mo >= 2 && mo <= 4 ? .3 : .2) ? 'rain' : null;
+}
+/** Soft clouds over the sky on a rainy night, the moon half behind one (scene units). */
+function drawRainClouds(c, V, t) {
+  const m = moonPos(V);
+  c.fillStyle = 'rgba(28,32,58,.55)';
+  for (const [x, y, w] of [[m.x - 18, m.y + 6, 30], [60, V.top + 12, 40], [190, V.top + 22, 46], [300, V.top + 8, 34]]) {
+    const dx = Math.sin(t * .05 + x) * 6;
+    c.beginPath(); c.ellipse(x + dx, y, w, 6, 0, 0, TAU); c.ellipse(x + dx - w * .35, y - 4, w * .45, 6, 0, 0, TAU); c.ellipse(x + dx + w * .3, y - 5, w * .5, 7, 0, 0, TAU); c.fill();
+  }
+}
+/** Falling rain or snow over the garden, drawn from the clock alone (no particles to keep). */
+function drawWeather(c, V, t, wx) {
+  const span = V.xr - V.xl, top = V.top - 10, fall = V.vh - top;
+  if (wx === 'rain') {
+    c.strokeStyle = 'rgba(160,178,220,.2)'; c.lineWidth = .5; c.beginPath();
+    for (let i = 0; i < 70; i++) {
+      const y = top + ((i * 37.3 + t * 150) % fall), x = V.xl + ((i * 53.7) % span) - (y - top) * .2;
+      c.moveTo(x, y); c.lineTo(x - 1.2, y + 5);
+    }
+    c.stroke();
+    if (has('pond')) {   // rings on the pond, a few at a time
+      for (let k = 0; k < 4; k++) {
+        const cyc = t / 1.3 + k * .25, n = Math.floor(cyc), p = cyc - n, r = mulberry32(n * 4 + k);
+        const x = 262 + (r() - .5) * 70, y = V.G + 2 + (r() - .5) * 8;
+        c.strokeStyle = `rgba(200,210,240,${.3 * (1 - p)})`; c.lineWidth = .5;
+        c.beginPath(); c.ellipse(x, y, 1 + p * 5, (1 + p * 5) * .3, 0, 0, TAU); c.stroke();
+      }
+    }
+  } else {
+    c.fillStyle = 'rgba(230,234,246,.7)';
+    for (let i = 0; i < 60; i++) {
+      const y = top + ((i * 41.7 + t * 9) % fall), x = V.xl + ((i * 59.3) % span) + Math.sin(t * .6 + i) * 6;
+      const r = .8 + (i % 3) * .4;
+      c.fillRect(x - r / 2, y - r / 2, r, r);
+    }
+    c.fillStyle = 'rgba(214,222,240,.3)';   // a dusting on the ground
+    c.beginPath(); c.moveTo(V.xl, nearY(V, V.xl) + 1.5);
+    for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, nearY(V, x) - .3);
+    for (let x = V.xr + 4; x >= V.xl; x -= 4) c.lineTo(x, nearY(V, x) + 1.6);
+    c.fill();
+  }
+}
+
+/* ============================================================
+   Visitors in the garden
+   ============================================================ */
+// The three visitors with a wish open sit in the garden while they wait: a
+// moonlit shape with glinting eyes, one in each of three spots (by the fence,
+// on the stones under the lamp, by the pond). A granted one hops and wanders
+// off; the next one comes in. Each drawing has its feet at (0, 0), faces
+// right, and returns its eyes [x, y, r] for the glints.
+const VISIT_SPOTS = [{ x: 84, dir: 1 }, { x: 198, dir: 1 }, { x: 334, dir: -1 }];
+const leaving = [null, null, null];      // { who, t0 }: a granted visitor on its way out
+const VISIT_IN_MS = 700, VISIT_OUT_MS = 1300;
+const SIL = '#2d3150';            // moonlit, a shade above the ground
+const VISIT_SCALE = 1.5;          // the drawings are made small; this is their size in the scene
+function ell(c, x, y, rx, ry, rot = 0, a0 = 0, a1 = TAU) { c.beginPath(); c.ellipse(x, y, rx, ry, rot, a0, a1); c.fill(); }
+function tri(c, ...p) { c.beginPath(); c.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) c.lineTo(p[i], p[i + 1]); c.closePath(); c.fill(); }
+const VISITOR_ART = {
+  Owl(c) {
+    c.fillStyle = SIL; ell(c, 0, -6.5, 4.4, 6.5);
+    tri(c, -3.8, -11, -2.8, -14.6, -1.4, -11.6); tri(c, 3.8, -11, 2.8, -14.6, 1.4, -11.6);
+    return [[-1.7, -9, 1], [1.7, -9, 1]];
+  },
+  Hedgehog(c) {
+    c.fillStyle = '#43372f'; ell(c, 0, 0, 7, 4.6, 0, Math.PI, 0);
+    c.strokeStyle = '#2c231e'; c.lineWidth = .7; c.beginPath();
+    for (let i = 0; i < 9; i++) { const a = Math.PI + i * Math.PI / 8; c.moveTo(Math.cos(a) * 5, Math.sin(a) * 3.2); c.lineTo(Math.cos(a) * 8, Math.sin(a) * 5.6); }
+    c.stroke(); c.fillStyle = '#54463c'; ell(c, 7, -1, 2.4, 1.6, .2);
+    return [[5.8, -2.3, .55]];
+  },
+  Fox(c) {
+    c.fillStyle = '#5e3826'; ell(c, -4.5, -1.2, 5, 1.9, -.15); ell(c, 0, -5, 4, 5.5); ell(c, 2, -11.5, 3.2, 3);
+    tri(c, .4, -14, 1, -17.6, 2.3, -14.3); tri(c, 2.8, -14.5, 4.3, -17.4, 4.7, -13.6); ell(c, 5, -10.8, 2.2, 1.3);
+    c.fillStyle = '#9b8a74'; ell(c, -9.2, -1.6, 1.4, 1);
+    return [[3.1, -12.2, .6]];
+  },
+  Rabbit(c) {
+    c.fillStyle = '#34333f'; ell(c, 0, -4, 6, 4.4); ell(c, 5, -7, 3, 3);
+    ell(c, 4.2, -12, 1, 3.6, -.25); ell(c, 6, -11.6, 1, 3.4, .2);
+    c.fillStyle = '#6f6c78'; ell(c, -6, -4, 1.4, 1.4);
+    return [[6.2, -7.6, .55]];
+  },
+  Toad(c) {
+    c.fillStyle = '#2f4231'; ell(c, 0, -2.2, 5.5, 2.8); ell(c, 2.6, -4.4, 1.5, 1.4); ell(c, 4.6, -4.1, 1.3, 1.2);
+    ell(c, -4.6, -.4, 2.2, .9); ell(c, 4, -.3, 1.8, .8);
+    return [[2.7, -4.8, .55], [4.7, -4.5, .5]];
+  },
+  Mouse(c) {
+    c.fillStyle = SIL; ell(c, 0, -2.4, 3.6, 2.6); ell(c, 3.4, -3, 2.2, 1.8); ell(c, 2.6, -5.1, 1.3, 1.3);
+    c.strokeStyle = SIL; c.lineWidth = .5; c.beginPath(); c.moveTo(-3.4, -2); c.quadraticCurveTo(-7, -1, -8.5, -3.5); c.stroke();
+    return [[4.4, -3.6, .45]];
+  },
+  Badger(c) {
+    c.fillStyle = '#34343f'; ell(c, 0, -4, 7, 3.8); ell(c, 6.2, -4, 3.4, 2.4);
+    c.fillRect(-5, -2, 1.6, 2); c.fillRect(3.4, -2, 1.6, 2);
+    c.fillStyle = '#8c8a96'; ell(c, 6.6, -5.3, 2.8, .7, .1);
+    return [[7, -4.3, .5]];
+  },
+  Deer(c) {
+    c.fillStyle = '#4a3c33'; c.strokeStyle = '#4a3c33'; c.lineWidth = 1; c.beginPath();
+    for (const [x0, x1] of [[-4, -4], [-2, -2.3], [3, 3.2], [5, 5.3]]) { c.moveTo(x0, -9); c.lineTo(x1, 0); }
+    c.stroke(); ell(c, 0, -11, 6.5, 3.6); tri(c, 4, -13, 7, -19, 9, -18, 6.5, -11);
+    ell(c, 9.2, -19.5, 2.6, 1.6, .2); ell(c, 7.6, -21.3, .8, 1.8, -.3);
+    c.lineWidth = .6; c.beginPath(); c.moveTo(8.4, -21); c.lineTo(8, -24.5); c.lineTo(6.8, -26); c.moveTo(8.1, -23.5); c.lineTo(9.4, -25.4); c.stroke();
+    return [[9.6, -20, .55]];
+  },
+  Mole(c) {
+    c.fillStyle = '#3a2e28'; ell(c, -1, 0, 7, 3.6, 0, Math.PI, 0);
+    c.fillStyle = '#43362f'; ell(c, 1.5, -3.6, 3, 2.2); c.fillStyle = '#b98484'; ell(c, 4.4, -3.6, .9, .7);
+    return [[2.7, -4.5, .3]];
+  },
+  Bat(c, t) {
+    const flap = Math.sin(t * 9), y = -15 + Math.sin(t * 1.6) * 1.5;
+    c.fillStyle = SIL; ell(c, 0, y, 1.6, 2.4);
+    tri(c, -1, y - 1, -7, y - 3 - 3 * flap, -5.2, y + 1, -3, y, -1, y + 1);
+    tri(c, 1, y - 1, 7, y - 3 - 3 * flap, 5.2, y + 1, 3, y, 1, y + 1);
+    tri(c, -1.3, y - 2, -.9, y - 3.6, -.3, y - 2.2); tri(c, 1.3, y - 2, .9, y - 3.6, .3, y - 2.2);
+    return [[-.6, y - 1.3, .4], [.6, y - 1.3, .4]];
+  },
+  Vole(c) {
+    c.fillStyle = '#363039'; ell(c, 0, -2.6, 4.2, 2.8); ell(c, 3.6, -3, 2.2, 2); ell(c, 2.6, -5, 1, 1);
+    c.strokeStyle = '#363039'; c.lineWidth = .5; c.beginPath(); c.moveTo(-4, -2); c.lineTo(-6, -1.2); c.stroke();
+    return [[4.6, -3.6, .45]];
+  },
+  Nightjar(c) {
+    c.fillStyle = '#3d3631'; ell(c, 0, -3, 5, 2.4, -.15); ell(c, 4, -4.2, 2.2, 2);
+    tri(c, -4, -2.6, -10, -1.6, -9.6, -.6, -4, -1.6);
+    return [[4.8, -4.8, .55]];
+  },
+};
+/**
+ * The visitors, in scene units. Each sits at its spot facing the middle of the
+ * garden, breathes a little, and blinks now and then. A new one walks in
+ * (fade and slide) once its wish card has appeared; a granted one hops when
+ * it says thank you, then fades off the way it came.
+ */
+function drawVisitors(c, V, t, ms) {
+  if (!S.intro) return;
+  for (let i = 0; i < 3; i++) {
+    const spot = VISIT_SPOTS[i], x = spot.x, y = nearY(V, x) + 4;
+    const one = (who, a, dx, hop, seed) => {
+      const art = VISITOR_ART[who]; if (!art || a <= 0) return;
+      c.save(); c.globalAlpha = a; c.translate(x + dx, y - hop); c.scale(spot.dir * VISIT_SCALE, VISIT_SCALE * (1 + .015 * Math.sin(t * 1.4 + seed)));
+      const eyes = art(c, t + seed);
+      c.restore();
+      const blink = ((t + seed * 3.7) % 6) < .15;
+      if (blink) return;
+      for (const [ex, ey, er] of eyes) {
+        const gx = x + dx + ex * spot.dir * VISIT_SCALE, gy = y - hop + ey * VISIT_SCALE;
+        drawGlow(c, gx, gy, er * 5, '#f2d38a', .5 * a);
+        c.globalAlpha = a; c.fillStyle = '#f6dc98'; c.fillRect(gx - er * .7, gy - er * .7, er * 1.4, er * 1.4); c.globalAlpha = 1;
+      }
+    };
+    // A granted visitor sits until it's thanked, hops, then fades off the
+    // way it came; the next one walks in from there once it's gone.
+    const out = leaving[i], outEnd = out ? out.t0 + VISIT_OUT_MS : 0;
+    if (out && ms < outEnd) {
+      const p = (ms - out.t0) / VISIT_OUT_MS;
+      if (p < 0) one(out.who, 1, 0, 0, i);
+      else one(out.who, 1 - smooth(.3, 1, p), -spot.dir * smooth(.3, 1, p) * 16, p < .3 ? Math.sin(p / .3 * Math.PI) * 4 : 0, i);
+      continue;
+    }
+    const w = S.wishes[i]; if (!w) continue;
+    const start = Math.max(w.born || 0, outEnd);
+    if (ms < start) continue;
+    const p = clamp((ms - start) / VISIT_IN_MS, 0, 1);
+    one(w.who, p, -spot.dir * (1 - smooth(0, 1, p)) * 12, 0, i);
+  }
+}
+
+/* ============================================================
    Wishes
    ============================================================ */
-function wishTier() {
-  const b = S.best;
-  if (b < 5) return 2 + Math.floor(Math.random() * (Math.max(3, b) - 1));
-  if (Math.random() < .15) return Math.min(b, MAX_TIER - 1);
-  const lo = Math.max(2, b - 4), hi = Math.min(b - 1, MAX_TIER - 1);
+// What a new visitor wishes for. Wishes lead you on rather than only asking
+// for what you've already grown: WISH_STRETCH of them are for the next thing
+// you've never grown (at most one such wish at a time; its card shows a
+// silhouette until you grow it, and it pays the most), WISH_BEST for your
+// best so far, and the rest for one of the three steps below it. Never a
+// Little moon (it rises before it could be given).
+const WISH_STRETCH = .25, WISH_BEST = .35;
+function wishTier(others) {
+  const b = S.best, top = MAX_TIER - 1, r = Math.random();
+  if (b < top && r < WISH_STRETCH && !others.some(o => o.tier > b)) return b + 1;
+  const lo = Math.max(2, b - 3), hi = Math.min(b - 1, top);
+  if (r < WISH_STRETCH + WISH_BEST || hi < lo) return clamp(b, 2, top);
   return lo + Math.floor(Math.random() * (hi - lo + 1));
 }
 function newWish(slot, born) {
   const others = S.wishes.filter((w, i) => i !== slot && w);
   let t = 2, who = 'Owl';
-  for (let k = 0; k < 8; k++) { t = wishTier(); if (!others.some(o => o.tier === t)) break; }
+  for (let k = 0; k < 8; k++) { t = wishTier(others); if (!others.some(o => o.tier === t)) break; }
   for (let k = 0; k < 16; k++) { who = VISITORS[Math.floor(Math.random() * VISITORS.length)]; if (!others.some(o => o.who === who)) break; }
   return { tier: t, who, reward: 3 * value(t) + 2 * t, born };
 }
@@ -1174,6 +1437,7 @@ function deliver(wi, cell, from) {
   fly(t, from || cellCenter(cell), to, 320, { s1: .45, arc: 40 });
   const nw = newWish(wi, now() + 900);
   nw.prev = { tier: w.tier, who: w.who, reward: w.reward, until: now() + 520, thanks: now() + 320 };
+  leaving[wi] = { who: w.who, t0: now() + 320 };   // hops when thanked, then wanders off
   S.wishes[wi] = nw;
   gain(w.reward, { x: r.x + r.w / 2, y: r.y + 10 }, 320);
   later(320, () => { burst(to.x, to.y, 12); sfx.wish(); buzz(12); });
@@ -1190,6 +1454,7 @@ function gather(cell, from) {
 }
 function hintWish(wi) {
   const w = S.wishes[wi], it = ITEMS[w.tier];
+  if (w.tier > S.best) { toast({ title: `${w.who} is hoping for something new`, sub: `Merge two ${ITEMS[w.tier - 1].many} to find out what grows.` }); return; }
   toast({ title: `${w.who} would love a ${it.name}`, sub: w.tier > 1 ? `Merge two ${ITEMS[w.tier - 1].many} to grow one.` : '', tier: w.tier });
 }
 
@@ -1331,6 +1596,7 @@ function onReturn() {
     const what = n === 1 ? `one ${ITEMS[tier].name.toLowerCase()}` : `${['', '', 'two', 'three'][n]} ${ITEMS[tier].many.toLowerCase()}`;
     toast({ title: 'Welcome back', sub: n ? GIFT_LINES[Math.floor(Math.random() * GIFT_LINES.length)](what) : 'Your garden waited for you.', dur: 3600 });
   }
+  checkMorning();   // before save(), which would count this visit as the night's
   save();
 }
 
@@ -1425,8 +1691,13 @@ function drawWishes(c, ms) {
     if (ready) { c.strokeStyle = rgba(COL.gold, .4 + .25 * Math.sin(ms / 380)); c.lineWidth = 1.6; }
     else { c.strokeStyle = 'rgba(255,255,255,.06)'; c.lineWidth = 1; }
     c.stroke();
-    const sp = Math.min(r.h * .86, r.w * .46);
-    drawItem(c, show.tier, r.x + 4 + sp / 2, r.y + r.h / 2, sp, ms, i * 3);
+    const sp = Math.min(r.h * .86, r.w * .46), ix = r.x + 4 + sp / 2, iy = r.y + r.h / 2;
+    if (show.tier <= S.best) drawItem(c, show.tier, ix, iy, sp, ms, i * 3);
+    else {   // something you haven't grown yet: its shape, and a question
+      c.drawImage(silhouette(show.tier), ix - sp / 2, iy - sp / 2, sp, sp);
+      c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(sp * .34, 700);
+      c.fillStyle = rgba(COL.gold, .6 + .25 * Math.sin(ms / 600 + i)); c.fillText('?', ix, iy);
+    }
     const tx = r.x + sp + 8, tw = r.w - sp - 14;
     c.textAlign = 'left'; c.textBaseline = 'middle';
     fitFont(c, show.who, tw, 12.5, 600); c.fillStyle = rgba(COL.text, .66);
@@ -1575,7 +1846,30 @@ function drawRotate(c) {
    The loop: 60fps while things move, 20fps when it's just twinkling,
    so it's kind to the battery.
    ============================================================ */
+/**
+ * Hush: after HUSH_AFTER_MS untouched (and nothing moving, no sheet open),
+ * everything but the garden fades out over a few seconds, so the phone lights
+ * the room less. The first touch only wakes it (see pointerdown), so a small
+ * hand on the screen can't plant a seed.
+ */
+const HUSH_AFTER_MS = 20000;
+let hushA = 1;
+function updateHush(dt, ms) {
+  const quiet = S.set.hush && ms - lastInput > HUSH_AFTER_MS && !drag && !anims.length && !wrap.classList.contains('open');
+  hushA = quiet ? Math.max(0, hushA - dt / 3) : Math.min(1, hushA + dt / .25);
+}
+/** Breathing: 10 s a breath (in for 4, out for 6), 0 to 1. */
+function breath(sec) { const p = (sec % 10) / 10; return p < .4 ? easeInOut(p / .4) : 1 - easeInOut((p - .4) / .6); }
+/** The breathing glow around the seed pouch, once you've rested a few seconds (Settings, off by default). */
+function drawBreath(c, ms) {
+  if (!S.set.breathe || L.rotate) return;
+  const rest = clamp((ms - lastInput - 6000) / 2500, 0, 1); if (!rest) return;
+  const b = breath(ms / 1000), P = L.pouch;
+  drawGlow(c, P.x, P.y - 4, P.r * (1.5 + .7 * b), COL.gold, (.08 + .3 * b) * rest);
+}
+
 function update(dt, ms) {
+  updateHush(dt, ms);
   anims = anims.filter(a => ms < a.t0 + a.dur);
   for (const p of parts) { p.life += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .94; p.vy = p.vy * .94 - 14 * dt; }
   parts = parts.filter(p => p.life < p.max);
@@ -1587,7 +1881,7 @@ function frame() {
   requestAnimationFrame(frame);
   const ms = now();
   const active = drag || anims.length || parts.length || floats.length || toasts.length
-    || ms - lastInput < 1500 || dispGlow !== S.glow;
+    || ms - lastInput < 1500 || dispGlow !== S.glow || (hushA > 0 && hushA < 1);
   if (!active && ms - lastDraw < 1000 / 20) return;
   const dt = Math.min(.05, (ms - lastDraw) / 1000); lastDraw = ms;
   update(dt, ms);
@@ -1595,15 +1889,27 @@ function frame() {
   if (L.rotate) { drawRotate(ctx); return; }
   ctx.fillStyle = '#05070f'; ctx.fillRect(0, 0, W, H);
   drawScene(ctx, ms);
-  drawHeader(ctx);
-  drawStatus(ctx);
-  drawWishes(ctx, ms);
-  drawBoard(ctx, ms);
-  drawBar(ctx, ms);
-  drawFlights(ctx, ms);
-  drawParticles(ctx);
-  drawDrag(ctx, ms);
-  drawToast(ctx, ms);
+  if (hushA >= 1) drawUI(ctx, ms);
+  else if (hushA > 0) {
+    uiCtx.setTransform(1, 0, 0, 1, 0, 0); uiCtx.clearRect(0, 0, uiC.width, uiC.height);
+    uiCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawUI(uiCtx, ms);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = hushA; ctx.drawImage(uiC, 0, 0); ctx.globalAlpha = 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  drawBreath(ctx, ms);
+  drawToast(ctx, ms);   // over the hush, so a morning or a moon is still told
+}
+/** Everything over the garden: the part that hush fades. */
+function drawUI(c, ms) {
+  drawHeader(c);
+  drawStatus(c);
+  drawWishes(c, ms);
+  drawBoard(c, ms);
+  drawBar(c, ms);
+  drawFlights(c, ms);
+  drawParticles(c);
+  drawDrag(c, ms);
 }
 
 /* ============================================================
@@ -1629,14 +1935,16 @@ function hitTest(x, y, dropping) {
 cv.addEventListener('pointerdown', e => {
   if (ptr || L.rotate) return;
   lastInput = now();
-  ptr = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, hit: hitTest(e.clientX, e.clientY), moved: false };
+  // While hushed, a touch only brings the garden back.
+  const wake = hushA < .6;
+  ptr = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, hit: wake ? { kind: 'none' } : hitTest(e.clientX, e.clientY), moved: false, wake };
   try { cv.setPointerCapture(e.pointerId); } catch (err) {}
 });
 cv.addEventListener('pointermove', e => {
   if (!ptr || e.pointerId !== ptr.id) return;
   lastInput = now();
   ptr.x = e.clientX; ptr.y = e.clientY;
-  if (!ptr.moved && Math.hypot(ptr.x - ptr.x0, ptr.y - ptr.y0) > 9) {
+  if (!ptr.moved && !ptr.wake && Math.hypot(ptr.x - ptr.x0, ptr.y - ptr.y0) > 9) {
     ptr.moved = true;
     const h = ptr.hit;
     if (h.kind === 'cell' && S.board[h.i] && !busy(h.i)) { drag = { src: h.i, tier: S.board[h.i] }; sel = -1; }
@@ -1647,7 +1955,7 @@ cv.addEventListener('pointerup', e => {
   lastInput = now();
   ptr.x = e.clientX; ptr.y = e.clientY;
   if (drag) drop();
-  else if (!ptr.moved) tap(ptr.hit);
+  else if (!ptr.moved && !ptr.wake) tap(ptr.hit);
   ptr = null;
 });
 cv.addEventListener('pointercancel', e => {
@@ -1817,6 +2125,9 @@ function openSettings() {
     ${toggleRow('warm', 'Warmer light', 'Filters out most of the blue.')}
     ${toggleRow('sound', 'Soft chimes', 'Very quiet. On iPhone they follow the silent switch.')}
     ${navigator.vibrate ? toggleRow('buzz', 'Gentle vibration', 'A tiny tap when things grow.') : ''}
+    ${toggleRow('hush', 'Fade to the garden', 'After 20 seconds untouched, only the garden stays lit. Tap anywhere to bring it back.')}
+    ${toggleRow('breathe', 'Breathing glow', 'When you rest, the seed pouch glows in and out, six breaths a minute. Breathe along if it helps.')}
+    ${toggleRow('weather', 'Weather', 'Gentle rain on some nights, snow on some winter ones.')}
     <div class="row col"><b>Keep it on your phone</b><small>${install}</small></div>
     <div class="row col"><button class="btn ghost" id="reset">Start a new garden</button></div>
     <button class="btn done" data-close>Done</button>

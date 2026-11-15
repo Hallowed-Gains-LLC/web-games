@@ -32,13 +32,43 @@ Live at [hallowedgains.com/games/moonflower/](https://hallowedgains.com/games/mo
 - **Easy on the battery.** It redraws at 60fps while something is moving and
   drops to 20fps when only the stars are twinkling.
 
+- **Fades to the garden.** After 20 seconds untouched, everything but the
+  garden fades out, so the phone lights the room less. The first touch only
+  brings it back (it can't plant a seed), so a small hand on the screen does
+  nothing. On by default; Settings → Fade to the garden (`HUSH_AFTER_MS`).
+- **A breathing glow**, if you want one: once you've rested a few seconds,
+  the seed pouch glows in and out at six breaths a minute (in for 4 s, out
+  for 6), and keeps going while the garden is faded. Off by default;
+  Settings → Breathing glow.
+
+## The garden at night
+
+- **The sky follows the real night.** The garden is always a night garden,
+  but its horizon follows the phone's clock: rose at dusk (5 to 9:30pm),
+  nothing in the deep night, a warm glow from 4:45am that fades by noon, and
+  a faint haze by day, with the stars dimming as it gets light
+  (`nightClock`, `drawHorizon`).
+- **"You made it to morning."** Play between 10pm and 5am and the first time
+  you're in the garden between 5 and 10am, a quiet toast says so, once a
+  morning (`checkMorning`; `S.nightOf`, `S.morningOf`).
+- **Weather by the date**: snow on about half of winter nights (December to
+  February) with a dusting on the ground, gentle rain on about one night in
+  five otherwise (more in spring) with clouds, dimmer stars and rings on the
+  pond. The same all day for everyone on a date (`weather`). Settings →
+  Weather turns it off.
+- **Visitors sit in the garden.** The three animals with a wish open wait in
+  the scene, by the fence, on the stones under the lamp and by the pond: a
+  moonlit shape with glinting eyes that blinks now and then (and a bat that
+  hovers). Grant a wish and that visitor hops, then wanders off, and the next
+  one walks in (`VISITOR_ART`, `drawVisitors`).
+
 ## How it works
 
 | Thing | What it does |
 | --- | --- |
 | Seed pouch | Tap for a seed. It grows with your garden: it stays 7 steps behind the best thing you've grown, so it gives Sprouts once you have a Luna moth, Seedlings from a Firefly jar, Buds from a Wishing tree and Moonflowers after a moon. Some taps (up to 30%, as the garden fills in) come up one step better. |
 | Two alike | Drag one onto the other, or tap one and then the other. They become the next item and earn glow. |
-| Wish cards | Three visitors, each wanting one item. A gold border means you have it: tap the card (or drag the item onto it). Pays 3× the item's seed value. |
+| Wish cards | Three visitors, each wanting one item. A gold border means you have it: tap the card (or drag the item onto it). Pays 3× the item's seed value. Wishes lead you on: about one in four (never more than one at a time) is for the next thing you've never grown, shown as a silhouette with a "?" until you grow it; about a third ask for your best so far; the rest for something a step to three below it (`wishTier`). |
 | Basket | Drag anything here (or select it and tap the basket) to tuck it away for its seed value in glow. |
 | Glow | Never spent. Crossing each threshold brings a new garden wonder to the scene. |
 
