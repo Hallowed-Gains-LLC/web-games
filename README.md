@@ -11,6 +11,7 @@ anyone with the link can play.
 | [`fitz-season/`](fitz-season/) | Fitz Season: It Ain't Christmas Yet, a six-minute game about a boat holding back Christmas on Lake Superior | [/games/fitz-season/](https://hallowedgains.com/games/fitz-season/) |
 | [`first-trinity/`](first-trinity/) | First Trinity Oktoberfest, a pixel-art stroll around the church's Oktoberfest | [/games/first-trinity/](https://hallowedgains.com/games/first-trinity/) |
 | [`lily/`](lily/) | Lily's games: Unicorn Quest and Walk Me Home | [/games/lily/](https://hallowedgains.com/games/lily/) |
+| [`moonflower/`](moonflower/) | Moonflower, a quiet merge garden for night feeds: one thumb, dim and warm, no timers | [/games/moonflower/](https://hallowedgains.com/games/moonflower/) |
 
 Both were imported from their old repos (`brandonadamprice/first_trinity` and
 `brandonadamprice/lily`) with their full commit history.
