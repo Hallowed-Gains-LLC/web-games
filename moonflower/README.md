@@ -36,7 +36,7 @@ Live at [hallowedgains.com/games/moonflower/](https://hallowedgains.com/games/mo
 
 | Thing | What it does |
 | --- | --- |
-| Seed pouch | Tap for a seed. Later on, some come up as sprouts. |
+| Seed pouch | Tap for a seed. It grows with your garden: it stays 7 steps behind the best thing you've grown, so it gives Sprouts once you have a Luna moth, Seedlings from a Firefly jar, Buds from a Wishing tree and Moonflowers after a moon. Some taps (up to 30%, as the garden fills in) come up one step better. |
 | Two alike | Drag one onto the other, or tap one and then the other. They become the next item and earn glow. |
 | Wish cards | Three visitors, each wanting one item. A gold border means you have it: tap the card (or drag the item onto it). Pays 3× the item's seed value. |
 | Basket | Drag anything here (or select it and tap the basket) to tuck it away for its seed value in glow. |
@@ -44,8 +44,16 @@ Live at [hallowedgains.com/games/moonflower/](https://hallowedgains.com/games/mo
 
 **The chain:** Seed → Sprout → Seedling → Bud → Moonflower → Posy → Glow-lily →
 Lantern bloom → Luna moth → Firefly jar → Wishing tree → Little moon. A moon
-takes 2,048 seeds' worth of merging, so it's a goal for a week or two of
-nights.
+is 2,048 seeds' worth, about 490 taps of the pouch: a goal for several nights.
+
+**Why the pouch grows** (`POUCH_LAG` in `index.html`). With a pouch that only
+ever gave Seeds, each new item took twice the taps of the one before: a first
+moon was about 1,570 taps, 1,480 of them after the first Moonflower. Trailing
+the best item by 7 steps keeps each late item to roughly 100 taps. A lag of 8
+would make a first moon about 780 taps; 6, about 290. When the pouch grows,
+a visitor wishing for something it can no longer make wishes for something
+else (`retireUnreachableWishes`), and the welcome-back gift is always a step
+better than the pouch.
 
 **Garden wonders** arrive at 40k² + 40k glow for the k-th one (80, 240, 480,
 …, 24,000): fireflies, a pond, a birch with an owl in it, a cottage whose
