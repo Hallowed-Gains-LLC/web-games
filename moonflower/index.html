@@ -519,6 +519,16 @@ function sprite(t) {
   ART[t](c);
   return sprites[t] = cv;
 }
+// An item's shape in shadow, for a wish card asking for something not yet grown.
+let silhouettes = [];
+function silhouette(t) {
+  if (silhouettes[t]) return silhouettes[t];
+  const src = sprite(t), cv = document.createElement('canvas');
+  cv.width = src.width; cv.height = src.height;
+  const c = cv.getContext('2d');
+  c.drawImage(src, 0, 0); c.globalCompositeOperation = 'source-atop'; c.fillStyle = '#2a3156'; c.fillRect(0, 0, cv.width, cv.height);
+  return silhouettes[t] = cv;
+}
 // A standalone picture of an item, for the HTML sheet.
 function paintItem(cv, t, known = true) {
   const px = cv.width = cv.height = 128;
@@ -619,7 +629,7 @@ function layout() {
   L.gear = { x: L.cx + L.cw - 18, y: hy, r: 22 };
   L.book = { x: L.cx + L.cw - 62, y: hy, r: 22 };
 
-  sprites = [];
+  sprites = []; silhouettes = [];
   sceneDirty = true;
   makeStars();
 }
@@ -1209,17 +1219,24 @@ function drawVisitors(c, V, t, ms) {
 /* ============================================================
    Wishes
    ============================================================ */
-function wishTier() {
-  const b = S.best;
-  if (b < 5) return 2 + Math.floor(Math.random() * (Math.max(3, b) - 1));
-  if (Math.random() < .15) return Math.min(b, MAX_TIER - 1);
-  const lo = Math.max(2, b - 4), hi = Math.min(b - 1, MAX_TIER - 1);
+// What a new visitor wishes for. Wishes lead you on rather than only asking
+// for what you've already grown: WISH_STRETCH of them are for the next thing
+// you've never grown (at most one such wish at a time; its card shows a
+// silhouette until you grow it, and it pays the most), WISH_BEST for your
+// best so far, and the rest for one of the three steps below it. Never a
+// Little moon (it rises before it could be given).
+const WISH_STRETCH = .25, WISH_BEST = .35;
+function wishTier(others) {
+  const b = S.best, top = MAX_TIER - 1, r = Math.random();
+  if (b < top && r < WISH_STRETCH && !others.some(o => o.tier > b)) return b + 1;
+  const lo = Math.max(2, b - 3), hi = Math.min(b - 1, top);
+  if (r < WISH_STRETCH + WISH_BEST || hi < lo) return clamp(b, 2, top);
   return lo + Math.floor(Math.random() * (hi - lo + 1));
 }
 function newWish(slot, born) {
   const others = S.wishes.filter((w, i) => i !== slot && w);
   let t = 2, who = 'Owl';
-  for (let k = 0; k < 8; k++) { t = wishTier(); if (!others.some(o => o.tier === t)) break; }
+  for (let k = 0; k < 8; k++) { t = wishTier(others); if (!others.some(o => o.tier === t)) break; }
   for (let k = 0; k < 16; k++) { who = VISITORS[Math.floor(Math.random() * VISITORS.length)]; if (!others.some(o => o.who === who)) break; }
   return { tier: t, who, reward: 3 * value(t) + 2 * t, born };
 }
@@ -1437,6 +1454,7 @@ function gather(cell, from) {
 }
 function hintWish(wi) {
   const w = S.wishes[wi], it = ITEMS[w.tier];
+  if (w.tier > S.best) { toast({ title: `${w.who} is hoping for something new`, sub: `Merge two ${ITEMS[w.tier - 1].many} to find out what grows.` }); return; }
   toast({ title: `${w.who} would love a ${it.name}`, sub: w.tier > 1 ? `Merge two ${ITEMS[w.tier - 1].many} to grow one.` : '', tier: w.tier });
 }
 
@@ -1673,8 +1691,13 @@ function drawWishes(c, ms) {
     if (ready) { c.strokeStyle = rgba(COL.gold, .4 + .25 * Math.sin(ms / 380)); c.lineWidth = 1.6; }
     else { c.strokeStyle = 'rgba(255,255,255,.06)'; c.lineWidth = 1; }
     c.stroke();
-    const sp = Math.min(r.h * .86, r.w * .46);
-    drawItem(c, show.tier, r.x + 4 + sp / 2, r.y + r.h / 2, sp, ms, i * 3);
+    const sp = Math.min(r.h * .86, r.w * .46), ix = r.x + 4 + sp / 2, iy = r.y + r.h / 2;
+    if (show.tier <= S.best) drawItem(c, show.tier, ix, iy, sp, ms, i * 3);
+    else {   // something you haven't grown yet: its shape, and a question
+      c.drawImage(silhouette(show.tier), ix - sp / 2, iy - sp / 2, sp, sp);
+      c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(sp * .34, 700);
+      c.fillStyle = rgba(COL.gold, .6 + .25 * Math.sin(ms / 600 + i)); c.fillText('?', ix, iy);
+    }
     const tx = r.x + sp + 8, tw = r.w - sp - 14;
     c.textAlign = 'left'; c.textBaseline = 'middle';
     fitFont(c, show.who, tw, 12.5, 600); c.fillStyle = rgba(COL.text, .66);

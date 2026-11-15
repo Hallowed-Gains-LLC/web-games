@@ -68,7 +68,7 @@ Live at [hallowedgains.com/games/moonflower/](https://hallowedgains.com/games/mo
 | --- | --- |
 | Seed pouch | Tap for a seed. It grows with your garden: it stays 7 steps behind the best thing you've grown, so it gives Sprouts once you have a Luna moth, Seedlings from a Firefly jar, Buds from a Wishing tree and Moonflowers after a moon. Some taps (up to 30%, as the garden fills in) come up one step better. |
 | Two alike | Drag one onto the other, or tap one and then the other. They become the next item and earn glow. |
-| Wish cards | Three visitors, each wanting one item. A gold border means you have it: tap the card (or drag the item onto it). Pays 3× the item's seed value. |
+| Wish cards | Three visitors, each wanting one item. A gold border means you have it: tap the card (or drag the item onto it). Pays 3× the item's seed value. Wishes lead you on: about one in four (never more than one at a time) is for the next thing you've never grown, shown as a silhouette with a "?" until you grow it; about a third ask for your best so far; the rest for something a step to three below it (`wishTier`). |
 | Basket | Drag anything here (or select it and tap the basket) to tuck it away for its seed value in glow. |
 | Glow | Never spent. Crossing each threshold brings a new garden wonder to the scene. |
 
