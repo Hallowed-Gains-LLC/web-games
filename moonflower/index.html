@@ -126,7 +126,7 @@
   .book .unk { opacity: .45; }
   .wonders { columns: 2; column-gap: 18px; padding: 0; list-style: none; font-size: 14px; margin: 0; }
   .wonders li { padding: 3px 0; break-inside: avoid; }
-  .wonders li.no { opacity: .3; }
+  .wonders li.no { opacity: .45; column-span: all; }
   .stats { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 14px; }
   .stats span:nth-child(even) { text-align: right; color: #efd9a8; font-weight: 600; }
 </style>
@@ -1896,7 +1896,14 @@ function drawStatus(c) {
   }
 }
 
+// The size of the picture on a wish card, and the room left for its words.
+const wishArt = r => Math.min(r.h * .86, r.w * (r.w < 120 ? .36 : .42));   // narrow cards (small phones) leave the name more room
 function drawWishes(c, ms) {
+  // One size for all three visitors' names (the longest decides), so the
+  // cards match; a name that still doesn't fit is cut short (fitText).
+  const r0 = L.wish[0], nameRoom = r0.w - wishArt(r0) - 14;
+  const names = S.wishes.flatMap(w => w ? [w.who, w.prev && w.prev.who] : []).filter(Boolean);
+  const namePx = Math.min(12.5, ...names.map(n => fitFont(c, n, nameRoom, 12.5, 600, 10.5)));
   for (let i = 0; i < 3; i++) {
     const r = L.wish[i], w = S.wishes[i];
     rr(c, r.x, r.y, r.w, r.h, 14); c.fillStyle = 'rgba(15,20,42,.95)'; c.fill();
@@ -1917,7 +1924,7 @@ function drawWishes(c, ms) {
     if (ready) { c.strokeStyle = rgba(COL.gold, .4 + .25 * Math.sin(ms / 380)); c.lineWidth = 1.6; }
     else { c.strokeStyle = 'rgba(255,255,255,.06)'; c.lineWidth = 1; }
     c.stroke();
-    const sp = Math.min(r.h * .86, r.w * .46), ix = r.x + 4 + sp / 2, iy = r.y + r.h / 2;
+    const sp = wishArt(r), ix = r.x + 4 + sp / 2, iy = r.y + r.h / 2;
     if (show.from) {   // an errand: another area's item, and a tag saying where it's from
       drawItem(c, show.tier, ix, iy, sp, ms, i * 3, 1, show.from);
       const tag = areaById(show.from).name.slice(4).toUpperCase();
@@ -1933,7 +1940,7 @@ function drawWishes(c, ms) {
     }
     const tx = r.x + sp + 8, tw = r.w - sp - 14;
     c.textAlign = 'left'; c.textBaseline = 'middle';
-    const whoLine = fitText(c, show.who, tw, 12.5, 600); c.fillStyle = rgba(COL.text, .66);
+    const whoLine = fitText(c, show.who, tw, namePx, 600, namePx); c.fillStyle = rgba(COL.text, .66);
     c.fillText(whoLine, tx, r.y + r.h * .34);
     fitFont(c, `✦ ${fmt(show.reward)}`, tw, 15, 700); c.fillStyle = rgba(COL.textHi, .92);
     c.fillText(`✦ ${fmt(show.reward)}`, tx, r.y + r.h * .66);
@@ -2273,8 +2280,11 @@ document.addEventListener('click', e => {
 
 function openSheet(html, onClose) {
   if (!wrap.classList.contains('open')) sheetOpenedAt = now();
-  sheetEl.innerHTML = html; sheetEl.scrollTop = 0;
+  sheetEl.innerHTML = html;
   wrap.classList.add('open'); sheetClose = onClose || null; resetArmed = false;
+  // Back to the top: only once it's showing, since a hidden (display: none)
+  // sheet ignores scrollTop and would open where the last sheet was left.
+  sheetEl.scrollTop = 0;
   for (const el of sheetEl.querySelectorAll('canvas[data-t]')) paintItem(el, +el.dataset.t, el.dataset.k !== '0');
   if (ptr) { ptr = null; drag = null; }
 }
@@ -2324,6 +2334,7 @@ function openIntro() {
       <li><canvas data-t="1"></canvas><div>Tap the <b>seed pouch</b> at the bottom for a seed.</div></li>
       <li><canvas data-t="4"></canvas><div>Drag two alike together, or tap one and then the other, and they <b>grow</b> into something new.</div></li>
       <li><canvas data-t="9"></canvas><div>Visitors drop by <b>wishing</b> for things. Tap their card once you've grown it.</div></li>
+      <li><span class="glyph">⌂</span><div>Grow far enough and a lane opens into the rest of the <b>sleeping town</b>. The map at the top shows the way.</div></li>
       <li><span class="glyph">☾</span><div>Nothing runs out and nothing can go wrong. Put it down any time. <b>Your garden will wait.</b></div></li>
     </ul>
     <button class="btn done" data-close>Into the garden</button>`,
@@ -2385,7 +2396,8 @@ function openBook() {
     const t = k + 1, known = t <= S.best;
     return `<div class="${known ? '' : 'unk'}"><canvas data-t="${t}" data-k="${known ? 1 : 0}"></canvas>${known ? it.name : '?'}</div>`;
   }).join('');
-  const wonders = DECOR.map((d, k) => k < S.decor ? `<li>✦ ${d.name}</li>` : `<li class="no">· · ·</li>`).join('');
+  const wonders = DECOR.slice(0, S.decor).map(d => `<li>✦ ${d.name}</li>`).join('')
+    + (S.decor < DECOR.length ? `<li class="no">· · · and ${DECOR.length - S.decor} more to find</li>` : '');
   const next = S.decor < DECOR.length
     ? `Next: <b>${DECOR[S.decor].name}</b>, in ${fmt(decorAt(S.decor + 1) - S.peak)} ✦.`
     : `Every wonder has come. Each ${fmt(STAR_STEP)} ✦ now adds a constellation to the sky.`;
