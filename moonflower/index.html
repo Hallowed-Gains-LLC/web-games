@@ -104,7 +104,7 @@
           background: none; border: 0; padding: 4px; color: #efd9a8; font: inherit; cursor: pointer; }
   .spot canvas { width: 62px; height: 62px; border-radius: 50%; background: radial-gradient(rgba(242,196,109,.22), rgba(242,196,109,0) 70%); }
   .spot.here canvas { box-shadow: 0 0 0 2px rgba(242,196,109,.7); }
-  .spot b { font-size: 13px; } .spot small { font-size: 11px; opacity: .65; }
+  .spot b { font-size: 13px; white-space: nowrap; } .spot small { font-size: 11px; opacity: .65; white-space: nowrap; }
   .spot.shut { opacity: .5; }
   .mapnote { text-align: center; min-height: 2.6em; opacity: .85; }
   .book canvas { width: 64px; height: 64px; display: block; margin: 0 auto 4px; }
@@ -130,7 +130,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '2.1';
+const VERSION = '2.2';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -4116,6 +4116,1021 @@ function liveHarbour(c, V, t) {
 }
 
 /* ============================================================
+   The Chapel
+   ============================================================ */
+// A small stone chapel at night, its door left on the latch: a bell tower,
+// a stained-glass window lit from inside, an old yew, a lychgate in the
+// churchyard wall, and candles in jars along the path. Its chain runs from
+// a tealight to an evening prayer, which rises like the garden's moon
+// ("Let my prayer be set forth before thee as incense", Psalm 141:2).
+// Opens when the harbour pulls in its first Rowing boat.
+const CHAPEL_ITEMS = [null,
+  { name: 'Tealight',            many: 'Tealights',            blurb: 'A small light, and enough to see by.' },
+  { name: 'Candle',              many: 'Candles',              blurb: 'Lit for someone.' },
+  { name: 'Candlestick',         many: 'Candlesticks',         blurb: 'Polished every Saturday, very carefully.' },
+  { name: 'Prayer book',         many: 'Prayer books',         blurb: 'Worn soft at the evening pages.' },
+  { name: 'Hymnal',              many: 'Hymnals',              blurb: 'Hum along if you don\'t know the words.' },
+  { name: 'Pew',                 many: 'Pews',                 blurb: 'Room for one more. There always is.' },
+  { name: 'Font',                many: 'Fonts',                blurb: 'A little water, and a name said out loud.' },
+  { name: 'Lectern',             many: 'Lecterns',             blurb: 'The big book, left open at tomorrow\'s reading.' },
+  { name: 'Organ',               many: 'Organs',               blurb: 'Resting its voice until Sunday.' },
+  { name: 'Stained-glass window', many: 'Stained-glass windows', blurb: 'Lit from inside, for anyone passing.' },
+  { name: 'Bell tower',          many: 'Bell towers',          blurb: 'The bell keeps quiet, so as not to wake anyone.' },
+  { name: 'Evening prayer',      many: 'Evening prayers',      blurb: 'Rising like incense, as the old psalm says.' },
+];
+const CHAPELC = {
+  flag: '#7a7269', flagD: '#57514b', turf: '#3a4a3a', turfL: '#4e6148',
+  wax: '#f6eedc', waxS: '#d6c7a6', flame: '#ffc25e', flameL: '#fff4cf', light: '#ffd27a',
+  tin: '#e2dfe0', tinD: '#86828c', brass: '#e8c878', brassD: '#94722f', brassM: '#c19a4a',
+  wood: '#7a5638', woodD: '#4f3524', woodL: '#a07650', red: '#8c3a3a', redD: '#5e2426', ribbon: '#b04a4a',
+  green: '#2f4a42', greenD: '#1f332d', page: '#f3ead6', pageS: '#d9cbae', gilt: '#d9b25c', ink: '#5a5048',
+  stone: '#b3aa9c', stoneL: '#d2cabb', stoneD: '#7c7468', slate: '#565b6e', slateL: '#6f758a', water: '#9cc0dc',
+  pipe: '#e6e8ec', pipeD: '#8f949e',
+  // the window's glass: muted, as if seen from outside by candlelight
+  ruby: '#b8565a', blue: '#4f6fa8', gold: '#e3b860', leaf: '#6c9a72', lead: '#2a2630',
+};
+/** A worn flagstone under the things that live indoors. */
+function chapelFlag(c, w = 26) {
+  c.fillStyle = CHAPELC.flagD; oval(c, 0, 38, w, 7); c.fill();
+  c.fillStyle = CHAPELC.flag; oval(c, -3, 36.8, w * .62, 3.2); c.fill();
+  c.strokeStyle = 'rgba(40,36,34,.45)'; c.lineWidth = .9; c.beginPath(); c.moveTo(w * .3, 32.5); c.lineTo(w * .45, 44); c.stroke();
+}
+/** A patch of churchyard grass under the things outdoors. */
+function chapelTurf(c, w = 26) {
+  c.fillStyle = CHAPELC.turf; oval(c, 0, 38, w, 7); c.fill();
+  c.fillStyle = CHAPELC.turfL; oval(c, -4, 36.6, w * .55, 3); c.fill();
+  c.strokeStyle = CHAPELC.turfL; c.lineWidth = 1.1; c.lineCap = 'round';
+  for (const [x, l] of [[-w * .8, 4], [-w * .7, 3], [w * .72, 4.4], [w * .82, 3]]) { c.beginPath(); c.moveTo(x, 39); c.quadraticCurveTo(x, 39 - l * .6, x + 1.2, 39 - l); c.stroke(); }
+}
+/** A teardrop between two points, round end down: a flame, or a drip of wax. */
+function chapelDrop(c, x, y, h, w) {
+  c.beginPath(); c.moveTo(x, y - h);
+  c.bezierCurveTo(x + w * .3, y - h * .55, x + w, y - h * .25, x, y);
+  c.bezierCurveTo(x - w, y - h * .25, x - w * .3, y - h * .55, x, y - h); c.fill();
+}
+/** A candle flame standing on (x, y), h tall: a warm glow, a gold flame, a pale heart and a hint of blue at the wick. */
+function chapelFlame(c, x, y, h, w) {
+  drawGlow(c, x, y - h * .45, h * 1.5, CHAPELC.light, .5);
+  c.fillStyle = CHAPELC.flame; chapelDrop(c, x, y, h, w);
+  c.fillStyle = CHAPELC.flameL; chapelDrop(c, x, y - h * .06, h * .66, w * .55);
+  c.fillStyle = 'rgba(140,170,230,.55)'; oval(c, x, y - 1, w * .32, h * .1); c.fill();
+}
+/** A candle's wick, a little bent. */
+function chapelWick(c, x, y, h = 4) {
+  c.strokeStyle = '#3a2c26'; c.lineWidth = 1.2; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + .4, y - h * .5, x + .9, y - h); c.stroke();
+}
+/** A pointed (Gothic) arch, w wide, its sill at y0, its springing at y1 and its point at y2. */
+function chapelArch(c, x, w, y0, y1, y2) {
+  const h = w / 2;
+  c.beginPath(); c.moveTo(x - h, y0); c.lineTo(x - h, y1);
+  c.quadraticCurveTo(x - h, y2 + (y1 - y2) * .3, x, y2);
+  c.quadraticCurveTo(x + h, y2 + (y1 - y2) * .3, x + h, y1);
+  c.lineTo(x + h, y0); c.closePath();
+}
+/**
+ * Stained glass inside a pointed arch: small panes in four muted colours with
+ * dark leading, and a cross of gold panes down the middle. `a(i)` gives each
+ * pane's brightness, so the scene can make them shimmer (1 for the book).
+ */
+function chapelGlass(c, x, w, y0, y1, y2, a = () => 1) {
+  const cols = ['ruby', 'blue', 'leaf', 'blue', 'ruby', 'gold', 'blue', 'leaf'];
+  const pw = w / 4, ph = pw * 1.15, rows = Math.ceil((y0 - y2) / ph);
+  c.save(); chapelArch(c, x, w, y0, y1, y2); c.clip();
+  c.fillStyle = CHAPELC.lead; c.fillRect(x - w, y2 - 1, w * 2, y0 - y2 + 2);
+  for (let r = 0; r < rows; r++) {
+    for (let k = 0; k < 4; k++) {
+      const px = x - w / 2 + k * pw, py = y0 - (r + 1) * ph, i = r * 4 + k;
+      // a cross of gold: the middle two columns, and one row across near the top
+      const cross = (k === 1 || k === 2) ? (r >= 1) : (r === rows - 3);
+      const col = cross ? CHAPELC.gold : CHAPELC[cols[(r * 3 + k * 5) % cols.length]];
+      c.globalAlpha = a(i); c.fillStyle = col;
+      c.fillRect(px + .5, py + .5, pw - 1, ph - 1);
+    }
+  }
+  c.globalAlpha = 1; c.restore();
+}
+
+const CHAPEL_ART = [null,
+  // 1 · Tealight
+  c => {
+    chapelFlag(c, 24);
+    drawGlow(c, 0, 10, 44, CHAPELC.light, .3);
+    const g = c.createLinearGradient(-18, 0, 18, 0); g.addColorStop(0, CHAPELC.tinD); g.addColorStop(.35, CHAPELC.tin); g.addColorStop(1, '#77737d');
+    c.fillStyle = g; c.beginPath(); c.moveTo(-18, 23); c.lineTo(-17, 33); c.ellipse(0, 33, 17, 4.6, 0, Math.PI, 0, true); c.lineTo(18, 23); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(80,76,86,.5)'; c.lineWidth = .8;          // the cup's crimped side
+    for (let x = -14; x <= 14; x += 4) { c.beginPath(); c.moveTo(x, 25 + Math.abs(x) * .08); c.lineTo(x * 1.02, 35.5 - Math.abs(x) * .12); c.stroke(); }
+    c.fillStyle = '#cfcbcc'; oval(c, 0, 23, 18, 5); c.fill();
+    c.fillStyle = CHAPELC.wax; oval(c, 0, 23.6, 15.6, 3.9); c.fill();
+    c.fillStyle = 'rgba(255,214,140,.5)'; oval(c, 0, 23, 6, 1.6); c.fill();   // a little melted pool
+    chapelWick(c, 0, 23, 4);
+    chapelFlame(c, .9, 19.5, 22, 5.6);
+    sparkle(c, 22, -4, 3.6, 'rgba(255,236,190,.7)');
+  },
+  // 2 · Candle
+  c => {
+    chapelFlag(c, 24);
+    drawGlow(c, 0, 4, 48, CHAPELC.light, .28);
+    const g = c.createLinearGradient(-12, 0, 12, 0); g.addColorStop(0, CHAPELC.waxS); g.addColorStop(.38, '#fff9ec'); g.addColorStop(1, '#c9b892');
+    c.fillStyle = g; c.beginPath(); c.moveTo(-12, 3); c.lineTo(-12, 34); c.ellipse(0, 34, 12, 3.4, 0, Math.PI, 0, true); c.lineTo(12, 3); c.closePath(); c.fill();
+    c.fillStyle = '#fbf3e2'; oval(c, 0, 3, 12, 3.6); c.fill();
+    c.fillStyle = '#eadcbc'; oval(c, 0, 3.6, 8.6, 2.2); c.fill();              // the hollow the flame has melted
+    c.fillStyle = '#fff6e6';                                                    // a drip down the side
+    c.beginPath(); c.moveTo(5, 4); c.quadraticCurveTo(9.6, 4.6, 9.4, 10); c.lineTo(9.2, 15); c.quadraticCurveTo(7.6, 17.4, 7, 14); c.quadraticCurveTo(6.6, 8, 5, 4); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.4)'; c.fillRect(-7.6, 8, 2.2, 22);
+    chapelWick(c, 0, 3.4, 4.4);
+    chapelFlame(c, 1, -.6, 24, 6);
+    sparkle(c, -22, -10, 3.4, 'rgba(255,236,190,.65)');
+  },
+  // 3 · Candlestick, brass, with a tall taper
+  c => {
+    c.fillStyle = 'rgba(0,0,0,.25)'; oval(c, 0, 38, 24, 4.6); c.fill();
+    const brass = (x0, x1) => { const g = c.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, CHAPELC.brassD); g.addColorStop(.4, CHAPELC.brass); g.addColorStop(1, CHAPELC.brassM); return g; };
+    c.fillStyle = brass(-21, 21); c.beginPath(); c.moveTo(-21, 36); c.quadraticCurveTo(-19, 28, -5, 26); c.lineTo(5, 26); c.quadraticCurveTo(19, 28, 21, 36); c.ellipse(0, 36, 21, 3.2, 0, 0, Math.PI); c.fill();
+    c.fillStyle = brass(-4, 4); c.fillRect(-3.4, 2, 6.8, 25);
+    c.fillStyle = brass(-7, 7); oval(c, 0, 20, 6.4, 2.8); c.fill(); oval(c, 0, 10, 5, 2.2); c.fill();
+    c.fillStyle = brass(-12, 12); oval(c, 0, 2, 12, 3.4); c.fill();             // the drip pan
+    c.fillStyle = 'rgba(255,246,210,.55)'; c.fillRect(-2.2, 4, 1.4, 22); oval(c, -10, 33, 5, 1.2, -.3); c.fill();
+    const g = c.createLinearGradient(-5, 0, 5, 0); g.addColorStop(0, CHAPELC.waxS); g.addColorStop(.4, '#fff9ec'); g.addColorStop(1, '#cdbd98');
+    c.fillStyle = g; c.fillRect(-4.6, -28, 9.2, 30);
+    c.fillStyle = '#fbf3e2'; oval(c, 0, -28, 4.6, 1.6); c.fill();
+    c.fillStyle = '#fff6e6'; c.beginPath(); c.moveTo(-4.6, -27); c.quadraticCurveTo(-6.4, -22, -5.4, -18); c.quadraticCurveTo(-4.4, -16.4, -4, -19); c.fill();
+    chapelWick(c, 0, -28, 3.6);
+    chapelFlame(c, .8, -31, 17, 4.8);
+    sparkle(c, 20, -24, 3.4, 'rgba(255,236,190,.65)');
+  },
+  // 4 · Prayer book, shut, its ribbon left in at the evening pages
+  c => {
+    chapelFlag(c, 30);
+    c.fillStyle = 'rgba(0,0,0,.28)'; oval(c, 2, 36, 30, 5); c.fill();
+    const A = [-31, 18], B = [5, 6], C = [33, 18], D = [-3, 30], T = 7;
+    const quad = (p, q, r, s) => { c.beginPath(); c.moveTo(...p); c.lineTo(...q); c.lineTo(...r); c.lineTo(...s); c.closePath(); };
+    const dn = p => [p[0], p[1] + T];
+    c.fillStyle = CHAPELC.redD; quad([A[0] - 1, A[1] + T + 1], [D[0], D[1] + T + 2], [C[0] + 1.4, C[1] + T + 1], C); c.fill();   // the back cover
+    c.beginPath(); c.moveTo(...A); c.lineTo(...D); c.lineTo(...C); c.lineTo(...dn(C)); c.lineTo(...dn(D)); c.lineTo(...dn(A)); c.closePath();
+    const g = c.createLinearGradient(0, 20, 0, 38); g.addColorStop(0, '#f3dc94'); g.addColorStop(1, '#b88f3e'); c.fillStyle = g; c.fill();   // gilt page edges
+    c.strokeStyle = 'rgba(140,100,40,.45)'; c.lineWidth = .6;
+    for (let k = 1; k < 4; k++) { const y = k * T / 4; c.beginPath(); c.moveTo(A[0], A[1] + y); c.lineTo(D[0], D[1] + y); c.lineTo(C[0], C[1] + y); c.stroke(); }
+    c.fillStyle = CHAPELC.redD; quad([A[0] - 2.4, A[1] - 1], [A[0], A[1]], dn(A), [A[0] - 2.4, A[1] + T + .4]); c.fill();   // the spine's edge
+    const cg = c.createLinearGradient(-20, 6, 20, 32); cg.addColorStop(0, '#a04646'); cg.addColorStop(1, CHAPELC.redD);
+    c.fillStyle = cg; quad(A, B, C, D); c.fill();
+    // a gold cross on the cover, drawn along its edges so it lies flat
+    const at = (u, v) => [A[0] + (B[0] - A[0]) * u + (D[0] - A[0]) * v, A[1] + (B[1] - A[1]) * u + (D[1] - A[1]) * v];
+    c.strokeStyle = CHAPELC.gilt; c.lineWidth = 2.2; c.lineCap = 'round'; c.beginPath();
+    c.moveTo(...at(.22, .5)); c.lineTo(...at(.8, .5)); c.moveTo(...at(.62, .3)); c.lineTo(...at(.62, .7)); c.stroke();
+    c.strokeStyle = 'rgba(217,178,92,.45)'; c.lineWidth = .7; quad(at(.06, .08), at(.94, .08), at(.94, .92), at(.06, .92)); c.stroke();
+    c.strokeStyle = CHAPELC.ribbon; c.lineWidth = 2.4; c.lineCap = 'butt';  // the ribbon, out of the pages and onto the floor
+    c.beginPath(); c.moveTo(16, 25); c.quadraticCurveTo(19, 36, 22, 37); c.quadraticCurveTo(27, 38.4, 31, 36); c.stroke();
+    c.fillStyle = CHAPELC.ribbon; tri(c, 30, 34.4, 34, 34, 32.4, 37.4);
+    sparkle(c, -20, -2, 3.4, 'rgba(255,236,190,.6)');
+  },
+  // 5 · Hymnal, open, humming to itself
+  c => {
+    chapelFlag(c, 32);
+    c.fillStyle = 'rgba(0,0,0,.3)'; oval(c, 0, 37, 34, 4.6); c.fill();
+    c.fillStyle = CHAPELC.greenD;                                                // the cover, peeping out round the pages
+    c.beginPath(); c.moveTo(0, 12); c.quadraticCurveTo(-16, 4, -35, 7); c.lineTo(-36, 34); c.quadraticCurveTo(-16, 31, 0, 37); c.quadraticCurveTo(16, 31, 36, 34); c.lineTo(35, 7); c.quadraticCurveTo(16, 4, 0, 12); c.fill();
+    for (const s of [-1, 1]) {
+      const g = c.createLinearGradient(0, 0, s * 32, 0); g.addColorStop(0, CHAPELC.pageS); g.addColorStop(.25, CHAPELC.page); g.addColorStop(1, '#e8dcc2');
+      c.fillStyle = g; c.beginPath(); c.moveTo(0, 9); c.quadraticCurveTo(s * 15, 1, s * 32, 4); c.lineTo(s * 32, 30); c.quadraticCurveTo(s * 15, 27, 0, 33); c.closePath(); c.fill();
+      // two staves of music, bending with the page
+      c.strokeStyle = 'rgba(90,80,72,.55)'; c.lineWidth = .55;
+      for (const top of [6, 17]) for (let k = 0; k < 4; k++) {
+        const o = top + k * 1.8; c.beginPath(); c.moveTo(s * 4, o + 3.4); c.quadraticCurveTo(s * 16, o - 3.4, s * 28, o - .6); c.stroke();
+      }
+      c.fillStyle = CHAPELC.ink;
+      for (const [u, top, k] of [[.25, 6, 1], [.45, 6, 2], [.7, 6, 0], [.3, 17, 2], [.55, 17, 1], [.8, 17, 3]]) {
+        const x = s * (4 + u * 24), y = top + k * 1.8 + 3.4 * (1 - 2 * u) * (1 - u) - .6 * u * u - 1.2 * u;
+        oval(c, x, y, 1.2, .85, -.35); c.fill(); c.fillRect(x + .8, y - 4.4, .5, 4.4);
+      }
+    }
+    c.strokeStyle = 'rgba(120,100,80,.5)'; c.lineWidth = 1; c.beginPath(); c.moveTo(0, 9); c.lineTo(0, 33); c.stroke();
+    // a tune, drifting up off the page
+    drawGlow(c, 14, -18, 16, CHAPELC.light, .35);
+    c.fillStyle = CHAPELC.brass; c.strokeStyle = CHAPELC.brass; c.lineWidth = 1.4;
+    oval(c, 9, -12, 3, 2.2, -.35); c.fill(); oval(c, 19, -15, 3, 2.2, -.35); c.fill();
+    c.beginPath(); c.moveTo(11.6, -12.6); c.lineTo(11.6, -25); c.lineTo(21.6, -28); c.lineTo(21.6, -15.6); c.stroke();
+    c.lineWidth = 2.4; c.beginPath(); c.moveTo(11.6, -24.4); c.lineTo(21.6, -27.4); c.stroke();
+    sparkle(c, -16, -12, 3.2, 'rgba(255,236,190,.6)');
+  },
+  // 6 · Pew, seen from the end, with a hassock and somebody's hymnal
+  c => {
+    c.fillStyle = 'rgba(0,0,0,.28)'; oval(c, 2, 38, 38, 4.6); c.fill();
+    const wood = (y0, y1, a = CHAPELC.woodL, b = CHAPELC.wood) => { const g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, a); g.addColorStop(1, b); return g; };
+    // The back plane sits up and to the right of the front one, as if seen from the front-left.
+    const DX = 6, DY = -8;
+    c.fillStyle = CHAPELC.woodD; c.fillRect(-27 + DX, 26 + DY, 58, 2.4);                  // a rail low down at the back
+    c.fillStyle = wood(-16, 10); c.fillRect(-28 + DX, -8 + DY, 60, 24);                  // the back
+    c.strokeStyle = 'rgba(60,40,26,.35)'; c.lineWidth = .8;
+    for (let y = -2; y < 14; y += 5) { c.beginPath(); c.moveTo(-28 + DX, y + DY); c.lineTo(32 + DX, y + DY); c.stroke(); }
+    c.fillStyle = '#b48a5e'; c.beginPath(); c.moveTo(-29 + DX, -8 + DY); c.lineTo(33 + DX, -8 + DY); c.lineTo(31, -8); c.lineTo(-31, -8); c.closePath(); c.fill();   // the top of the back
+    c.fillStyle = '#b0855a'; c.beginPath(); c.moveTo(-30, 16); c.lineTo(28, 16); c.lineTo(28 + DX, 16 + DY); c.lineTo(-30 + DX, 16 + DY); c.closePath(); c.fill();   // the seat
+    c.fillStyle = CHAPELC.wood; c.fillRect(-30, 16, 58, 3.6);
+    c.fillStyle = CHAPELC.green; c.beginPath(); c.moveTo(6, 14.6); c.lineTo(16, 14.6); c.lineTo(19, 10.6); c.lineTo(9, 10.6); c.closePath(); c.fill();   // a hymnal, left on the seat
+    c.fillStyle = CHAPELC.page; c.fillRect(6, 14.6, 10, 1.2);
+    for (const x of [-33, 27]) {                                                          // the two ends, with rounded tops
+      c.fillStyle = wood(-20, 38, '#9c7149', '#6a4a30');
+      c.beginPath(); c.moveTo(x, 37); c.lineTo(x, 8); c.quadraticCurveTo(x, -4, x + 2.6, -12); c.quadraticCurveTo(x + 4.4, -19, x + DX + 1.4, -18.4);
+      c.quadraticCurveTo(x + DX + 4, -18, x + DX + 3.6, -12); c.lineTo(x + DX + 3.6, 37 + DY); c.lineTo(x + 3.6, 37); c.closePath(); c.fill();
+      c.fillStyle = CHAPELC.woodL; c.beginPath(); c.moveTo(x + 3.6, 37); c.lineTo(x + 3.6, 6); c.quadraticCurveTo(x + 3.6, -6, x + DX + 3.6, -12); c.lineTo(x + DX + 3.6, 2); c.quadraticCurveTo(x + 4, 4, x + 3.6, 37); c.fill();
+      c.strokeStyle = 'rgba(60,40,26,.55)'; c.lineWidth = .8; c.beginPath(); c.arc(x + 4.2, -5, 1.6, 0, TAU); c.stroke();
+    }
+    c.fillStyle = CHAPELC.red; c.beginPath(); c.roundRect(-14, 29.4, 18, 8, 3); c.fill();   // a hassock, to kneel on
+    c.fillStyle = '#a85050'; c.beginPath(); c.roundRect(-13, 29.4, 16, 2.6, 1.6); c.fill();
+    c.strokeStyle = 'rgba(240,200,120,.55)'; c.lineWidth = .7; c.beginPath(); c.moveTo(-9, 34); c.lineTo(-5, 31.6); c.lineTo(-1, 34); c.lineTo(-5, 36.4); c.closePath(); c.stroke();
+  },
+  // 7 · Font, of old stone, with a little water in it and a shell for pouring
+  c => {
+    c.fillStyle = 'rgba(0,0,0,.28)'; oval(c, 0, 38, 28, 4.6); c.fill();
+    const stone = (x0, x1) => { const g = c.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, CHAPELC.stoneD); g.addColorStop(.4, CHAPELC.stoneL); g.addColorStop(1, CHAPELC.stone); return g; };
+    c.fillStyle = stone(-24, 24); c.beginPath(); c.moveTo(-24, 38); c.lineTo(-23, 33); c.lineTo(23, 33); c.lineTo(24, 38); c.closePath(); c.fill();   // two steps
+    c.fillStyle = stone(-18, 18); c.beginPath(); c.moveTo(-18, 33.4); c.lineTo(-17, 28); c.lineTo(17, 28); c.lineTo(18, 33.4); c.closePath(); c.fill();
+    c.fillStyle = stone(-10, 10); c.fillRect(-10, 10, 20, 18.6);                         // the stem, eight-sided
+    c.strokeStyle = 'rgba(80,72,64,.45)'; c.lineWidth = .9; c.beginPath(); c.moveTo(-4.6, 12); c.lineTo(-4.6, 28); c.moveTo(4.6, 12); c.lineTo(4.6, 28); c.stroke();
+    c.fillStyle = stone(-28, 28); c.beginPath(); c.moveTo(-27, -4); c.lineTo(-22, 12); c.quadraticCurveTo(0, 16, 22, 12); c.lineTo(27, -4); c.closePath(); c.fill();   // the bowl, eight-sided
+    c.strokeStyle = 'rgba(80,72,64,.45)'; c.lineWidth = .9;
+    for (const x of [-18, -8.6, 8.6, 18]) { c.beginPath(); c.moveTo(x, -2); c.lineTo(x * .84, 14); c.stroke(); }
+    c.fillStyle = 'rgba(255,250,236,.35)'; c.fillRect(-27, -4, 54, 3.4);                  // the moulding round the top
+    c.strokeStyle = 'rgba(90,80,70,.6)'; c.lineWidth = 1.6; c.lineCap = 'round';          // a cross, carved on the front face
+    c.beginPath(); c.moveTo(0, 1.6); c.lineTo(0, 11.4); c.moveTo(-3.4, 4.6); c.lineTo(3.4, 4.6); c.stroke();
+    c.fillStyle = CHAPELC.stoneL; oval(c, 0, -4, 27, 6.4); c.fill();                     // the rim
+    const wg = c.createLinearGradient(0, -9, 0, 1); wg.addColorStop(0, '#cfe2f0'); wg.addColorStop(1, '#6f97bd');
+    c.fillStyle = wg; oval(c, 0, -3.6, 22.4, 4.4); c.fill();                              // the water
+    c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = .8; c.beginPath(); c.ellipse(-3, -3.4, 6, 1.4, 0, 0, TAU); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.7)'; oval(c, -12, -4.8, 4.4, .9); c.fill();
+    c.save(); c.translate(19, -7.4); c.rotate(-.35);                                       // a scallop shell, resting on the rim
+    c.fillStyle = '#f1dccb'; c.beginPath(); c.moveTo(0, 3); c.lineTo(-6, -2.6); c.quadraticCurveTo(0, -8.4, 6, -2.6); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(190,140,120,.7)'; c.lineWidth = .6; c.beginPath(); for (const a of [-.9, -.45, 0, .45, .9]) { c.moveTo(0, 3); c.lineTo(Math.sin(a) * 6.6, 3 - Math.cos(a) * 8.6); } c.stroke();
+    c.fillStyle = '#e2c6b2'; c.fillRect(-1.6, 2.2, 3.2, 1.6);
+    c.restore();
+    drawGlow(c, 0, -6, 30, '#dfe9ff', .22);
+    sparkle(c, -14, -16, 4, 'rgba(225,236,255,.75)'); sparkle(c, 4, -22, 2.6, 'rgba(225,236,255,.55)');
+  },
+  // 8 · Lectern, the big book open on it
+  c => {
+    c.fillStyle = 'rgba(0,0,0,.28)'; oval(c, 0, 38, 24, 4.4); c.fill();
+    const wood = (x0, x1) => { const g = c.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, CHAPELC.woodD); g.addColorStop(.45, CHAPELC.woodL); g.addColorStop(1, CHAPELC.wood); return g; };
+    c.fillStyle = wood(-20, 20); c.beginPath(); c.roundRect(-20, 32, 40, 6, 2.4); c.fill();   // the foot
+    c.fillStyle = wood(-5, 5); c.fillRect(-4.4, 0, 8.8, 33);                     // the post
+    c.fillStyle = wood(-8, 8); oval(c, 0, 20, 7, 2.6); c.fill(); oval(c, 0, 3, 8, 2.4); c.fill();
+    c.fillStyle = CHAPELC.woodD; c.beginPath(); c.moveTo(-27, 0); c.lineTo(27, 0); c.lineTo(23, -14); c.lineTo(-23, -14); c.closePath(); c.fill();   // the sloping desk
+    c.fillStyle = CHAPELC.wood; c.fillRect(-28, -1, 56, 3.4);                   // and its lip
+    for (const s of [-1, 1]) {                                                    // the book's two pages
+      const g = c.createLinearGradient(0, 0, s * 24, 0); g.addColorStop(0, CHAPELC.pageS); g.addColorStop(.3, CHAPELC.page); g.addColorStop(1, '#e8dcc2');
+      c.fillStyle = g; c.beginPath(); c.moveTo(0, -14.6); c.quadraticCurveTo(s * 11, -19, s * 23, -17); c.lineTo(s * 25, -2); c.quadraticCurveTo(s * 12, -4.4, 0, -.6); c.closePath(); c.fill();
+      c.strokeStyle = 'rgba(90,80,72,.45)'; c.lineWidth = .7;                     // lines of print
+      for (let k = 0; k < 5; k++) { const y = -14 + k * 2.6; c.beginPath(); c.moveTo(s * 3.4, y + .4); c.quadraticCurveTo(s * 12, y - 3, s * 21.4, y - 1.6 + k * .2); c.stroke(); }
+    }
+    c.fillStyle = '#a04646'; c.beginPath(); c.moveTo(-6, -1); c.lineTo(-6, 13); c.lineTo(-7.6, 15.4); c.lineTo(-4.4, 14); c.lineTo(-3, 15.4); c.lineTo(-3, -1); c.closePath(); c.fill();   // a ribbon hanging down
+    c.fillStyle = '#c99a3a'; c.beginPath(); c.moveTo(1, -1); c.lineTo(1, 9); c.lineTo(2.6, 7.6); c.lineTo(4, 9); c.lineTo(4, -1); c.closePath(); c.fill();
+    sparkle(c, 22, -28, 3.6, 'rgba(255,236,190,.65)');
+  },
+  // 9 · Organ, its pipes catching the candlelight
+  c => {
+    c.fillStyle = 'rgba(0,0,0,.28)'; oval(c, 0, 38, 36, 4.4); c.fill();
+    const wg = c.createLinearGradient(0, -8, 0, 38); wg.addColorStop(0, CHAPELC.wood); wg.addColorStop(1, CHAPELC.woodD);
+    c.fillStyle = wg; c.beginPath(); c.moveTo(-31, 38); c.lineTo(-31, -6); c.quadraticCurveTo(0, -18, 31, -6); c.lineTo(31, 38); c.closePath(); c.fill();   // the case
+    c.fillStyle = 'rgba(20,12,8,.4)'; c.fillRect(-26, -6, 52, 16);             // the dark behind the pipes
+    const pipes = [[-22, -12], [-15, -19], [-7.5, -27], [0, -34], [7.5, -27], [15, -19], [22, -12]];
+    for (const [x, top] of pipes) {
+      const g = c.createLinearGradient(x - 3, 0, x + 3, 0); g.addColorStop(0, CHAPELC.pipeD); g.addColorStop(.4, CHAPELC.pipe); g.addColorStop(1, '#a5aab3');
+      c.fillStyle = g; c.fillRect(x - 3, top, 6, 6 - top);
+      c.beginPath(); c.moveTo(x - 3, 6); c.lineTo(x - .9, 11); c.lineTo(x + .9, 11); c.lineTo(x + 3, 6); c.fill();   // the pipe's foot
+      c.fillStyle = '#4a4d58'; c.beginPath(); c.moveTo(x - 2, 5); c.lineTo(x - 2, 2.4); c.quadraticCurveTo(x, .6, x + 2, 2.4); c.lineTo(x + 2, 5); c.fill();   // its mouth
+      c.fillStyle = '#c9ccd3'; oval(c, x, top, 3, .9); c.fill();
+    }
+    c.fillStyle = CHAPELC.woodL; c.fillRect(-29, 11, 58, 3);                    // the keyboard's shelf
+    c.fillStyle = '#efe6d4'; c.fillRect(-24, 14, 48, 5);                       // the keys
+    c.fillStyle = '#2a2420'; for (let x = -22; x < 24; x += 3.4) { if ((Math.round((x + 22) / 3.4) % 7) % 3 === 2) continue; c.fillRect(x + 1.6, 14, 1.4, 3); }
+    c.fillStyle = CHAPELC.woodD; c.fillRect(-29, 19, 58, 2);
+    c.strokeStyle = 'rgba(30,18,12,.45)'; c.lineWidth = .8; c.strokeRect(-22, 24, 18, 10); c.strokeRect(4, 24, 18, 10);   // panels
+    drawGlow(c, -26, 6, 14, CHAPELC.light, .5); c.fillStyle = CHAPELC.light; c.fillRect(-27.4, 6, 2.8, 4.4);   // a little lamp to play by
+    c.fillStyle = CHAPELC.brassD; c.fillRect(-28.4, 10, 4.8, 1.2);
+    sparkle(c, 26, -26, 3.4, 'rgba(255,236,190,.6)');
+  },
+  // 10 · Stained-glass window, lit from inside
+  c => {
+    drawGlow(c, 0, 0, 56, '#ffcf87', .3);
+    c.fillStyle = 'rgba(0,0,0,.28)'; oval(c, 0, 38, 32, 4.4); c.fill();
+    const sg = c.createLinearGradient(-30, 0, 30, 0); sg.addColorStop(0, CHAPELC.stoneD); sg.addColorStop(.45, CHAPELC.stone); sg.addColorStop(1, '#948b7e');
+    c.fillStyle = sg; c.fillRect(-30, 26, 60, 12);                             // a piece of the wall
+    c.strokeStyle = 'rgba(70,62,54,.5)'; c.lineWidth = .8; c.beginPath(); c.moveTo(-30, 32); c.lineTo(30, 32); c.moveTo(-12, 26); c.lineTo(-12, 32); c.moveTo(14, 26); c.lineTo(14, 32); c.moveTo(2, 32); c.lineTo(2, 38); c.stroke();
+    c.fillStyle = sg; chapelArch(c, 0, 50, 28, -6, -42); c.fill();           // the stone surround
+    c.fillStyle = CHAPELC.stoneL; c.fillRect(-27, 25, 54, 3.6);               // the sill
+    chapelGlass(c, 0, 38, 25, -4, -35);
+    drawGlow(c, 0, -6, 26, '#ffe2a6', .3);
+    c.strokeStyle = CHAPELC.lead; c.lineWidth = 1.6; chapelArch(c, 0, 38, 25, -4, -35); c.stroke();
+    sparkle(c, 26, -30, 3.6, 'rgba(255,236,190,.7)');
+  },
+  // 11 · Bell tower, the bell asleep in the belfry
+  c => {
+    chapelTurf(c, 26);
+    const sg = c.createLinearGradient(-15, 0, 15, 0); sg.addColorStop(0, CHAPELC.stoneD); sg.addColorStop(.4, CHAPELC.stoneL); sg.addColorStop(1, CHAPELC.stone);
+    c.fillStyle = sg; c.beginPath(); c.moveTo(-16, 38); c.lineTo(-14, -14); c.lineTo(14, -14); c.lineTo(16, 38); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(80,72,64,.4)'; c.lineWidth = .8;                     // courses of stone
+    for (let y = -6, k = 0; y < 36; y += 6, k++) { c.beginPath(); c.moveTo(-15, y); c.lineTo(15, y); for (let x = -10 + (k % 2) * 5; x < 14; x += 10) { c.moveTo(x, y); c.lineTo(x, y + 6); } c.stroke(); }
+    c.fillStyle = CHAPELC.slate; c.beginPath(); c.moveTo(-18, -13); c.lineTo(0, -40); c.lineTo(18, -13); c.closePath(); c.fill();   // the spire cap
+    c.fillStyle = CHAPELC.slateL; c.beginPath(); c.moveTo(-18, -13); c.lineTo(0, -40); c.lineTo(-2, -13); c.closePath(); c.fill();
+    c.strokeStyle = CHAPELC.gilt; c.lineWidth = 1.4; c.lineCap = 'round';      // a small cross on top
+    c.beginPath(); c.moveTo(0, -40); c.lineTo(0, -48); c.moveTo(-2.6, -45.4); c.lineTo(2.6, -45.4); c.stroke();
+    c.fillStyle = '#2a2833'; chapelArch(c, 0, 14, 6, -4, -12); c.fill();     // the belfry, and its bell
+    drawGlow(c, 0, -1, 12, '#f0d79a', .35);
+    const bg = c.createLinearGradient(-5, 0, 5, 0); bg.addColorStop(0, CHAPELC.brassD); bg.addColorStop(.4, CHAPELC.brass); bg.addColorStop(1, CHAPELC.brassM);
+    c.fillStyle = bg; c.beginPath(); c.moveTo(-1.8, -8); c.quadraticCurveTo(-4, -7, -4, -3); c.quadraticCurveTo(-4.4, 1, -6, 2.4); c.lineTo(6, 2.4); c.quadraticCurveTo(4.4, 1, 4, -3); c.quadraticCurveTo(4, -7, 1.8, -8); c.closePath(); c.fill();
+    c.fillStyle = CHAPELC.brassD; oval(c, 0, 3.4, 1.4, 1.2); c.fill();
+    c.fillStyle = '#2a2833'; c.beginPath(); c.moveTo(-4, 38); c.lineTo(-4, 29); c.quadraticCurveTo(0, 24, 4, 29); c.lineTo(4, 38); c.fill();   // the door
+    drawGlow(c, 0, 17, 9, CHAPELC.light, .5); c.fillStyle = CHAPELC.light; c.fillRect(-1, 13, 2, 7);   // a slit window, lit
+    sparkle(c, 22, -32, 3.4, 'rgba(255,236,190,.65)');
+  },
+  // 12 · Evening prayer: two hands folded, made of light, and a wisp of it rising like incense
+  c => {
+    drawGlow(c, 0, 0, 62, '#ffe6b0', .42);
+    c.lineCap = 'round';
+    for (const [x0, ph, w, k] of [[0, 0, 2.6, 1], [-3, 2.6, 1.2, .55]]) {                           // the wisp: thins and fades as it rises
+      const at = u => [x0 + Math.sin(u * 5 + ph) * (1.6 + u * 5) * k, -31 + (1 - k) * 8 - u * 22 * k];
+      for (let i = 0; i < 14; i++) {
+        const [ax, ay] = at(i / 14), [bx, by] = at((i + 1) / 14);
+        c.strokeStyle = `rgba(255,240,205,${.75 * (1 - i / 14)})`; c.lineWidth = w * (1 - i / 22);
+        c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke();
+      }
+    }
+    const g = c.createRadialGradient(-2, 0, 2, 0, 2, 36); g.addColorStop(0, '#fffaf0'); g.addColorStop(.55, '#ffe6ad'); g.addColorStop(1, '#efbf74');
+    c.fillStyle = g;
+    for (const s of [-1, 1]) {                                                             // each hand: fingers stepping down from the tips, the palm, the wrist
+      c.beginPath(); c.moveTo(0, -31);
+      c.bezierCurveTo(s * 3, -31, s * 6, -28, s * 6.8, -23.4); c.lineTo(s * 6.3, -21.8);
+      c.quadraticCurveTo(s * 9.8, -22, s * 10.3, -17.2); c.lineTo(s * 9.8, -15.4);
+      c.quadraticCurveTo(s * 12.8, -15, s * 13.2, -10);
+      c.bezierCurveTo(s * 14.6, -2, s * 14.6, 8, s * 12.2, 15);
+      c.quadraticCurveTo(s * 10.4, 19, s * 10.6, 24); c.lineTo(s * 13, 33); c.lineTo(0, 33); c.closePath(); c.fill();
+    }
+    c.fillStyle = 'rgba(240,196,120,.55)'; c.beginPath(); c.moveTo(-10.8, 26); c.lineTo(10.8, 26); c.lineTo(13, 33); c.lineTo(-13, 33); c.closePath(); c.fill();   // cuffs
+    c.strokeStyle = 'rgba(200,140,70,.6)'; c.lineWidth = 1;                                 // where they meet, and the fingers
+    c.beginPath(); c.moveTo(0, -29); c.lineTo(0, 21); c.stroke();
+    for (const s of [-1, 1]) {
+      c.beginPath(); c.moveTo(s * 6.3, -21.8); c.quadraticCurveTo(s * 5.6, -14, s * 4.6, -6);
+      c.moveTo(s * 9.8, -15.4); c.quadraticCurveTo(s * 9.4, -8, s * 8.4, -2); c.stroke();
+      // a thumb, lying up the middle beside the other one
+      c.beginPath(); c.moveTo(s * .5, 21); c.lineTo(s * .5, 3); c.quadraticCurveTo(s * .7, -1.4, s * 3, -1.2); c.quadraticCurveTo(s * 5.6, -.6, s * 6, 6); c.quadraticCurveTo(s * 6.6, 14, s * 9, 21); c.closePath();
+      c.fillStyle = 'rgba(255,250,236,.55)'; c.fill();
+      c.strokeStyle = 'rgba(200,140,70,.4)'; c.beginPath(); c.moveTo(s * 3, -1.2); c.quadraticCurveTo(s * 5.6, -.6, s * 6, 6); c.quadraticCurveTo(s * 6.6, 14, s * 9, 21); c.stroke();
+      c.strokeStyle = 'rgba(200,140,70,.6)';
+    }
+    c.fillStyle = 'rgba(255,255,255,.4)'; oval(c, -7.4, -8, 1.6, 7, .1); c.fill();
+    sparkle(c, 16, -38, 4, 'rgba(255,244,214,.9)'); sparkle(c, -15, -46, 2.8, 'rgba(255,244,214,.7)'); sparkle(c, -22, 6, 3, 'rgba(255,244,214,.6)');
+  },
+];
+
+const CHAPEL_VISITORS = ['Owl', 'Barn owl', 'Robin', 'Mouse', 'Fox', 'Hedgehog', 'Bat', 'Cat', 'Rabbit', 'Deer', 'Dove', 'Badger'];
+// The chapel's own visitor (the rest are the garden's, the farm's and the
+// park's): drawn like those, feet at (0, 0), facing right, returning its eyes.
+// A pale dove, but kept a soft moonlit grey so it doesn't glare at night.
+Object.assign(VISITOR_ART, {
+  Dove(c) {
+    c.fillStyle = '#a5a2b2'; tri(c, -3.2, -4.6, -9, -3.8, -8.6, -2.2, -3.2, -2.4);   // tail
+    ell(c, 0, -3.8, 4.8, 3.2, -.12); ell(c, 3, -5.8, 2.2, 2); ell(c, 4, -7.6, 2, 1.9);
+    c.fillStyle = '#8f8b9e'; ell(c, -1, -4.4, 3.6, 1.8, -.22);                         // the folded wing
+    c.fillStyle = '#9a8486'; tri(c, 5.7, -7.9, 7.3, -7.3, 5.7, -6.9);
+    c.fillRect(-.6, -1, .6, 1); c.fillRect(1.4, -1, .6, 1);
+    return [[4.6, -8, .4]];
+  },
+});
+
+const CHAPEL_SHAPES = [
+  { name: 'The Evening Prayer', pts: [[0, -.95], [-.38, -.35], [-.45, .35], [-.3, .95], [.3, .95], [.45, .35], [.38, -.35], [0, .4]],
+    lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 0], [0, 7]] },
+  { name: 'The Cross', pts: [[0, -.95], [0, -.4], [-.6, -.4], [.6, -.4], [0, .95]], lines: [[0, 1], [2, 1], [1, 3], [1, 4]] },
+  { name: 'The Dove', pts: [[-.9, .35], [-.2, .15], [.45, -.05], [.85, -.2], [-.35, -.9], [.15, -.75], [.25, .55]],
+    lines: [[0, 1], [1, 2], [2, 3], [1, 4], [2, 5], [2, 6]] },
+  { name: 'The Bell', pts: [[0, -.95], [-.35, -.55], [.35, -.55], [-.8, .6], [.8, .6], [0, .6], [0, .95]],
+    lines: [[0, 1], [0, 2], [1, 3], [2, 4], [3, 5], [5, 4], [5, 6]] },
+  { name: 'The Candle', pts: [[-.3, -.2], [.3, -.2], [.3, .95], [-.3, .95], [0, -.5], [0, -.95]], lines: [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5]] },
+  { name: 'The Window', pts: [[-.6, .95], [.6, .95], [-.6, -.2], [.6, -.2], [-.35, -.72], [.35, -.72], [0, -.95], [0, .95]],
+    lines: [[0, 7], [7, 1], [0, 2], [1, 3], [2, 4], [4, 6], [6, 5], [5, 3], [6, 7]] },
+  { name: 'The Lamb', pts: [[-.85, .35], [-.6, -.15], [.1, -.3], [.5, -.25], [.7, -.65], [.95, -.35], [.6, .3], [-.1, .45]],
+    lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 0]] },
+  { name: 'The Fish', pts: [[.9, 0], [.2, -.45], [.2, .45], [-.45, 0], [-.9, -.4], [-.9, .4]],
+    lines: [[0, 1], [1, 3], [3, 5], [0, 2], [2, 3], [3, 4]] },
+];
+// Visitors wait under the yew, by the churchyard wall below the chapel, and
+// just outside the lychgate.
+const CHAPEL_SPOTS = [{ x: 70, dir: 1 }, { x: 214, dir: 1 }, { x: 352, dir: -1 }];
+
+// Where things stand at the chapel (scene units), shared by its land and live parts.
+const CHAPEL_X = 142;            // the middle of the chapel's west front: its door, and the window over it
+const CHAPEL_LIFT = 10;          // the chapel stands on a rise, this far above the ground line
+const CHAPEL_GATE = 312;         // the lychgate
+const CHAPEL_JARS = [[288, .25], [252, .5], [212, .72], [174, .92]];   // candles in jars up the path: x, and how far up the rise
+const CHAPEL_WIN = { w: 13, y0: 17, y1: 30, y2: 39 };                  // the west window, as heights above the chapel's foot
+const CHAPEL_LANCETS = [186, 206, 226];                                // the small lit windows down the side
+
+/** The chapel's land (cached): far hills, the churchyard rise, the chapel and its tower, the yew, a few old headstones, the wall and lychgate. */
+function landChapel(c, V) {
+  const G = V.G, B = G - CHAPEL_LIFT, rnd = mulberry32(23);
+  c.fillStyle = '#0c1127'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
+  for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, farY(V, x));
+  c.lineTo(V.xr + 4, V.vh + 2); c.fill();
+  c.fillStyle = '#0a0e21';                              // a few far trees, and a farmhouse light or two (in liveChapel)
+  for (const [x, r] of [[262, 6], [272, 8], [283, 5.6], [338, 6.4], [350, 5]]) { const y = farY(V, x) + 2; c.beginPath(); c.arc(x, y - r * .9, r, 0, TAU); c.fill(); }
+  // The churchyard: a gentle rise the chapel stands on, between the far hills and the wall.
+  const rise = x => B + 1 + Math.pow((x - 180) / 150, 2) * 9;
+  c.fillStyle = '#0b1023'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
+  for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, Math.min(rise(x), nearY(V, x) - 1));
+  c.lineTo(V.xr + 4, V.vh + 2); c.fill();
+  { // the path, from the lychgate up to the door, narrowing as it goes
+    const at = u => ({ x: lerp(CHAPEL_GATE, CHAPEL_X, u) + 14 * Math.sin(u * Math.PI), y: lerp(nearY(V, CHAPEL_GATE) - 1, B + .6, Math.pow(u, .8)), w: lerp(9, 3.2, u) });
+    c.fillStyle = '#141a33'; c.beginPath();
+    for (let i = 0; i <= 14; i++) { const p = at(i / 14); i ? c.lineTo(p.x, p.y - p.w * .22) : c.moveTo(p.x, p.y - p.w * .22); }
+    for (let i = 14; i >= 0; i--) { const p = at(i / 14); c.lineTo(p.x, p.y + p.w * .22); }
+    c.fill(); }
+  { const x = 103, w = 24, top = B - 43;               // the bell tower, at the west end
+    c.fillStyle = '#181d33'; c.fillRect(x - w / 2, top, w, B - top + 1);
+    c.fillStyle = '#12162a'; c.fillRect(x + w / 2 - 6, top, 6, B - top + 1);   // its shadowed side
+    c.fillStyle = '#1e2440'; c.fillRect(x - w / 2 - 1, top - 1.6, w + 2, 2.2);   // a string course under the cap
+    c.fillStyle = '#0f1222'; c.beginPath(); c.moveTo(x - w / 2 - 2, top - .5); c.lineTo(x, top - 16); c.lineTo(x + w / 2 + 2, top - .5); c.closePath(); c.fill();
+    c.strokeStyle = '#0f1222'; c.lineWidth = 1.1; c.beginPath(); c.moveTo(x, top - 16); c.lineTo(x, top - 22); c.moveTo(x - 2.2, top - 19.6); c.lineTo(x + 2.2, top - 19.6); c.stroke();
+    c.fillStyle = '#0a0c17'; chapelArch(c, x - 1, 8, top + 14, top + 7, top + 3); c.fill();   // the belfry, and the bell asleep in it
+    c.fillStyle = '#3a3428'; c.beginPath(); c.moveTo(x - 2.6, top + 12.6); c.quadraticCurveTo(x - 2.4, top + 7, x - 1, top + 7); c.quadraticCurveTo(x + .4, top + 7, x + .6, top + 12.6); c.closePath(); c.fill();
+    c.fillStyle = '#0a0c17'; c.fillRect(x - 1.8, top + 22, 1.6, 6);           // a slit window
+    c.strokeStyle = '#1c2139'; c.lineWidth = .6;                               // courses of stone, faint
+    for (let y = top + 6; y < B; y += 7) { c.beginPath(); c.moveTo(x - w / 2, y); c.lineTo(x + w / 2 - 6, y); c.stroke(); } }
+  { // the nave, running back from the west front, with its long roof
+    const x0 = CHAPEL_X + 28, x1 = 238, eave = B - 26, ridge = B - 45;
+    c.fillStyle = '#151a2f'; c.fillRect(x0, eave, x1 - x0, B - eave + 1);
+    c.fillStyle = '#0e1120'; c.beginPath(); c.moveTo(CHAPEL_X, ridge); c.lineTo(x1 - 26, ridge); c.lineTo(x1 + 2, eave - 1); c.lineTo(x0 - 2, eave - 1); c.closePath(); c.fill();
+    c.strokeStyle = '#161b31'; c.lineWidth = .6;                               // slates, faint
+    for (let k = 1; k < 4; k++) { const y = lerp(ridge, eave, k / 4); c.beginPath(); c.moveTo(lerp(CHAPEL_X, x0, k / 4) + 4, y); c.lineTo(lerp(x1 - 26, x1, k / 4), y); c.stroke(); }
+    c.fillStyle = '#0d1020'; for (const x of CHAPEL_LANCETS) { chapelArch(c, x, 6, B - 6, B - 16, B - 21); c.fill(); }   // window openings (lit in liveChapel)
+    c.fillStyle = '#12162a'; for (const x of [x0 + 10, x0 + 30, x0 + 50]) c.fillRect(x - 1.6, B - 22, 3.2, 23);   // buttresses
+  }
+  { const x = CHAPEL_X, w = 56, eave = B - 26, apex = B - 47;    // the west front, a gable facing us
+    c.fillStyle = '#1b2038'; c.beginPath(); c.moveTo(x - w / 2, B + 1); c.lineTo(x - w / 2, eave); c.lineTo(x, apex); c.lineTo(x + w / 2, eave); c.lineTo(x + w / 2, B + 1); c.closePath(); c.fill();
+    c.strokeStyle = '#262c48'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(x - w / 2 - 2, eave + 1); c.lineTo(x, apex - 1); c.lineTo(x + w / 2 + 2, eave + 1); c.stroke();   // the coping
+    c.strokeStyle = '#262c48'; c.lineWidth = 1.1; c.beginPath(); c.moveTo(x, apex - 1); c.lineTo(x, apex - 7); c.moveTo(x - 2.2, apex - 4.8); c.lineTo(x + 2.2, apex - 4.8); c.stroke();   // a cross on the gable
+    c.strokeStyle = '#20253f'; c.lineWidth = .6;                               // courses of stone, faint
+    for (let y = B - 5; y > apex + 4; y -= 6) { const half = y > eave ? w / 2 : (w / 2) * (y - apex) / (eave - apex); c.beginPath(); c.moveTo(x - half + 1, y); c.lineTo(x + half - 1, y); c.stroke(); }
+    const W = CHAPEL_WIN;                                                      // the window's stone surround (its glass is in liveChapel)
+    c.fillStyle = '#272d4a'; chapelArch(c, x, W.w + 4, B - W.y0 + 1.6, B - W.y1, B - W.y2 - 2.6); c.fill();
+    c.fillStyle = '#2e3554'; chapelArch(c, x, 15, B + .5, B - 9, B - 15); c.fill();   // the door's arch, and the door
+    c.fillStyle = '#2a1c18'; chapelArch(c, x, 11, B + .5, B - 8, B - 13); c.fill();
+    c.strokeStyle = '#3e2a22'; c.lineWidth = .6; c.beginPath(); c.moveTo(x, B - 13); c.lineTo(x, B); c.stroke();
+    c.fillStyle = '#7a6440'; c.fillRect(x + 2, B - 5.6, 1.2, 1.2);             // the latch
+    c.fillStyle = '#20253f'; c.fillRect(x - 9, B - .4, 18, 1.6);               // the step
+    c.fillStyle = '#11141f'; c.fillRect(x + 11.4, B - 12, .8, 3); c.fillRect(x + 10.4, B - 9.4, 3, .7);   // the lantern's bracket (its light is in liveChapel)
+  }
+  { const x = 44, y = nearY(V, 44) + 1;                 // the old yew: dark, broad and dense, older than the chapel
+    c.fillStyle = '#16120f'; c.beginPath(); c.moveTo(x - 7, y); c.quadraticCurveTo(x - 3, y - 8, x - 4, y - 14); c.lineTo(x + 4, y - 14); c.quadraticCurveTo(x + 3, y - 8, x + 8, y); c.fill();
+    c.fillStyle = '#0a1412';                                                   // clumps of foliage in a broad, rounded cone
+    c.beginPath(); c.ellipse(x, y - 24, 19, 17, 0, 0, TAU); c.fill();
+    for (let i = 0; i < 70; i++) {
+      const u = rnd(), half = 25 * (1 - Math.pow(u, 1.7)) + 4, cx = x + (rnd() * 2 - 1) * half * .85, cy = y - 9 - u * 40;
+      c.beginPath(); c.ellipse(cx, cy, 5 + rnd() * 4, 3.4 + rnd() * 2.2, (rnd() - .5) * .5, 0, TAU); c.fill();
+    }
+    c.fillStyle = '#0f1b19';                                                   // moonlight on the clumps facing the moon
+    for (let i = 0; i < 22; i++) {
+      const u = rnd(), half = 25 * (1 - Math.pow(u, 1.7)) + 4, cx = x + (.25 + rnd() * .6) * half * .85, cy = y - 11 - u * 38;
+      c.beginPath(); c.ellipse(cx, cy, 3 + rnd() * 2.4, 1.6 + rnd(), (rnd() - .5) * .4, Math.PI, TAU); c.fill();
+    } }
+  for (const [x, h, lean] of [[256, 8, -.08], [272, 9.6, .05], [290, 7.4, .12]]) {   // a few old headstones, soft-edged and leaning
+    const y = rise(x) + 1;
+    c.save(); c.translate(x, y); c.rotate(lean);
+    c.fillStyle = '#1b2036'; c.beginPath(); c.moveTo(-3.4, 1); c.lineTo(-3.4, -h + 3.4); c.arc(0, -h + 3.4, 3.4, Math.PI, 0); c.lineTo(3.4, 1); c.closePath(); c.fill();
+    c.fillStyle = '#20263f'; c.fillRect(-3.4, -h + 3.4, 1.2, h - 3);
+    c.restore();
+  }
+  c.fillStyle = 'rgba(214,206,186,.5)';                 // somebody's left flowers
+  c.beginPath(); c.arc(273.6, rise(273) - .4, .8, 0, TAU); c.arc(275.2, rise(275) - 1.2, .7, 0, TAU); c.arc(276.4, rise(276) - .2, .7, 0, TAU); c.fill();
+  c.fillStyle = '#090d1b'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
+  for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, nearY(V, x));
+  c.lineTo(V.xr + 4, V.vh + 2); c.fill();
+  // The churchyard wall: low, of rough stones with a coping on top, open at the lychgate.
+  const gate0 = CHAPEL_GATE - 11, gate1 = CHAPEL_GATE + 11, WH = 5;
+  for (const [a, b] of [[V.xl, gate0], [gate1, V.xr + 4]]) {
+    c.fillStyle = '#141829'; c.beginPath(); c.moveTo(a, nearY(V, a) + 1);
+    for (let x = a; x <= b; x += 2) c.lineTo(x, nearY(V, x) - WH);
+    c.lineTo(b, nearY(V, b) + 1); c.closePath(); c.fill();
+    c.fillStyle = '#1d2236'; for (let x = a; x < b; x += 3.4) { const y = nearY(V, x) - WH; c.fillRect(x, y - 1.1, 2.9, 1.5); }
+    c.strokeStyle = '#0e111e'; c.lineWidth = .5;
+    for (let x = a + 2, k = 0; x < b; x += 4.6, k++) { const y = nearY(V, x) - WH + 1.5 + (k % 2) * 1.8; c.beginPath(); c.moveTo(x, y); c.lineTo(x + 2.4, y); c.stroke(); }
+  }
+  { const x = CHAPEL_GATE, y = nearY(V, x) + 1, ph = 17;   // the lychgate: two posts, a little roof, and the gate left ajar
+    c.fillStyle = '#17131a'; c.fillRect(x - 11, y - ph, 2.6, ph); c.fillRect(x + 8.4, y - ph, 2.6, ph);
+    c.fillRect(x - 12, y - ph - 1, 24, 2);
+    c.strokeStyle = '#17131a'; c.lineWidth = .9; c.beginPath(); c.moveTo(x - 9, y - ph + 1); c.lineTo(x - 4, y - ph - 1); c.moveTo(x + 9, y - ph + 1); c.lineTo(x + 4, y - ph - 1); c.stroke();
+    c.fillStyle = '#101320'; c.beginPath(); c.moveTo(x - 16, y - ph + 1); c.lineTo(x, y - ph - 10); c.lineTo(x + 16, y - ph + 1); c.closePath(); c.fill();
+    c.strokeStyle = '#1e2338'; c.lineWidth = 1; c.beginPath(); c.moveTo(x - 16, y - ph + 1); c.lineTo(x, y - ph - 10); c.lineTo(x + 16, y - ph + 1); c.stroke();
+    c.strokeStyle = '#2b2226'; c.lineWidth = .9;                               // the gate, swung half open
+    c.beginPath(); c.moveTo(x - 8.4, y - 2); c.lineTo(x - 2, y - 3.4); c.moveTo(x - 8.4, y - 8); c.lineTo(x - 2, y - 9.4); c.moveTo(x - 2, y - 3.4); c.lineTo(x - 2, y - 9.4); c.moveTo(x - 5, y - 2.7); c.lineTo(x - 5, y - 8.7); c.stroke(); }
+  c.strokeStyle = '#142029'; c.lineWidth = .8;          // grass along the foot of the wall
+  for (let x = V.xl; x < V.xr; x += 3 + rnd() * 5) {
+    if (Math.abs(x - CHAPEL_GATE) < 10) continue;
+    const y = nearY(V, x) + 1.4;
+    for (let k = 0; k < 2; k++) { const h = 2 + rnd() * 3.6, lean = (rnd() - .5) * 4; c.beginPath(); c.moveTo(x + k, y); c.quadraticCurveTo(x + k, y - h * .6, x + k + lean, y - h); c.stroke(); }
+  }
+}
+/** The chapel's live parts: the west window's slow shimmer, the side windows and the door lantern, and the candles in jars up the path. */
+function liveChapel(c, V, t) {
+  const B = V.G - CHAPEL_LIFT, x = CHAPEL_X, W = CHAPEL_WIN;
+  { // the stained glass, as if a candle burns just inside: each pane breathes a little on its own
+    const a0 = .72 + .07 * Math.sin(t * .7) + .04 * Math.sin(t * 1.9);
+    drawGlow(c, x, B - (W.y0 + W.y2) / 2, 30, '#f2c27e', .28 * a0);
+    chapelGlass(c, x, W.w, B - W.y0, B - W.y1, B - W.y2, i => a0 * (.86 + .14 * Math.sin(t * (.5 + (i % 5) * .09) + i * 1.7)));
+    c.strokeStyle = 'rgba(42,38,48,.9)'; c.lineWidth = .6; chapelArch(c, x, W.w, B - W.y0, B - W.y1, B - W.y2); c.stroke();
+  }
+  for (const [i, lx] of CHAPEL_LANCETS.entries()) {      // the side windows: plain glass, warm
+    const a = .7 + .08 * Math.sin(t * 1.1 + i * 2.3) + .04 * Math.sin(t * 3.1 + i);
+    drawGlow(c, lx, B - 13, 10, '#ffcf87', .3 * a);
+    c.globalAlpha = a; c.fillStyle = '#f2c27e'; chapelArch(c, lx, 4, B - 7, B - 15.4, B - 19.6); c.fill(); c.globalAlpha = 1;
+    c.fillStyle = 'rgba(42,30,30,.7)'; c.fillRect(lx - 2, B - 12, 4, .5);
+  }
+  { const lx = x + 11.8, ly = B - 14.6, a = .85 + .06 * Math.sin(t * 1.4) + .04 * Math.sin(t * 4.1);   // the lantern by the door
+    drawGlow(c, lx, ly, 16, '#ffcf87', .42 * a);
+    c.fillStyle = '#11141f'; c.fillRect(lx - 1.8, ly - 3.4, 3.6, .8);
+    c.globalAlpha = a; c.fillStyle = '#ffd796'; c.fillRect(lx - 1.4, ly - 2.6, 2.8, 3.6); c.globalAlpha = 1;
+  }
+  for (const [i, [jx, u]] of CHAPEL_JARS.entries()) {     // candles in jars, up the path: each flickers on its own
+    const jy = lerp(nearY(V, CHAPEL_GATE) - 1, B + .6, Math.pow(u, .8)) - .4;
+    const f = .8 + .1 * Math.sin(t * 2.3 + i * 1.9) + .06 * Math.sin(t * 5.7 + i * 3.1), k = 1 - u * .35;
+    drawGlow(c, jx, jy - 2 * k, 9 * k, '#ffcf87', .45 * f);
+    c.fillStyle = `rgba(190,200,220,${.28})`; c.fillRect(jx - 1.4 * k, jy - 3.4 * k, 2.8 * k, 3.4 * k);   // the jar
+    c.globalAlpha = f; c.fillStyle = '#ffe2a0'; c.fillRect(jx - .45 * k, jy - 2.6 * k - .5 * Math.sin(t * 4 + i), .9 * k, 1.5 * k); c.globalAlpha = 1;
+  }
+  for (const [i, fx] of [[0, 268], [1, 344]]) {           // a farmhouse light or two, far off
+    const fy = farY(V, fx) + 2 - 2.4, a = .6 + .2 * Math.sin(t * .4 + i * 2);
+    drawGlow(c, fx + 10, fy, 4, '#ffd27a', a * .5); c.fillStyle = `rgba(255,214,140,${a})`; c.fillRect(fx + 9.6, fy - .5, 1, 1);
+  }
+}
+
+/* ============================================================
+   The Nursery
+   ============================================================ */
+// A family house on a hill at night, one window still lit upstairs. Its chain
+// runs from a rattle to a sweet dream, which drifts up like the garden's moon.
+// It's the last area of the town, and opens when the chapel finds a Hymnal.
+// The art is things only, never a baby: what rises is a dream.
+const NURSERY_ITEMS = [null,
+  { name: 'Rattle',        many: 'Rattles',        blurb: 'Best not shaken after midnight.' },
+  { name: 'Baby sock',     many: 'Baby socks',     blurb: 'There is only ever one.' },
+  { name: 'Bib',           many: 'Bibs',           blurb: 'Clean for about four minutes.' },
+  { name: 'Bottle',        many: 'Bottles',        blurb: 'Tested on your wrist. Twice.' },
+  { name: 'Teddy bear',    many: 'Teddy bears',    blurb: 'Worn thin behind one ear from being held.' },
+  { name: 'Blanket',       many: 'Blankets',       blurb: 'Tucked in. Kicked off. Tucked in.' },
+  { name: 'Mobile',        many: 'Mobiles',        blurb: 'Turning slowly, watched very closely.' },
+  { name: 'Rocking horse', many: 'Rocking horses', blurb: 'Waiting for someone to be big enough.' },
+  { name: 'Rocking chair', many: 'Rocking chairs', blurb: 'Creaks on the third rock. You know the one.' },
+  { name: 'Crib',          many: 'Cribs',          blurb: 'Tiptoe. Mind the creaky board.' },
+  { name: 'Night-light',   many: 'Night-lights',   blurb: 'Just enough light to find the pacifier by.' },
+  { name: 'Sweet dream',   many: 'Sweet dreams',   blurb: 'Made of every shush you ever whispered.' },
+];
+const NURSERYC = {
+  cream: '#f6eedf', creamS: '#ddd0b8', pink: '#eeb0b4', pinkD: '#c9848c', pinkL: '#f8d4d4',
+  blue: '#a9c4e6', blueD: '#7f9fcc', blueL: '#d6e4f5', mint: '#b4dcc4', mintD: '#86b49a', mintL: '#d4eedf',
+  butter: '#f6dc8a', butterD: '#d9b45a', duck: '#f4cf5a', beak: '#eea04a',
+  wood: '#c99a66', woodD: '#9a6c42', woodL: '#e2bc8c', grey: '#e2e0e6', greyD: '#aeabba', mane: '#6c6478',
+  red: '#c9675a', redD: '#9c4a40', bear: '#c48d5c', bearD: '#98663e', bearL: '#e8c79e', eye: '#2e2420',
+  milk: '#fbf8f0', teat: '#e9c88e', teatD: '#c9a46a', light: '#ffd27a', glow: '#ffcf87',
+  cloud: '#f3efff', cloudS: '#c9c1ea', moon: '#ffe7a6', moonD: '#e8bf62',
+};
+/** A rounded rectangle, added to the current path (by hand: older Safari has no roundRect). */
+function nurseryRound(c, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+/** A shadow on the floor under a thing. */
+function nurseryShadow(c, w) { c.fillStyle = 'rgba(0,0,0,.25)'; oval(c, 0, 38, w, 4); c.fill(); }
+/** A five-pointed star, as on a mobile or a garland (a path, filled here). */
+function nurseryStar(c, x, y, r, rot = 0) {
+  c.beginPath();
+  for (let k = 0; k < 10; k++) { const a = rot - Math.PI / 2 + k * Math.PI / 5, d = k % 2 ? r * .45 : r; c.lineTo(x + Math.cos(a) * d, y + Math.sin(a) * d); }
+  c.closePath(); c.fill();
+}
+/** A crescent moon, horns to the right before `rot` turns it (a path, filled here). */
+function nurseryCrescent(c, x, y, r, rot = 0, thin = .45) {
+  c.save(); c.translate(x, y); c.rotate(rot);
+  c.beginPath(); c.arc(0, 0, r, Math.PI / 2, Math.PI * 1.5); c.ellipse(0, 0, r * thin, r, 0, -Math.PI / 2, Math.PI / 2, true); c.fill();
+  c.restore();
+}
+/** A little cloud: a few round puffs on a flat base (a path, filled here). */
+function nurseryCloud(c, x, y, s) {
+  c.beginPath();
+  for (const [dx, dy, r] of [[-.55, .1, .42], [0, -.18, .58], [.55, .08, .44], [0, .22, .5]]) { c.moveTo(x + (dx + r) * s, y + dy * s); c.arc(x + dx * s, y + dy * s, r * s, 0, TAU); }
+  c.fill();
+}
+const NURSERY_ART = [null,
+  // 1 · Rattle: a round head with a band of dots, a handle, a ring to hold
+  c => {
+    nurseryShadow(c, 22);
+    c.save(); c.translate(-3, 6); c.rotate(.5);
+    c.strokeStyle = NURSERYC.butter; c.lineWidth = 4.6; c.beginPath(); c.arc(0, 28, 7, 0, TAU); c.stroke();
+    c.strokeStyle = NURSERYC.butterD; c.lineWidth = 1; c.beginPath(); c.arc(0, 28, 9.3, .4, 2.2); c.stroke();
+    const h = c.createLinearGradient(-4, 0, 4, 0); h.addColorStop(0, NURSERYC.mintL); h.addColorStop(1, NURSERYC.mintD);
+    c.fillStyle = h; c.beginPath(); nurseryRound(c, -4, -10, 8, 33, 4); c.fill();
+    c.fillStyle = NURSERYC.blueD; c.beginPath(); nurseryRound(c, -7, -11, 14, 5, 2.4); c.fill();
+    const g = c.createRadialGradient(-5, -28, 2, 0, -22, 16); g.addColorStop(0, NURSERYC.pinkL); g.addColorStop(1, NURSERYC.pink);
+    c.fillStyle = g; c.beginPath(); c.arc(0, -22, 15, 0, TAU); c.fill();
+    c.save(); c.beginPath(); c.arc(0, -22, 15, 0, TAU); c.clip();
+    c.fillStyle = NURSERYC.cream; oval(c, 0, -21, 16, 4.2); c.fill();
+    c.fillStyle = NURSERYC.pinkD; for (const x of [-10, -3.4, 3.4, 10]) { c.beginPath(); c.arc(x, -21, 1.5, 0, TAU); c.fill(); }
+    c.restore();
+    c.fillStyle = 'rgba(255,255,255,.65)'; oval(c, -6, -29, 2.6, 4.6, -.6); c.fill();
+    c.restore();
+    sparkle(c, 26, -30, 4, 'rgba(255,236,190,.7)'); sparkle(c, -22, -10, 2.6, 'rgba(255,236,190,.5)');
+  },
+  // 2 · Baby sock, striped, with a yellow heel and toe
+  c => {
+    nurseryShadow(c, 24);
+    c.save(); c.translate(-6, 0);
+    const path = () => { c.beginPath(); c.moveTo(-13, -10); c.lineTo(7, -10); c.lineTo(7, 13); c.bezierCurveTo(7, 18, 11, 20, 17, 21); c.bezierCurveTo(29, 22, 30, 37.5, 18, 37.5); c.lineTo(-5, 37.5); c.bezierCurveTo(-16, 37.5, -18, 25, -13, 16); c.closePath(); };
+    const g = c.createLinearGradient(0, -10, 0, 38); g.addColorStop(0, NURSERYC.blueL); g.addColorStop(1, NURSERYC.blue);
+    path(); c.fillStyle = g; c.fill();
+    c.save(); path(); c.clip();
+    c.fillStyle = 'rgba(255,255,255,.75)'; c.fillRect(-20, -1, 30, 3.4); c.fillRect(-20, 7, 30, 3.4);
+    c.fillStyle = NURSERYC.butter; oval(c, -13, 33, 8, 7.5); c.fill(); oval(c, 24, 31, 7.5, 9); c.fill();   // heel and toe
+    c.restore();
+    c.fillStyle = NURSERYC.cream; c.beginPath(); nurseryRound(c, -15, -18, 24, 10, 3); c.fill();   // the cuff, ribbed
+    c.strokeStyle = NURSERYC.creamS; c.lineWidth = 1; for (let x = -12; x < 8; x += 3) { c.beginPath(); c.moveTo(x, -16.5); c.lineTo(x, -9.5); c.stroke(); }
+    c.restore();
+    sparkle(c, 22, -10, 3.6, 'rgba(255,236,190,.6)');
+  },
+  // 3 · Bib, with ties and a little duck sewn on
+  c => {
+    nurseryShadow(c, 24);
+    c.strokeStyle = NURSERYC.pink; c.lineWidth = 3; c.lineCap = 'round';   // the ties
+    c.beginPath(); c.moveTo(-10, -11); c.bezierCurveTo(-16, -18, -20, -26, -28, -24); c.moveTo(10, -11); c.bezierCurveTo(16, -20, 22, -26, 28, -32); c.stroke();
+    const g = c.createLinearGradient(0, -16, 0, 38); g.addColorStop(0, '#fffaf0'); g.addColorStop(1, NURSERYC.creamS);
+    // The bib, with a scoop out of the top for the neck, piped in pink all round.
+    c.save(); c.beginPath(); c.ellipse(0, 11, 23, 26, 0, 0, TAU); c.clip();
+    c.beginPath(); c.rect(-30, -20, 60, 62); c.arc(0, -15, 11, 0, TAU); c.clip('evenodd');
+    c.fillStyle = g; c.fillRect(-30, -20, 60, 62);
+    c.strokeStyle = NURSERYC.pink; c.lineWidth = 4.8; c.beginPath(); c.ellipse(0, 11, 23, 26, 0, 0, TAU); c.stroke(); c.beginPath(); c.arc(0, -15, 11, 0, TAU); c.stroke();
+    c.restore();
+    c.fillStyle = NURSERYC.duck; oval(c, -1, 21, 9, 5.6); c.fill(); c.beginPath(); c.arc(6, 12, 4.4, 0, TAU); c.fill();
+    c.beginPath(); c.moveTo(-9, 19); c.lineTo(-13, 15); c.lineTo(-7, 17); c.fill();
+    c.fillStyle = NURSERYC.butterD; oval(c, -3, 21, 4.6, 2.6, -.3); c.fill();
+    c.fillStyle = NURSERYC.beak; c.beginPath(); c.moveTo(10, 12); c.lineTo(14, 13.4); c.lineTo(10, 14.8); c.fill();
+    c.fillStyle = NURSERYC.eye; c.beginPath(); c.arc(7, 11, 1, 0, TAU); c.fill();
+    c.strokeStyle = 'rgba(201,132,140,.55)'; c.lineWidth = 1; c.setLineDash([1.6, 1.8]); c.beginPath(); c.ellipse(-1, 18, 15, 11, 0, 0, TAU); c.stroke(); c.setLineDash([]);   // its stitching
+  },
+  // 4 · Bottle of milk, teat on top
+  c => {
+    nurseryShadow(c, 18);
+    c.fillStyle = 'rgba(232,236,248,.4)'; c.beginPath(); nurseryRound(c, -13, -7, 26, 45, 8); c.fill();
+    c.save(); c.beginPath(); nurseryRound(c, -13, -7, 26, 45, 8); c.clip();
+    const m = c.createLinearGradient(-13, 0, 13, 0); m.addColorStop(0, NURSERYC.milk); m.addColorStop(1, '#e6dfcf');
+    c.fillStyle = m; c.fillRect(-14, 5, 28, 34);
+    c.fillStyle = 'rgba(255,255,255,.6)'; c.fillRect(-14, 5, 28, 1.6);
+    c.restore();
+    c.strokeStyle = 'rgba(127,159,204,.85)'; c.lineWidth = 1.2;
+    for (let k = 0; k < 4; k++) { const y = -1 + k * 8; c.beginPath(); c.moveTo(5, y); c.lineTo(k % 2 ? 9 : 11, y); c.stroke(); }
+    c.fillStyle = 'rgba(255,255,255,.7)'; c.beginPath(); nurseryRound(c, -9.5, -2, 3.2, 34, 1.6); c.fill();
+    c.fillStyle = NURSERYC.blueD; for (const [x, y] of [[-4, 14], [1, 26]]) nurseryStar(c, x, y, 2.6);
+    const t = c.createLinearGradient(-8, 0, 8, 0); t.addColorStop(0, '#f6dcae'); t.addColorStop(1, NURSERYC.teatD);
+    c.fillStyle = t; c.beginPath(); c.moveTo(-9, -12); c.bezierCurveTo(-9, -22, -3, -22, -3, -28); c.quadraticCurveTo(0, -34, 3, -28); c.bezierCurveTo(3, -22, 9, -22, 9, -12); c.fill();
+    c.fillStyle = NURSERYC.blue; c.beginPath(); nurseryRound(c, -14.5, -14, 29, 9, 3); c.fill();
+    c.strokeStyle = 'rgba(127,159,204,.9)'; c.lineWidth = 1; for (let x = -11; x <= 11; x += 3.6) { c.beginPath(); c.moveTo(x, -12.5); c.lineTo(x, -6.5); c.stroke(); }
+    sparkle(c, 20, -24, 3.6, 'rgba(255,236,190,.6)');
+  },
+  // 5 · Teddy bear, sitting up, a little worn
+  c => {
+    nurseryShadow(c, 26);
+    const B = NURSERYC;
+    c.fillStyle = B.bear; oval(c, -17, 15, 6, 10.5, .55); c.fill(); oval(c, 17, 15, 6, 10.5, -.55); c.fill();   // arms
+    const g = c.createRadialGradient(-4, 12, 3, 0, 18, 20); g.addColorStop(0, B.bearL); g.addColorStop(.35, B.bear); g.addColorStop(1, B.bearD);
+    c.fillStyle = g; oval(c, 0, 19, 16, 16); c.fill();
+    c.fillStyle = B.bear; oval(c, -12, 32, 9, 6); c.fill(); oval(c, 12, 32, 9, 6); c.fill();   // legs, soles out
+    c.fillStyle = B.bearL; oval(c, -13.5, 33, 5, 4); c.fill(); oval(c, 13.5, 33, 5, 4); c.fill();
+    c.fillStyle = B.bear; for (const x of [-12, 12]) { c.beginPath(); c.arc(x, -16, 6.5, 0, TAU); c.fill(); }
+    c.fillStyle = B.bearL; c.beginPath(); c.arc(-12, -16, 3.4, 0, TAU); c.fill();
+    c.fillStyle = '#f0dcc0'; c.beginPath(); c.arc(12, -16, 3.6, 0, TAU); c.fill();   // the worn ear, loved thin
+    const hg = c.createRadialGradient(-4, -8, 2, 0, -4, 16); hg.addColorStop(0, B.bearL); hg.addColorStop(.4, B.bear); hg.addColorStop(1, B.bearD);
+    c.fillStyle = hg; c.beginPath(); c.arc(0, -4, 14.5, 0, TAU); c.fill();
+    c.strokeStyle = B.bearD; c.lineWidth = .9; c.beginPath(); for (const y of [-19, -16.4, -13.8]) { c.moveTo(14.8, y - 1); c.lineTo(17.6, y + 1); } c.stroke();   // stitches
+    c.fillStyle = B.bearL; oval(c, 0, 1.5, 7, 5.4); c.fill();
+    c.fillStyle = B.eye; oval(c, 0, -1.2, 2.6, 1.8); c.fill();
+    c.strokeStyle = B.eye; c.lineWidth = 1; c.beginPath(); c.moveTo(0, .4); c.lineTo(0, 2.6); c.moveTo(-2.6, 3.4); c.quadraticCurveTo(0, 4.6, 2.6, 3.4); c.stroke();
+    for (const x of [-6, 6]) { c.fillStyle = B.eye; c.beginPath(); c.arc(x, -7, 1.9, 0, TAU); c.fill(); c.fillStyle = 'rgba(255,255,255,.8)'; c.beginPath(); c.arc(x + .6, -7.6, .6, 0, TAU); c.fill(); }
+    c.fillStyle = B.blue; tri(c, 0, 10.5, -8, 6, -8, 15); tri(c, 0, 10.5, 8, 6, 8, 15);   // a bow at the neck
+    c.fillStyle = B.blueD; c.beginPath(); c.arc(0, 10.5, 2.2, 0, TAU); c.fill();
+  },
+  // 6 · Blanket, folded, with a satin edge
+  c => {
+    nurseryShadow(c, 32);
+    const B = NURSERYC;
+    for (let k = 0; k < 3; k++) {
+      const y = 24 - k * 12, x = -30 + k * 1.5, w = 60 - k * 3;
+      const g = c.createLinearGradient(0, y, 0, y + 14); g.addColorStop(0, B.mintL); g.addColorStop(1, B.mintD);
+      c.fillStyle = g; c.beginPath(); nurseryRound(c, x, y, w, 14, 7); c.fill();
+      c.fillStyle = 'rgba(80,130,104,.35)'; for (let i = 0; i < 9; i++) for (let j = 0; j < 2; j++) { c.beginPath(); c.arc(x + 9 + i * (w - 18) / 8 + j * 2.4, y + 5 + j * 4.4, .9, 0, TAU); c.fill(); }   // its little holes
+    }
+    c.fillStyle = B.mintL; c.beginPath(); c.moveTo(-28, 2); c.lineTo(-21, -10); c.lineTo(31, -10); c.lineTo(27, 2); c.closePath(); c.fill();   // the top
+    c.strokeStyle = B.pinkL; c.lineWidth = 3; c.lineJoin = 'round'; c.beginPath(); c.moveTo(-25.4, 1); c.lineTo(-19.6, -8.2); c.lineTo(29, -8.2); c.lineTo(25.6, 1); c.closePath(); c.stroke();   // the satin edge, for holding
+    c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1; c.beginPath(); c.moveTo(-18, -8.6); c.lineTo(27, -8.6); c.stroke();
+    c.fillStyle = B.cream; c.beginPath(); nurseryRound(c, 20, 13, 6, 8, 1.4); c.fill();   // its label
+    sparkle(c, -20, -18, 3.4, 'rgba(255,236,190,.6)');
+  },
+  // 7 · Mobile: a moon, a cloud, a bird and a star, hung from a bow
+  c => {
+    const B = NURSERYC;
+    drawGlow(c, 0, 0, 52, '#fff1cf', .14);
+    c.fillStyle = B.pink; tri(c, 0, -42, -7, -46.5, -7, -38); tri(c, 0, -42, 7, -46.5, 7, -38); c.beginPath(); c.arc(0, -42, 2, 0, TAU); c.fill();
+    c.strokeStyle = 'rgba(240,230,210,.7)'; c.lineWidth = 1; c.beginPath(); c.moveTo(0, -40); c.lineTo(0, -29);
+    for (const [x, y] of [[-26, -2], [-9, 12], [9, 4], [26, -8]]) { c.moveTo(x, -23 - (1 - Math.abs(x) / 30) * 5); c.lineTo(x, y); }
+    c.stroke();
+    c.strokeStyle = B.wood; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(-28, -22); c.quadraticCurveTo(0, -34, 28, -22); c.stroke();
+    c.fillStyle = B.woodD; c.beginPath(); c.arc(0, -28, 2.6, 0, TAU); c.fill();
+    c.fillStyle = B.butter; nurseryCrescent(c, -25, 4, 9, -.3);
+    c.fillStyle = '#fbf8ff'; nurseryCloud(c, -9, 17, 11);
+    c.fillStyle = B.pink; oval(c, 9, 10, 7, 4.6, -.15); c.fill(); c.beginPath(); c.arc(14.5, 6.5, 3.4, 0, TAU); c.fill();   // the bird
+    c.fillStyle = B.pinkD; oval(c, 7, 8, 4.4, 2.4, -.5); c.fill(); tri(c, 2.6, 10, -2.4, 7, -1.4, 12);
+    c.fillStyle = B.beak; tri(c, 17.6, 6, 20.6, 7, 17.6, 8);
+    c.fillStyle = B.blue; nurseryStar(c, 26, -3, 7.5, .15);
+    sparkle(c, -4, -14, 2.6, 'rgba(255,236,190,.6)');
+  },
+  // 8 · Rocking horse, dapple grey with a red saddle
+  c => {
+    nurseryShadow(c, 34);
+    const B = NURSERYC;
+    const rock = x => 26 + 10 * (1 - (x / 36) ** 2);   // the top of the rocker under x
+    c.strokeStyle = B.greyD; c.lineWidth = 3.6; c.lineCap = 'round';   // the far legs
+    c.beginPath(); c.moveTo(-10, 6); c.lineTo(-17, rock(-17) - 2); c.moveTo(14, 6); c.lineTo(19, rock(19) - 2); c.stroke();
+    c.strokeStyle = B.woodD; c.lineWidth = 5; c.beginPath(); c.moveTo(-36, 25); c.quadraticCurveTo(0, 47, 36, 25); c.stroke();
+    c.strokeStyle = B.wood; c.lineWidth = 2; c.beginPath(); c.moveTo(-34, 25); c.quadraticCurveTo(0, 45, 34, 25); c.stroke();
+    c.strokeStyle = B.grey; c.lineWidth = 4.2;
+    c.beginPath(); c.moveTo(-14, 6); c.lineTo(-25, rock(-25) - 2); c.moveTo(10, 6); c.lineTo(26, rock(26) - 2); c.stroke();
+    c.strokeStyle = B.mane; c.lineWidth = 4; c.beginPath(); c.moveTo(-19, 0); c.bezierCurveTo(-28, 0, -28, 12, -24, 20); c.stroke();   // tail
+    const g = c.createLinearGradient(0, -8, 0, 12); g.addColorStop(0, '#f4f2f6'); g.addColorStop(1, B.greyD);
+    c.fillStyle = g; oval(c, -1, 3, 20, 9.5); c.fill();
+    c.beginPath(); c.moveTo(10, 0); c.lineTo(18, -22); c.lineTo(27, -20); c.lineTo(21, 4); c.fill();
+    oval(c, 27, -22, 5.4, 9.5, 1.1); c.fill();
+    c.fillStyle = 'rgba(150,146,170,.4)'; for (const [x, y, r] of [[-12, 2, 2.6], [-5, 6, 2], [2, 1, 2.2], [8, 7, 1.8], [-15, 7, 1.6], [16, -8, 1.8]]) { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }   // dapples
+    c.fillStyle = B.mane; c.beginPath(); c.moveTo(11, -2); c.quadraticCurveTo(13, -20, 21, -27); c.lineTo(23, -24); c.quadraticCurveTo(17, -15, 17, 1); c.fill();
+    c.fillStyle = B.grey; tri(c, 22, -28, 23, -34, 25.5, -28);
+    c.fillStyle = B.red; oval(c, -1, -5, 9, 4); c.fill(); c.fillRect(-4, -5, 6, 11);
+    c.fillStyle = B.redD; oval(c, -1, -6.4, 6, 1.6); c.fill();
+    c.strokeStyle = B.red; c.lineWidth = 1.2; c.beginPath(); c.moveTo(24, -26); c.lineTo(30, -16); c.moveTo(27, -25); c.lineTo(33, -20); c.stroke();   // the bridle
+    c.fillStyle = B.eye; c.beginPath(); c.arc(25.6, -23, 1.5, 0, TAU); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.8)'; c.beginPath(); c.arc(26, -23.5, .5, 0, TAU); c.fill();
+  },
+  // 9 · Rocking chair, a cushion and a muslin over the arm
+  c => {
+    nurseryShadow(c, 30);
+    const B = NURSERYC;
+    c.strokeStyle = B.woodD; c.lineWidth = 4.4; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(-32, 29); c.quadraticCurveTo(-2, 45, 30, 28); c.stroke();                  // the rocker
+    c.strokeStyle = B.wood; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(-14, 34); c.lineTo(-24, -32); c.moveTo(15, 7); c.lineTo(18, 33); c.stroke();   // back post, front leg
+    c.beginPath(); c.moveTo(-24, -32); c.quadraticCurveTo(-27, -38, -21, -38); c.stroke();
+    c.fillStyle = B.pink; c.save(); c.translate(-17, -12); c.rotate(-.15); c.beginPath(); nurseryRound(c, -2, -18, 8, 32, 4); c.fill(); c.restore();   // back cushion
+    c.strokeStyle = B.woodL; c.lineWidth = 1.6; c.beginPath(); for (const x of [-4, 3, 10]) { c.moveTo(x, 4); c.lineTo(x + .4, -7); } c.stroke();   // spindles under the arm
+    c.strokeStyle = B.wood; c.lineWidth = 4.6; c.beginPath(); c.moveTo(-17, 7); c.lineTo(19, 7); c.stroke();          // the seat
+    c.fillStyle = B.pinkL; c.beginPath(); nurseryRound(c, -16, -1, 34, 7, 3.5); c.fill();
+    c.fillStyle = B.pinkD; for (const x of [-6, 7]) { c.beginPath(); c.arc(x, 2.5, 1, 0, TAU); c.fill(); }
+    c.strokeStyle = B.woodD; c.lineWidth = 3.4; c.beginPath(); c.moveTo(-19, -9); c.quadraticCurveTo(2, -12, 21, -10); c.moveTo(18, -9.6); c.lineTo(16, 6); c.stroke();   // the arm
+    c.fillStyle = '#fbf8f2'; c.beginPath(); c.moveTo(2, -12); c.lineTo(14, -11.6); c.lineTo(15, 2); c.lineTo(11, 6); c.lineTo(6, 3); c.lineTo(1, 4); c.closePath(); c.fill();   // a muslin, over the arm
+    c.strokeStyle = B.blue; c.lineWidth = 1.3; c.beginPath(); c.moveTo(1.6, 1); c.lineTo(6, 0); c.lineTo(11, 3); c.lineTo(14.4, -.4); c.stroke();
+  },
+  // 10 · Crib, a quilt over the rail and the teddy already in
+  c => {
+    nurseryShadow(c, 38);
+    const B = NURSERYC;
+    c.fillStyle = B.woodD; c.beginPath(); c.moveTo(-30, -6); c.lineTo(-30, -24); c.quadraticCurveTo(0, -34, 30, -24); c.lineTo(30, -6); c.fill();   // the far side, taller at the head
+    c.fillStyle = B.bear; for (const x of [9, 19]) { c.beginPath(); c.arc(x, -22, 3.4, 0, TAU); c.fill(); }
+    c.beginPath(); c.arc(14, -15, 7, 0, TAU); c.fill(); c.fillStyle = B.bearL; oval(c, 14, -12.6, 3.4, 2.6); c.fill();
+    c.fillStyle = B.eye; for (const x of [11.6, 16.4]) { c.beginPath(); c.arc(x, -16, 1, 0, TAU); c.fill(); }
+    c.fillStyle = B.cream; oval(c, -15, -11, 11, 4.6); c.fill();   // a pillow
+    c.fillStyle = B.wood; for (let x = -24; x <= 24; x += 6) c.fillRect(x - 1.2, -10, 2.4, 30);   // the bars
+    const g = c.createLinearGradient(0, -14, 0, 24); g.addColorStop(0, B.woodL); g.addColorStop(1, B.wood);
+    c.fillStyle = g; c.beginPath(); nurseryRound(c, -32, -13, 64, 4.6, 2); c.fill(); c.beginPath(); nurseryRound(c, -32, 19, 64, 5, 2); c.fill();
+    const squares = [B.pink, B.blueL, B.butter, B.mintL, B.pinkL];   // a patchwork quilt, over the front rail
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) { c.fillStyle = squares[(i + j * 2) % 5]; c.fillRect(-24 + i * 7, -14 + j * 7, 7, 7); }
+    c.fillStyle = squares[2]; for (let i = 0; i < 4; i++) { c.beginPath(); c.arc(-20.5 + i * 7, 7, 3.5, 0, Math.PI); c.fill(); }
+    c.fillStyle = 'rgba(255,255,255,.3)'; c.fillRect(-24, -14, 28, 2);
+    c.fillStyle = B.woodD; for (const x of [-33, 33]) { c.fillRect(x - 3, -18, 6, 56); }
+    c.fillStyle = B.wood; for (const x of [-33, 33]) { c.fillRect(x - 2.2, -18, 3.4, 56); c.beginPath(); c.arc(x, -21, 4.2, 0, TAU); c.fill(); }
+    c.fillStyle = 'rgba(255,255,255,.4)'; for (const x of [-33, 33]) { c.beginPath(); c.arc(x - 1.4, -22.4, 1.4, 0, TAU); c.fill(); }
+    sparkle(c, -2, -34, 3.6, 'rgba(255,236,190,.7)');
+  },
+  // 11 · Night-light, a little toadstool with a lit door
+  c => {
+    nurseryShadow(c, 22);
+    const B = NURSERYC;
+    drawGlow(c, 0, 0, 50, B.glow, .5);
+    c.fillStyle = B.woodD; c.beginPath(); nurseryRound(c, -16, 30, 32, 8, 3); c.fill();
+    c.fillStyle = B.wood; c.beginPath(); nurseryRound(c, -16, 30, 32, 3, 1.5); c.fill();
+    const s = c.createLinearGradient(-9, 0, 9, 0); s.addColorStop(0, '#fff8e4'); s.addColorStop(1, '#edd6aa');
+    c.fillStyle = s; c.beginPath(); c.moveTo(-10, 31); c.quadraticCurveTo(-6, 18, -7, 6); c.lineTo(7, 6); c.quadraticCurveTo(6, 18, 10, 31); c.fill();
+    drawGlow(c, 0, 24, 12, '#ffe3a0', .8);
+    c.fillStyle = '#ffd98a'; c.beginPath(); c.moveTo(-3, 31); c.lineTo(-3, 24); c.arc(0, 24, 3, Math.PI, 0); c.lineTo(3, 31); c.fill();   // a tiny lit door
+    const g = c.createRadialGradient(-4, -10, 3, 0, -4, 30); g.addColorStop(0, '#ffeec4'); g.addColorStop(.6, '#f6b07a'); g.addColorStop(1, '#de8462');
+    c.fillStyle = g; c.beginPath(); c.moveTo(-27, 8); c.bezierCurveTo(-27, -27, 27, -27, 27, 8); c.quadraticCurveTo(0, 13, -27, 8); c.fill();
+    c.fillStyle = 'rgba(255,248,226,.9)'; for (const [x, y, r] of [[-14, -6, 3.6], [0, -14, 3.2], [13, -5, 3.8], [-5, 2, 2.2], [20, 3, 2]]) { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
+    sparkle(c, 28, -20, 3.6, 'rgba(255,240,200,.8)');
+  },
+  // 12 · Sweet dream: a soft cloud with a sleepy moon curled up on it
+  c => {
+    const B = NURSERYC;
+    drawGlow(c, 0, 4, 62, '#e6dcff', .45); drawGlow(c, 2, -8, 34, B.moon, .35);
+    c.fillStyle = B.moon; nurseryCrescent(c, 2, -10, 17, -.35, .5);
+    c.fillStyle = 'rgba(232,191,98,.55)'; nurseryCrescent(c, 2, -10, 17, -.35, .82);
+    c.save(); c.translate(2, -10); c.rotate(-.35);   // its face, asleep
+    sleepyEye(c, -12, -8, 2.2, '#9a6e2e');
+    c.fillStyle = 'rgba(238,150,140,.5)'; c.beginPath(); c.arc(-12.6, -3.6, 2, 0, TAU); c.fill();
+    c.restore();
+    const g = c.createLinearGradient(0, 2, 0, 32); g.addColorStop(0, '#fbf9ff'); g.addColorStop(1, B.cloudS);
+    c.fillStyle = g; c.beginPath();
+    for (const [x, y, r] of [[-22, 18, 10], [-9, 10, 13], [8, 9, 14], [22, 16, 10], [0, 20, 14]]) { c.moveTo(x + r, y); c.arc(x, y, r, 0, TAU); }
+    c.fill(); c.beginPath(); nurseryRound(c, -30, 16, 60, 13, 6.5); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.7)'; oval(c, -9, 4, 6, 2.4, -.2); c.fill(); oval(c, 9, 3, 5, 2, .1); c.fill();
+    c.fillStyle = 'rgba(205,200,240,.85)'; c.font = '700 9px sans-serif'; c.fillText('z', 18, -16); c.font = '700 6px sans-serif'; c.fillText('z', 25, -23);
+    c.fillStyle = '#fff3c8'; nurseryStar(c, -26, -18, 4.6, .2);
+    sparkle(c, 30, -2, 4, 'rgba(255,240,210,.9)'); sparkle(c, -31, 0, 3, 'rgba(255,240,210,.7)');
+  },
+];
+
+// Every one of them already lives in the town: the garden's, the farm's Cat
+// and Duck, the park's Robin and Squirrel, the lane's Dormouse and Moth.
+const NURSERY_VISITORS = ['Rabbit', 'Hedgehog', 'Mouse', 'Owl', 'Cat', 'Duck', 'Fox', 'Robin', 'Dormouse', 'Moth', 'Deer', 'Squirrel'];
+
+const NURSERY_SHAPES = [
+  { name: 'The Sweet Dream', pts: [[-.95, .7], [-.7, .25], [-.3, .1], [.1, .25], [.5, .1], [.9, .35], [.95, .7], [-.15, -.95], [-.5, -.75], [-.5, -.35], [-.15, -.2], [-.3, -.55]],
+    lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 0], [7, 8], [8, 9], [9, 10], [10, 11], [11, 7]] },
+  { name: 'The Teddy', pts: [[-.6, -.9], [.6, -.9], [-.4, -.55], [.4, -.55], [0, -.25], [-.65, .3], [.65, .3], [-.45, .9], [.45, .9]],
+    lines: [[0, 2], [1, 3], [2, 3], [2, 4], [3, 4], [4, 5], [4, 6], [5, 7], [6, 8], [7, 8]] },
+  { name: 'The Rattle', pts: [[-.5, -.95], [-.05, -.75], [0, -.3], [-.45, -.15], [-.85, -.5], [.4, .4], [.75, .5], [.8, .9], [.4, .85]],
+    lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0], [2, 5], [5, 6], [6, 7], [7, 8], [8, 5]] },
+  { name: 'The Rocking Horse', pts: [[.6, -.95], [.95, -.6], [.35, -.25], [-.5, -.25], [-.9, -.05], [-.6, .5], [.6, .5], [-.95, .3], [0, .78], [.95, .3]],
+    lines: [[0, 1], [0, 2], [2, 3], [3, 4], [3, 5], [2, 6], [7, 5], [5, 8], [8, 6], [6, 9]] },
+  { name: 'The Bottle', pts: [[0, -.95], [-.35, -.55], [.35, -.55], [-.4, .9], [.4, .9]], lines: [[0, 1], [0, 2], [1, 2], [1, 3], [2, 4], [3, 4]] },
+  { name: 'The Mobile', pts: [[0, -.95], [0, -.55], [-.85, -.35], [.85, -.35], [-.85, .35], [0, .55], [.85, .85]],
+    lines: [[0, 1], [1, 2], [1, 3], [2, 4], [1, 5], [3, 6]] },
+  { name: 'The Bath Duck', pts: [[-.9, .1], [-.4, .6], [.55, .6], [.75, .05], [.35, -.2], [.3, -.75], [.65, -.55], [.95, -.35]],
+    lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [4, 0]] },
+  { name: 'The Crib', pts: [[-.85, -.75], [.85, -.75], [-.85, .95], [.85, .95], [-.85, -.45], [.85, -.45], [-.85, .45], [.85, .45], [0, -.45], [0, .45]],
+    lines: [[0, 2], [1, 3], [4, 5], [6, 7], [8, 9]] },
+];
+// Visitors wait on the lawn by the apple tree, just outside the garden gate,
+// and under the washing line.
+const NURSERY_SPOTS = [{ x: 62, dir: 1 }, { x: 226, dir: -1 }, { x: 322, dir: -1 }];
+
+// The house sits on a gentle hill left of the middle, clear of the moon, and
+// no taller than the farm's oak, so the lower row of constellations stays
+// clear of its roof. The hill rises out of the near ground between x 20 and 262.
+const NURSERY_HOUSE = { x: 104, w: 72 };
+const NURSERY_GATE = 204;
+const NURSERY_LINE = [282, 346];    // the washing line's two posts
+const nurseryHillY = (V, x) => nearY(V, x) - (x > 20 && x < 262 ? 11 * Math.sin(Math.PI * (x - 20) / 242) ** 2 : 0);
+/** Where the house stands, and its nursery window (upstairs, on the left), in scene units. */
+function nurseryHouse(V) {
+  const h = NURSERY_HOUSE, base = nurseryHillY(V, h.x + h.w / 2) + 2;
+  return { x: h.x, w: h.w, base, win: { x: h.x + 7, y: base - 34, w: 22, h: 15 } };
+}
+
+/** The nursery's land (cached): far hills and the town asleep on them, the hill, the house, an apple tree, the pram, the fence and gate, the washing line's posts. */
+function landNursery(c, V) {
+  const rnd = mulberry32(23);
+  c.fillStyle = '#0c1127'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
+  for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, farY(V, x));
+  c.lineTo(V.xr + 4, V.vh + 2); c.fill();
+  c.fillStyle = '#0a0e20';                             // the rest of the town, far off: a few roofs and the chapel's steeple
+  for (const [x, w, h] of [[214, 12, 7], [228, 10, 9]]) {
+    const y = farY(V, x + w / 2) + 3;
+    c.fillRect(x, y - h, w, h + 3); tri(c, x - 1.5, y - h, x + w / 2, y - h - 5, x + w + 1.5, y - h);
+  }
+  { const x = 252, y = farY(V, 252) + 3; c.fillRect(x - 4, y - 14, 8, 17); tri(c, x - 4.6, y - 14, x, y - 28, x + 4.6, y - 14); }
+  c.fillStyle = '#0b1022';                             // hedgerows over the far fields
+  for (let i = 0; i < 26; i++) { const x = -10 + rnd() * 120, y = farY(V, x) + 4 + (i % 2) * 6; c.beginPath(); c.ellipse(x, y, 3 + rnd() * 2, 1.6, 0, 0, TAU); c.fill(); }
+
+  c.fillStyle = '#0b1024';                             // the house's hill
+  c.beginPath(); c.moveTo(V.xl, V.vh + 2);
+  for (let x = V.xl; x <= V.xr + 4; x += 2) c.lineTo(x, nurseryHillY(V, x));
+  c.lineTo(V.xr + 4, V.vh + 2); c.fill();
+
+  { const x = 40, y = nurseryHillY(V, 40) + 1;         // an old apple tree on the hill
+    c.fillStyle = '#121014'; c.beginPath(); c.moveTo(x - 3, y); c.quadraticCurveTo(x - 1, y - 14, x - 6, y - 24); c.lineTo(x - 3, y - 25); c.quadraticCurveTo(x + 1, y - 18, x + 2, y - 26); c.lineTo(x + 4, y - 25); c.quadraticCurveTo(x + 2, y - 12, x + 3, y); c.fill();
+    c.fillStyle = '#0d1518'; for (let i = 0; i < 34; i++) { const a = rnd() * TAU, d = Math.sqrt(rnd()) * 17; c.beginPath(); c.ellipse(x + Math.cos(a) * d * 1.25, y - 32 + Math.sin(a) * d * .7, 5 + rnd() * 3, 3.4 + rnd() * 2, rnd() * 3, 0, TAU); c.fill(); }
+    c.fillStyle = '#2a1e22'; for (let i = 0; i < 6; i++) { c.beginPath(); c.arc(x - 14 + rnd() * 28, y - 38 + rnd() * 14, 1.1, 0, TAU); c.fill(); } }   // a few apples
+
+  const H = nurseryHouse(V), { x, w, base } = H, eave = base - 38;
+  c.fillStyle = '#141a30'; c.fillRect(x, eave, w, base - eave + 4);                   // the walls
+  c.fillStyle = '#0d1122'; c.beginPath(); c.moveTo(x - 4, eave + 1); c.lineTo(x + 10, eave - 15); c.lineTo(x + w - 10, eave - 15); c.lineTo(x + w + 4, eave + 1); c.closePath(); c.fill();   // the roof
+  c.fillRect(x + w - 22, eave - 21, 9, 10); c.fillRect(x + w - 21, eave - 23, 3, 3); c.fillRect(x + w - 16.6, eave - 23, 3, 3);   // a chimney with two pots
+  c.fillStyle = '#1a2036';                             // the dark windows (the nursery's is lit in liveNursery)
+  c.fillRect(H.win.x, H.win.y, H.win.w, H.win.h);
+  c.fillRect(x + w - 25, H.win.y + 1, 16, 13);         // the other bedroom, asleep
+  c.fillRect(x + 8, base - 14, 18, 11);                // downstairs
+  c.fillStyle = '#0c0f1e';
+  for (const [wx, wy, ww] of [[H.win.x, H.win.y + H.win.h, H.win.w], [x + w - 25, H.win.y + 14, 16], [x + 8, base - 3, 18]]) c.fillRect(wx - 1, wy, ww + 2, 1.4);   // sills
+  c.fillStyle = '#131830'; for (const [wx, wy, ww, wh] of [[x + w - 25, H.win.y + 1, 16, 13], [x + 8, base - 14, 18, 11]]) { c.fillRect(wx + ww / 2 - .5, wy, 1, wh); c.fillRect(wx, wy + wh / 2 - .5, ww, 1); }   // glazing bars
+  const dx = x + 36;                                   // the front door, a fanlight over it, a little porch roof
+  c.fillStyle = '#0a0d1a'; c.fillRect(dx - 5, base - 15, 10, 15);
+  c.fillStyle = '#1a2036'; c.beginPath(); c.arc(dx, base - 15, 5, Math.PI, 0); c.fill();
+  c.fillStyle = '#0d1122'; c.beginPath(); c.moveTo(dx - 9, base - 20); c.lineTo(dx, base - 25); c.lineTo(dx + 9, base - 20); c.closePath(); c.fill();
+  c.fillStyle = '#20263e'; c.fillRect(dx - 7, base - 1, 14, 1.8);                     // the step
+  c.fillStyle = '#0f1424'; c.fillRect(dx + 8.4, base - 15, 2.6, 4);                    // the porch lamp (lit in liveNursery)
+
+  { const px = x + w - 14, py = base;                  // the pram, parked by the door for the morning walk
+    c.save(); c.translate(px, py); c.scale(.8, .8); c.translate(-px, -py);   // drawn at a size, then made pram-sized beside the door
+    c.fillStyle = '#242a4c';
+    c.beginPath(); c.moveTo(px - 9, py - 13); c.quadraticCurveTo(px - 9, py - 5, px - 2, py - 5); c.lineTo(px + 6, py - 5); c.quadraticCurveTo(px + 9, py - 6, px + 9, py - 13); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(px - 9, py - 13); c.arc(px - 9, py - 13, 9, -Math.PI / 2, 0); c.closePath(); c.fill();   // the hood, up
+    c.strokeStyle = '#242a4c'; c.lineWidth = 1.1; c.beginPath(); c.moveTo(px + 8, py - 12); c.lineTo(px + 13, py - 18); c.lineTo(px + 15.5, py - 18); c.moveTo(px - 4, py - 5); c.lineTo(px - 4, py - 3); c.moveTo(px + 4, py - 5); c.lineTo(px + 4, py - 3); c.stroke();
+    c.strokeStyle = '#3a4166'; c.lineWidth = 1; for (const wx of [px - 4.5, px + 4.5]) { c.beginPath(); c.arc(wx, py - 2.4, 2.6, 0, TAU); c.stroke(); }
+    c.restore(); }
+
+  c.fillStyle = '#0f1426';                             // the path, from the door down the hill to the gate
+  c.beginPath();
+  for (let u = 0; u <= 1.001; u += .05) { const px = lerp(dx, NURSERY_GATE, u) + Math.sin(u * Math.PI) * 6, py = lerp(base, nearY(V, NURSERY_GATE) + 1, u); c.lineTo(px - 2.6 - u * 3, py); }
+  for (let u = 1; u >= -.001; u -= .05) { const px = lerp(dx, NURSERY_GATE, u) + Math.sin(u * Math.PI) * 6, py = lerp(base, nearY(V, NURSERY_GATE) + 1, u); c.lineTo(px + 2.6 + u * 3, py); }
+  c.fill();
+
+  c.fillStyle = '#0d141a';                             // a hedge by the house, and a rose under the window
+  for (let i = 0; i < 14; i++) { const hx = x - 16 + rnd() * 14, hy = nurseryHillY(V, hx) - 2 - rnd() * 5; c.beginPath(); c.ellipse(hx, hy, 3.4 + rnd() * 2, 2.6 + rnd() * 1.4, 0, 0, TAU); c.fill(); }
+  for (let i = 0; i < 9; i++) { const rx = x + 6 + i * 2.6; c.beginPath(); c.ellipse(rx, base - 1.5 - (i % 3) * 1.2, 2.6, 2.2, 0, 0, TAU); c.fill(); }
+  c.fillStyle = '#3a2434'; for (let i = 0; i < 5; i++) { c.beginPath(); c.arc(x + 8 + rnd() * 20, base - 2.4 - rnd() * 2.4, .9, 0, TAU); c.fill(); }
+
+  c.fillStyle = '#090d1b';                             // the near ground
+  c.beginPath(); c.moveTo(V.xl, V.vh + 2);
+  for (let x2 = V.xl; x2 <= V.xr + 4; x2 += 4) c.lineTo(x2, nearY(V, x2));
+  c.lineTo(V.xr + 4, V.vh + 2); c.fill();
+
+  c.fillStyle = '#161b2d';                             // the picket fence along the front, and its gate
+  for (let fx = V.xl + 1; fx < 262; fx += 4.2) {
+    const gate = Math.abs(fx - NURSERY_GATE) < 7, y = nearY(V, fx) + 1, h = gate ? 9 : 8;
+    c.fillRect(fx, y - h, 2.2, h); tri(c, fx, y - h, fx + 1.1, y - h - 1.6, fx + 2.2, y - h);
+  }
+  c.fillStyle = '#131828';
+  for (const ry of [3, 6.4]) { c.beginPath(); for (let fx = V.xl; fx <= 262; fx += 4) { const y = nearY(V, fx) + 1 - ry; fx === V.xl ? c.moveTo(fx, y) : c.lineTo(fx, y); } for (let fx = 262; fx >= V.xl; fx -= 4) c.lineTo(fx, nearY(V, fx) + 1 - ry + 1.1); c.fill(); }
+  c.fillStyle = '#1c2236'; for (const gx of [NURSERY_GATE - 8.6, NURSERY_GATE + 7.4]) c.fillRect(gx, nearY(V, gx) - 11, 2.4, 12);   // gateposts
+
+  c.fillStyle = '#141a28';                             // the washing line's posts (the line and the washing are live)
+  for (const lx of NURSERY_LINE) { const y = nearY(V, lx) + 2; c.fillRect(lx - 1, y - 28, 2, 28); c.fillRect(lx - 4, y - 28, 8, 1.6); }
+  c.strokeStyle = '#142029'; c.lineWidth = .8;          // grass
+  for (let gx = V.xl; gx < V.xr; gx += 3 + rnd() * 5) {
+    const y = nearY(V, gx) + 1;
+    for (let k = 0; k < 2; k++) { const h = 2 + rnd() * 4, lean = (rnd() - .5) * 4; c.beginPath(); c.moveTo(gx + k, y); c.quadraticCurveTo(gx + k, y - h * .6, gx + k + lean, y - h); c.stroke(); }
+  }
+}
+/** The washing line's sag at u (0..1 along it), in scene units. */
+function nurseryLineY(V, u) {
+  const [a, b] = NURSERY_LINE, y0 = nearY(V, a) + 2 - 27, y1 = nearY(V, b) + 2 - 27;
+  return lerp(y0, y1, u) + 6 * 4 * u * (1 - u);   // sags 6 in the middle
+}
+// What's pegged out, along the line: [u, what, colour]. Small, and moonlit.
+const NURSERY_WASHING = [[.12, 'vest', '#3e4568'], [.3, 'sock', '#46506e'], [.38, 'sock', '#46506e'], [.58, 'suit', '#4a4262'], [.82, 'muslin', '#3f4a62']];
+/** The nursery's live parts: the lit nursery window with its mobile turning and a paper-star garland, the landing light over the door, the porch lamp, the washing swaying on the line. */
+function liveNursery(c, V, t) {
+  const H = nurseryHouse(V), r = H.win, cx = r.x + r.w / 2;
+  { const a = .9 + .06 * Math.sin(t * .9) + .03 * Math.sin(t * 2.3);   // a lamp turned low, breathing a little
+    drawGlow(c, cx, r.y + r.h / 2, 30, NURSERYC.glow, .4 * a);
+    const g = c.createLinearGradient(0, r.y, 0, r.y + r.h); g.addColorStop(0, '#ffe2a4'); g.addColorStop(1, '#f6b870');
+    c.globalAlpha = a; c.fillStyle = g; c.fillRect(r.x, r.y, r.w, r.h); c.globalAlpha = 1;
+    c.fillStyle = 'rgba(110,62,52,.55)'; c.fillRect(r.x, r.y, 3, r.h); c.fillRect(r.x + r.w - 3, r.y, 3, r.h);   // curtains, open a crack
+    // The paper-star garland, across the top of the window, swaying a little.
+    c.strokeStyle = 'rgba(96,56,44,.7)'; c.lineWidth = .35; c.beginPath();
+    for (let u = 0; u <= 1.001; u += .1) { const x = lerp(r.x + 2, r.x + r.w - 2, u), y = r.y + 1.2 + 4 * u * (1 - u) * 1.6; u ? c.lineTo(x, y) : c.moveTo(x, y); }
+    c.stroke();
+    c.fillStyle = 'rgba(96,56,44,.8)';
+    for (const [k, u] of [.1, .27, .73, .9].entries()) { const sw = Math.sin(t * .8 + k * 1.7) * .25; nurseryStar(c, lerp(r.x + 2, r.x + r.w - 2, u) + sw, r.y + 2.3 + 4 * u * (1 - u) * 1.6, 1.1, sw); }
+    // The cot mobile, a silhouette against the lamp: three shapes on a slow ring.
+    const hy = r.y + 4.4, top = r.y;
+    c.strokeStyle = 'rgba(80,46,36,.75)'; c.lineWidth = .3; c.beginPath(); c.moveTo(cx, top); c.lineTo(cx, hy); c.stroke();
+    const pieces = [0, 1, 2].map(k => { const a = t * .35 + k * TAU / 3; return { k, x: cx + Math.cos(a) * 6.2, y: hy + Math.sin(a) * .9, d: Math.sin(a) }; }).sort((p, q) => p.d - q.d);
+    for (const p of pieces) {
+      const near = .5 + .5 * p.d, s = .8 + .25 * near;
+      c.strokeStyle = `rgba(80,46,36,${.45 + .3 * near})`; c.beginPath(); c.moveTo(cx, hy); c.lineTo(p.x, p.y); c.lineTo(p.x, p.y + 3.6); c.stroke();
+      c.fillStyle = `rgba(80,46,36,${.55 + .35 * near})`;
+      if (p.k === 0) nurseryCrescent(c, p.x, p.y + 5.4, 1.9 * s, -.3);
+      else if (p.k === 1) nurseryCloud(c, p.x, p.y + 5.4, 2.5 * s);
+      else nurseryStar(c, p.x, p.y + 5.4, 2.1 * s, t * .2);
+    }
+    c.strokeStyle = '#141a30'; c.lineWidth = .8; c.strokeRect(r.x + .4, r.y + .4, r.w - .8, r.h - .8);   // the frame (one big pane, so the mobile shows)
+  }
+  { const dx = H.x + 36, a = .55 + .04 * Math.sin(t * .7);       // the landing light, through the fanlight
+    c.save(); c.beginPath(); c.arc(dx, H.base - 15, 4.2, Math.PI, 0); c.closePath(); c.clip();
+    drawGlow(c, dx, H.base - 16, 6, NURSERYC.glow, a); c.restore();
+    c.fillStyle = '#0a0d1a'; c.fillRect(dx - .3, H.base - 19.5, .6, 4.5); }
+  { const lx = H.x + 45.7, ly = H.base - 13, a = .9 + .05 * Math.sin(t * 2.7);   // the porch lamp
+    drawGlow(c, lx, ly, 20, '#ffcf87', .38 * a); drawGlow(c, lx, H.base, 18, '#ffcf87', .1 * a);
+    c.fillStyle = '#ffdc9c'; c.fillRect(lx - 1, ly - 1.4, 2, 2.8);
+    for (let i = 0; i < 2; i++) { const m = t * (1.4 + i * .6) + i * 2.2; c.fillStyle = 'rgba(230,220,200,.7)'; c.fillRect(lx + Math.cos(m) * (4 + i * 2) - .5, ly + Math.sin(m * 1.3) * 3 - .4, 1, .8); } }
+  // The washing line, and what's on it, swaying in the night air.
+  const [a0, a1] = NURSERY_LINE;
+  c.strokeStyle = '#2a3048'; c.lineWidth = .5; c.beginPath();
+  for (let u = 0; u <= 1.001; u += .05) { const x = lerp(a0, a1, u), y = nurseryLineY(V, u); u ? c.lineTo(x, y) : c.moveTo(x, y); }
+  c.stroke();
+  for (const [k, [u, what, col]] of NURSERY_WASHING.entries()) {
+    const x = lerp(a0, a1, u), y = nurseryLineY(V, u), sway = .1 * Math.sin(t * .9 + k * 1.3) + .04 * Math.sin(t * 2.1 + k);
+    c.save(); c.translate(x, y); c.rotate(sway); c.fillStyle = col;
+    if (what === 'vest') { c.beginPath(); c.moveTo(-4, 0); c.lineTo(4, 0); c.lineTo(6, 2.6); c.lineTo(4, 3.6); c.lineTo(4, 10); c.quadraticCurveTo(0, 11, -4, 10); c.lineTo(-4, 3.6); c.lineTo(-6, 2.6); c.closePath(); c.fill(); }
+    else if (what === 'sock') { c.beginPath(); c.moveTo(-1.2, 0); c.lineTo(1.2, 0); c.lineTo(1.2, 4.4); c.quadraticCurveTo(3.4, 4.6, 3.2, 6); c.quadraticCurveTo(2.6, 7, 0, 6.6); c.quadraticCurveTo(-1.4, 6.4, -1.2, 4.4); c.closePath(); c.fill(); }
+    else if (what === 'suit') { c.beginPath(); c.moveTo(-3.6, 0); c.lineTo(3.6, 0); c.lineTo(5.6, 4.6); c.lineTo(3.6, 4.4); c.lineTo(3.6, 9); c.lineTo(3.2, 14); c.lineTo(.6, 14); c.lineTo(0, 10); c.lineTo(-.6, 14); c.lineTo(-3.2, 14); c.lineTo(-3.6, 9); c.lineTo(-3.6, 4.4); c.lineTo(-5.6, 4.6); c.closePath(); c.fill(); }
+    else { c.beginPath(); c.moveTo(-4.4, 0); c.lineTo(4.4, 0); c.lineTo(4.8, 9); c.lineTo(-4, 9.6); c.closePath(); c.fill(); }
+    c.fillStyle = '#5a5f7a'; c.fillRect(-.5, -1, 1, 2);   // a peg
+    c.restore();
+  }
+}
+
+/* ============================================================
    The areas themselves (after everything they point at)
    ============================================================ */
 const AREAS = [
@@ -4177,6 +5192,30 @@ const AREAS = [
       lede: 'You built a whole harbour, one pebble at a time, while the boats slept.<br>Its star has gone up as the Guiding Star, so anyone still up can find their way home.',
       more: 'Every guiding star you make from now on rises to make a new constellation over the harbour.' },
   },
+  {
+    id: 'chapel', name: 'The Chapel', items: CHAPEL_ITEMS, art: CHAPEL_ART, visitors: CHAPEL_VISITORS,
+    shapes: CHAPEL_SHAPES, spots: CHAPEL_SPOTS, renderLand: landChapel, drawLive: liveChapel, pond: null,
+    opens: { from: 'harbour', tier: 5, need: 'Pull a Rowing boat in at the harbour to open the path up to the chapel.' },
+    map: { x: 50, y: 28, icon: 2 },
+    words: { pouch: 'Tealights', last: 'the last prayer of the night', book: 'Chapel book',
+      welcome: 'A little chapel, its door left on the latch. Pair things up, just like in the garden.',
+      done: 'You sent up an evening prayer. There\'s nothing left to find, only more to light: every evening prayer rises into the sky as a new constellation.' },
+    ending: { title: 'Like incense',
+      lede: 'You lit a whole chapel, one tealight at a time, while the town slept.<br>Its evening prayer has gone up like incense into the stars, as the Evening Prayer, for everyone asleep and everyone still up.',
+      more: 'Every evening prayer you say from now on rises to make a new constellation over the chapel.' },
+  },
+  {
+    id: 'nursery', name: 'The Nursery', items: NURSERY_ITEMS, art: NURSERY_ART, visitors: NURSERY_VISITORS,
+    shapes: NURSERY_SHAPES, spots: NURSERY_SPOTS, renderLand: landNursery, drawLive: liveNursery, pond: null,
+    opens: { from: 'chapel', tier: 5, need: 'Find a Hymnal in the chapel to open the way to the nursery.' },
+    map: { x: 76, y: 15, icon: 5 },
+    words: { pouch: 'Rattles', last: 'sweet dreams, at last', book: 'Nursery book',
+      welcome: 'A house on the hill, one window still lit. Pair things up, just like in the garden.',
+      done: 'You made a sweet dream. There\'s nothing left to find, only more to dream: every sweet dream rises into the sky as a new constellation.' },
+    ending: { title: 'Sweet dreams',
+      lede: 'You kept the night watch while the whole town slept, and made all of this, one small thing at a time.<br>The nursery\'s first sweet dream has drifted up into the stars as the Sweet Dream. Nobody saw the hours you kept. They counted, every one.',
+      more: 'Every sweet dream you make from now on rises to make a new constellation over the house on the hill. Go gently. The nights do get shorter.' },
+  },
 ];
 const areaById = id => AREAS.find(a => a.id === id) || AREAS[0];
 let AREA = AREAS[0];
@@ -4184,8 +5223,7 @@ let AREA = AREAS[0];
 /**
  * The town at night: every area as a lit spot on a winding lane, the one
  * you're in marked, closed ones dim with what opens them. Tap an open spot
- * to walk there. The lane runs on into the dark past the last area, for the
- * parts of the town that are still asleep.
+ * to walk there. The nursery, at the top, is the end of the lane.
  */
 function openMap() {
   const spots = AREAS.map(a => {
@@ -4193,7 +5231,7 @@ function openMap() {
     return `<button class="spot${here ? ' here' : ''}${open ? '' : ' shut'}" data-area="${a.id}" style="left:${a.map.x}%;top:${a.map.y}%">
       <canvas data-icon="${a.id}"></canvas><b>${a.name}</b><small>${here ? 'You are here' : open ? 'Walk over' : 'Not yet'}</small></button>`;
   }).join('');
-  const pts = AREAS.map(a => a.map), last = pts[pts.length - 1];
+  const pts = AREAS.map(a => a.map);
   const lane = pts.map((p, i) => i ? ` Q ${(pts[i - 1].x + p.x) / 2 + 14} ${(pts[i - 1].y + p.y) / 2 + 10} ${p.x} ${p.y}` : `M ${p.x} ${p.y}`).join('');
   const shut = AREAS.find(a => !S.opened.includes(a.id));
   openSheet(`
@@ -4203,7 +5241,6 @@ function openMap() {
         <path d="M0 70 Q 20 60 40 66 T 80 58 T 100 62 L 100 100 L 0 100 Z" fill="#0c1127"/>
         <path d="M0 84 Q 30 76 55 82 T 100 78 L 100 100 L 0 100 Z" fill="#0a0f22"/>
         <path d="${lane}" fill="none" stroke="#e9cf98" stroke-opacity=".35" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="1 2.6" vector-effect="non-scaling-stroke"/>
-        <path d="M ${last.x} ${last.y} Q ${last.x + 18} ${last.y - 6} 100 ${last.y - 26}" fill="none" stroke="#e9cf98" stroke-opacity=".12" stroke-width="1.6" stroke-dasharray="1 2.6" vector-effect="non-scaling-stroke"/>
       </svg>
       ${spots}
     </div>
