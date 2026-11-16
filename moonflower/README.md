@@ -102,10 +102,18 @@ anything of the player or gets in the way of the game.
   stands over the far hills: a tower and spire with a cross, one window lit.
   You can see the town has a church long before the lane reaches it (each
   area's `steeple`, `drawFarSteeple`).
-- **A breath prayer.** With the breathing glow and Night verses both on,
-  once the garden has faded (or the scene is expanded) and you're resting,
-  Psalm 46:10 comes and goes with the breath: "Be still," as you breathe in,
-  "and know that I am God." as you breathe out (`drawBreath`).
+- **Psalms in the night.** Once the garden has faded (the hush), whole
+  psalms are read in the dark below it, where the board was, a verse at a
+  time: each new verse fades in at the bottom while the ones before drift
+  up and dim, like a slow scroll, with a rest between psalms. Psalms 4, 134,
+  121, 23, 131, 91, 127, 8 and 46, in that order, for lying awake. Each is
+  whole and word for word (KJV, without the superscriptions). Some that
+  suit the night are left out for a verse that jars at 3am (3, 63, 139).
+  It only moves on while it's showing (about 4.5 s plus 60 ms a character
+  for each verse) and picks up where it left off, across nights. It's dim
+  on purpose, since the fade is there to light the room less. On by
+  default; Settings → Psalms in the night (`NIGHT_PSALMS`, `drawPsalms`,
+  `S.psalmAt`).
 - **Soli Deo gloria** under the version in Settings: the maker's mark Bach
   wrote at the end of his scores.
 - **The Church's year, by the phone's date** (`churchSeason`):

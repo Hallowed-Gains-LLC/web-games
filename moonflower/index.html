@@ -151,7 +151,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '2.6.0';
+const VERSION = '2.7.0';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -620,7 +620,8 @@ function freshState() {
     morningOf: '',    // the last morning that was said
     feastOf: '',      // the last Christmas Day or Easter Day that was greeted (dayKey)
     verseAt: {},      // each verse list's next turn (VERSES)
-    set: { dim: 1, warm: false, sound: false, buzz: false, hush: true, breathe: false, weather: true, verses: true },
+    psalmAt: { p: 0, v: 0 },   // the next psalm verse to read in the dark (NIGHT_PSALMS)
+    set: { dim: 1, warm: false, sound: false, buzz: false, hush: true, breathe: false, weather: true, verses: true, psalms: true },
   };
 }
 function load() {
@@ -1396,6 +1397,104 @@ function drawVerse(c, ms) {
   lines.forEach((ln, i) => c.fillText(ln, cx, y0 + lh * (i + .5)));
   c.font = font(px * .82, 600); c.fillStyle = rgba(COL.gold, .8);
   c.fillText(v.ref, cx, y0 + lines.length * lh + px * .85);
+  c.restore();
+}
+
+/*
+ * Psalms in the night. Once the garden has faded (the hush), whole psalms
+ * are read in the dark below it, where the board was, a verse at a time:
+ * each new verse fades in at the bottom while the ones before drift up and
+ * dim, like a slow scroll. It only moves on while it's showing, and picks up
+ * where it left off, across nights (S.psalmAt). Dim on purpose: the fade is
+ * there to light the room less. Settings → Psalms in the night.
+ *
+ * The King James Version, each psalm whole and word for word (copied from
+ * the KJV text A Simple Way to Pray bundles, devotions/data/kjv.json;
+ * the superscriptions, "A Psalm of David" and the like, are left out).
+ * Psalms for lying awake, in the order they're read. Some that suit the
+ * night were left out for a verse that jars at 3am: 3 ("thou hast broken the
+ * teeth of the ungodly"), 63 ("a portion for foxes"), 139 ("Surely thou
+ * wilt slay the wicked").
+ */
+const NIGHT_PSALMS = [
+  { n: 4, verses: ["Hear me when I call, O God of my righteousness: thou hast enlarged me when I was in distress; have mercy upon me, and hear my prayer.", "O ye sons of men, how long will ye turn my glory into shame? how long will ye love vanity, and seek after leasing? Selah.", "But know that the LORD hath set apart him that is godly for himself: the LORD will hear when I call unto him.", "Stand in awe, and sin not: commune with your own heart upon your bed, and be still. Selah.", "Offer the sacrifices of righteousness, and put your trust in the LORD.", "There be many that say, Who will shew us any good? LORD, lift thou up the light of thy countenance upon us.", "Thou hast put gladness in my heart, more than in the time that their corn and their wine increased.", "I will both lay me down in peace, and sleep: for thou, LORD, only makest me dwell in safety."] },
+  { n: 134, verses: ["Behold, bless ye the LORD, all ye servants of the LORD, which by night stand in the house of the LORD.", "Lift up your hands in the sanctuary, and bless the LORD.", "The LORD that made heaven and earth bless thee out of Zion."] },
+  { n: 121, verses: ["I will lift up mine eyes unto the hills, from whence cometh my help.", "My help cometh from the LORD, which made heaven and earth.", "He will not suffer thy foot to be moved: he that keepeth thee will not slumber.", "Behold, he that keepeth Israel shall neither slumber nor sleep.", "The LORD is thy keeper: the LORD is thy shade upon thy right hand.", "The sun shall not smite thee by day, nor the moon by night.", "The LORD shall preserve thee from all evil: he shall preserve thy soul.", "The LORD shall preserve thy going out and thy coming in from this time forth, and even for evermore."] },
+  { n: 23, verses: ["The LORD is my shepherd; I shall not want.", "He maketh me to lie down in green pastures: he leadeth me beside the still waters.", "He restoreth my soul: he leadeth me in the paths of righteousness for his name’s sake.", "Yea, though I walk through the valley of the shadow of death, I will fear no evil: for thou art with me; thy rod and thy staff they comfort me.", "Thou preparest a table before me in the presence of mine enemies: thou anointest my head with oil; my cup runneth over.", "Surely goodness and mercy shall follow me all the days of my life: and I will dwell in the house of the LORD for ever."] },
+  { n: 131, verses: ["LORD, my heart is not haughty, nor mine eyes lofty: neither do I exercise myself in great matters, or in things too high for me.", "Surely I have behaved and quieted myself, as a child that is weaned of his mother: my soul is even as a weaned child.", "Let Israel hope in the LORD from henceforth and for ever."] },
+  { n: 91, verses: ["He that dwelleth in the secret place of the most High shall abide under the shadow of the Almighty.", "I will say of the LORD, He is my refuge and my fortress: my God; in him will I trust.", "Surely he shall deliver thee from the snare of the fowler, and from the noisome pestilence.", "He shall cover thee with his feathers, and under his wings shalt thou trust: his truth shall be thy shield and buckler.", "Thou shalt not be afraid for the terror by night; nor for the arrow that flieth by day;", "Nor for the pestilence that walketh in darkness; nor for the destruction that wasteth at noonday.", "A thousand shall fall at thy side, and ten thousand at thy right hand; but it shall not come nigh thee.", "Only with thine eyes shalt thou behold and see the reward of the wicked.", "Because thou hast made the LORD, which is my refuge, even the most High, thy habitation;", "There shall no evil befall thee, neither shall any plague come nigh thy dwelling.", "For he shall give his angels charge over thee, to keep thee in all thy ways.", "They shall bear thee up in their hands, lest thou dash thy foot against a stone.", "Thou shalt tread upon the lion and adder: the young lion and the dragon shalt thou trample under feet.", "Because he hath set his love upon me, therefore will I deliver him: I will set him on high, because he hath known my name.", "He shall call upon me, and I will answer him: I will be with him in trouble; I will deliver him, and honour him.", "With long life will I satisfy him, and shew him my salvation."] },
+  { n: 127, verses: ["Except the LORD build the house, they labour in vain that build it: except the LORD keep the city, the watchman waketh but in vain.", "It is vain for you to rise up early, to sit up late, to eat the bread of sorrows: for so he giveth his beloved sleep.", "Lo, children are an heritage of the LORD: and the fruit of the womb is his reward.", "As arrows are in the hand of a mighty man; so are children of the youth.", "Happy is the man that hath his quiver full of them: they shall not be ashamed, but they shall speak with the enemies in the gate."] },
+  { n: 8, verses: ["O LORD our Lord, how excellent is thy name in all the earth! who hast set thy glory above the heavens.", "Out of the mouth of babes and sucklings hast thou ordained strength because of thine enemies, that thou mightest still the enemy and the avenger.", "When I consider thy heavens, the work of thy fingers, the moon and the stars, which thou hast ordained;", "What is man, that thou art mindful of him? and the son of man, that thou visitest him?", "For thou hast made him a little lower than the angels, and hast crowned him with glory and honour.", "Thou madest him to have dominion over the works of thy hands; thou hast put all things under his feet:", "All sheep and oxen, yea, and the beasts of the field;", "The fowl of the air, and the fish of the sea, and whatsoever passeth through the paths of the seas.", "O LORD our Lord, how excellent is thy name in all the earth!"] },
+  { n: 46, verses: ["God is our refuge and strength, a very present help in trouble.", "Therefore will not we fear, though the earth be removed, and though the mountains be carried into the midst of the sea;", "Though the waters thereof roar and be troubled, though the mountains shake with the swelling thereof. Selah.", "There is a river, the streams whereof shall make glad the city of God, the holy place of the tabernacles of the most High.", "God is in the midst of her; she shall not be moved: God shall help her, and that right early.", "The heathen raged, the kingdoms were moved: he uttered his voice, the earth melted.", "The LORD of hosts is with us; the God of Jacob is our refuge. Selah.", "Come, behold the works of the LORD, what desolations he hath made in the earth.", "He maketh wars to cease unto the end of the earth; he breaketh the bow, and cutteth the spear in sunder; he burneth the chariot in the fire.", "Be still, and know that I am God: I will be exalted among the heathen, I will be exalted in the earth.", "The LORD of hosts is with us; the God of Jacob is our refuge. Selah."] },
+];
+const PSALM_HOLD_MS = 8000, PSALM_FADE_MS = 2500;   // after a psalm's last verse: a rest, then it fades before the next
+const psalmVerseMs = text => 4500 + text.length * 60;   // long enough to read slowly, twice
+let psalmView = null;   // { p, from, v, t, end, off, wraps }: the psalm on screen, its first and newest verse, time on the newest
+
+/** The psalm in the dark below the faded garden (see NIGHT_PSALMS). Drawn over the hush, so it's there when the board isn't. */
+function drawPsalms(c, ms) {
+  const vis = S.set.psalms && !expanded && !L.rotate && !wrap.classList.contains('open') ? clamp(1 - hushA * 1.6, 0, 1) : 0;
+  const dt = psalmView ? Math.min(250, ms - psalmView.last) : 0;
+  if (!vis) { if (psalmView) psalmView.last = ms; if (hushA >= 1) psalmView = null; return; }
+  if (!psalmView) {   // coming into the hush: carry on where we left off
+    const at = S.psalmAt, p = at.p % NIGHT_PSALMS.length, v = Math.min(at.v, NIGHT_PSALMS[p].verses.length - 1);
+    psalmView = { p, from: v, v, t: 0, end: 0, off: null, wraps: null, last: ms };
+  }
+  const pv = psalmView, ps = NIGHT_PSALMS[pv.p];
+  pv.last = ms;
+  if (vis > .5) {   // the clock only runs while it can be read
+    if (pv.end) pv.end += dt;
+    else if ((pv.t += dt) > psalmVerseMs(ps.verses[pv.v])) {
+      if (pv.v + 1 < ps.verses.length) { pv.v++; pv.t = 0; S.psalmAt = { p: pv.p, v: pv.v }; }
+      else { pv.end = 1; S.psalmAt = { p: (pv.p + 1) % NIGHT_PSALMS.length, v: 0 }; }
+      save();
+    }
+    if (pv.end > PSALM_HOLD_MS + PSALM_FADE_MS) {   // on to the next psalm
+      const p = S.psalmAt.p; psalmView = { p, from: 0, v: 0, t: 0, end: 0, off: null, wraps: null, last: ms };
+      return;
+    }
+  }
+  // Lay out the verses so far (wrapped once per width), the newest at the bottom.
+  const top = L.wishY + 4, bottom = L.barTop - 12, maxW = Math.min(L.cw - 28, 380), px = 15, lh = px * 1.5;
+  if (!pv.wraps || pv.wraps.w !== maxW) {
+    c.font = font(px, 500);
+    pv.wraps = { w: maxW, v: ps.verses.map((text, i) => {
+      const lines = [];
+      for (const word of `${i + 1}\u2002${text}`.split(' ')) {
+        const last = lines[lines.length - 1];
+        if (last !== undefined && c.measureText(`${last} ${word}`).width <= maxW) lines[lines.length - 1] = `${last} ${word}`;
+        else lines.push(word);
+      }
+      return lines;
+    }) };
+  }
+  const heading = pv.from ? `Psalm ${ps.n}, from verse ${pv.from + 1}` : `Psalm ${ps.n}`;
+  const blocks = [{ lines: [heading], head: true }];
+  for (let i = pv.from; i <= pv.v; i++) blocks.push({ lines: pv.wraps.v[i], i });
+  const height = blocks.reduce((h, b) => h + b.lines.length * lh + (b.head ? 10 : 12), 0);
+  const target = Math.min(0, (bottom - 16) - (top + 20 + height));   // scrolled up once it no longer fits
+  pv.off = pv.off === null ? target : pv.off + (target - pv.off) * Math.min(1, dt / 600);
+  const fadeAll = vis * (pv.end ? clamp(1 - (pv.end - PSALM_HOLD_MS) / PSALM_FADE_MS, 0, 1) : 1);
+  c.save(); c.textAlign = 'left'; c.textBaseline = 'middle';
+  let y = top + 20 + pv.off;
+  const x0 = W / 2 - maxW / 2;
+  for (const b of blocks) {
+    const newest = b.i === pv.v, inA = newest && !pv.end ? clamp(pv.t / 1500, 0, 1) : 1;
+    b.lines.forEach((ln, k) => {
+      const ly = y + lh * (k + .5);
+      const edge = clamp((ly - top) / 46, 0, 1) * clamp((bottom - ly) / 20, 0, 1);   // soft at the top, where old verses drift off
+      if (edge <= 0) return;
+      c.globalAlpha = fadeAll * edge * inA * (b.head ? .55 : newest ? .62 : .34);
+      if (b.head) { c.font = font(12, 600); c.fillStyle = COL.gold; c.textAlign = 'center'; c.fillText(ln, W / 2, ly); c.textAlign = 'left'; return; }
+      c.font = font(px, 500); c.fillStyle = COL.textHi;
+      if (k === 0) {   // the verse number, in gold
+        const num = `${b.i + 1}\u2002`, nw = c.measureText(num).width;
+        c.fillStyle = COL.gold; c.fillText(num, x0, ly);
+        c.fillStyle = COL.textHi; c.fillText(ln.slice(num.length), x0 + nw, ly);
+      } else c.fillText(ln, x0, ly);
+    });
+    y += b.lines.length * lh + (b.head ? 10 : 12);
+  }
   c.restore();
 }
 
@@ -2439,28 +2538,12 @@ function updateHush(dt, ms) {
 }
 /** Breathing: 10 s a breath (in for 4, out for 6), 0 to 1. */
 function breath(sec) { const p = (sec % 10) / 10; return p < .4 ? easeInOut(p / .4) : 1 - easeInOut((p - .4) / .6); }
-/**
- * The breathing glow around the seed pouch, once you've rested a few seconds
- * (Settings, off by default). With Night verses on too, once the garden has
- * faded (or the scene is expanded), a line of Psalm 46:10 to breathe with:
- * "Be still," on the breath in, "and know that I am God." on the breath out.
- */
+/** The breathing glow around the seed pouch, once you've rested a few seconds (Settings, off by default). */
 function drawBreath(c, ms) {
   if (!S.set.breathe || L.rotate) return;
   const rest = clamp((ms - lastInput - 6000) / 2500, 0, 1); if (!rest) return;
   const b = breath(ms / 1000), P = L.pouch;
   if (!expanded) drawGlow(c, P.x, P.y - 4, P.r * (1.5 + .7 * b), COL.gold, (.08 + .3 * b) * rest);
-  const quiet = expanded ? 1 : clamp(1 - hushA * 2, 0, 1);
-  if (!S.set.verses || verseNow || toasts.length || !quiet) return;
-  const p = (ms / 1000 % 10) / 10, inhale = p < .4, u = inhale ? p / .4 : (p - .4) / .6;
-  const top = L.st + L.headerH, y = top + (L.scene.h - 40 - top) * .42;
-  c.save(); c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.globalAlpha = Math.sin(Math.PI * u) * .6 * rest * quiet;
-  c.font = font(17, 500); c.fillStyle = COL.textHi;
-  c.fillText(inhale ? 'Be still,' : 'and know that I am God.', W / 2, y);
-  c.globalAlpha = .28 * rest * quiet; c.font = font(11, 600); c.fillStyle = COL.gold;
-  c.fillText('Psalm 46:10', W / 2, y + 22);
-  c.restore();
 }
 
 function update(dt, ms) {
@@ -2493,6 +2576,7 @@ function frame() {
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = hushA; ctx.drawImage(uiC, 0, 0); ctx.globalAlpha = 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
+  drawPsalms(ctx, ms);   // in the dark where the board was, once it has faded
   drawBreath(ctx, ms);
   if (ms - arrivedAt < 700) { ctx.fillStyle = `rgba(5,7,15,${1 - (ms - arrivedAt) / 700})`; ctx.fillRect(0, 0, W, H); }
   drawToast(ctx, ms);   // over the hush, so a morning or a moon is still told
@@ -2815,9 +2899,10 @@ function openSettings() {
     ${toggleRow('sound', 'Soft chimes', 'Very quiet. On iPhone they follow the silent switch.')}
     ${navigator.vibrate ? toggleRow('buzz', 'Gentle vibration', 'A tiny tap when things grow.') : ''}
     ${toggleRow('hush', 'Fade to the garden', 'After 20 seconds untouched, only the garden stays lit. Tap anywhere to bring it back.')}
-    ${toggleRow('breathe', 'Breathing glow', 'When you rest, the seed pouch glows in and out, six breaths a minute. Breathe along if it helps. With Night verses on, once the garden has faded, a line of Psalm 46 to breathe with.')}
+    ${toggleRow('breathe', 'Breathing glow', 'When you rest, the seed pouch glows in and out, six breaths a minute. Breathe along if it helps.')}
     ${toggleRow('weather', 'Weather', 'Gentle rain on some nights, snow on some winter ones.')}
     ${toggleRow('verses', 'Night verses', 'A line of Scripture (King James Version) when you come back in the night, and when morning comes.')}
+    ${toggleRow('psalms', 'Psalms in the night', 'Once the garden has faded, a psalm for lying awake, a verse at a time, in the dark below it (King James Version). It picks up where you left off.')}
     <div class="row col"><b>Keep it on your phone</b><small>${install}</small></div>
     <div class="row col"><button class="btn ghost" id="reset">Start the town over</button><small style="text-align:center">A fresh garden, and every other place closes again.</small></div>
     <button class="btn done" data-close>Done</button>
