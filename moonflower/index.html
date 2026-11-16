@@ -165,7 +165,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '2.9.0';
+const VERSION = '2.9.1';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -2707,6 +2707,23 @@ function expandGlyph(c, x, y, dir) {
   }
 }
 
+/**
+ * What the line under the scene says away from the garden: this place's own
+ * goal, not the garden's (its wonders and the glow constellations are the
+ * garden's, and glow is the whole town's). In turn: the way on to the next
+ * place, until it opens; then this place's last thing; then, once it's
+ * grown, another of them for the sky, the bar showing how much of the next
+ * one is already on the board (its worth in seeds, out of the 2,048 it takes).
+ */
+function areaProgress() {
+  const next = AREAS.find(a => a.opens && a.opens.from === AREA.id && !S.opened.includes(a.id));
+  if (next && S.best < next.opens.tier) {
+    return { label: `Next: the way to ${next.name.toLowerCase()}`, right: `${S.best} of ${next.opens.tier} found`, frac: S.best / next.opens.tier };
+  }
+  if (S.best < MAX_TIER) return { label: `Next: ${AREA.words.last}`, right: `${S.best} of ${MAX_TIER} found`, frac: S.best / MAX_TIER };
+  const worth = S.board.reduce((n, t) => n + (t ? value(t) : 0), 0);
+  return { label: `Next: another ${ITEMS[MAX_TIER].name.toLowerCase()}`, right: `${fmt(S.skyMoons)} in the sky`, frac: clamp(worth / value(MAX_TIER), 0, 1) };
+}
 function drawStatus(c) {
   const y = L.scene.h - 17, x0 = L.cx, w = L.cw;
   let label, right = '', frac = null;
@@ -2717,9 +2734,10 @@ function drawStatus(c) {
   } else if (S.stats.seeds === 0 && S.stats.merges === 0) label = 'Tap the seed pouch below';
   else if (S.stats.merges === 0) label = 'Drag a seed onto another seed';
   else if (S.area !== 'garden' && S.board.every((t, i) => t === freshBoard()[i])) label = `Welcome to ${AREA.name.toLowerCase()}. Pair things up.`;
+  else if (S.area !== 'garden') ({ label, right, frac } = areaProgress());
   else if (S.decor < DECOR.length) {
     const a = decorAt(S.decor), b = decorAt(S.decor + 1);
-    label = `${S.area === 'garden' ? 'Next' : 'Garden next'}: ${DECOR[S.decor].name}`; right = `${fmt(Math.max(0, b - S.peak))} ✦ to go`;
+    label = `Next: ${DECOR[S.decor].name}`; right = `${fmt(Math.max(0, b - S.peak))} ✦ to go`;
     frac = clamp((S.peak - a) / (b - a), 0, 1);
   } else {
     const base = decorAt(DECOR.length), k = Math.floor((S.peak - base) / STAR_STEP), a = base + k * STAR_STEP;
