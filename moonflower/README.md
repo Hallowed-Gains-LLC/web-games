@@ -35,6 +35,19 @@ Live at [hallowedgains.com/games/moonflower/](https://hallowedgains.com/games/mo
 - **Easy on the battery.** It redraws at 60fps while something is moving and
   drops to 20fps when only the stars are twinkling.
 
+- **Small flourishes, soft light only.** Two things merging shrink into
+  each other in a bloom of light; the new one springs out of it with a small
+  hop and settles, a thin ring spreads from the tile, and the tile keeps a
+  warm afterglow for a moment. Bigger things get a second ring. Motes of glow
+  fly home on a curve to the ✦ counter, which bumps as they land (from
+  merges, wishes and the basket too). A new discovery sends up a pillar of
+  soft light. A dragged item lifts with a shadow and leans into the move,
+  and its twins on the board glow. The tiles are a little glassy, the higher
+  things on the board catch a glint now and then, the pouch squashes when
+  tapped, sheets rise on a soft spring over a blurred backdrop, and (with
+  sound on) the bigger merges add a quiet third. With the phone's "reduce
+  motion" on, only the bloom and afterglow stay (`calm`). In the code:
+  `flash`, `ring`, `tileGlow`, `beam`, `homeMotes`, `springPop`, `twinkles`.
 - **Fades to the garden.** After 20 seconds untouched, everything but the
   garden fades out, so the phone lights the room less. The first touch only
   brings it back (it can't plant a seed), so a small hand on the screen does
