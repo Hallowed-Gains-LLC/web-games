@@ -130,7 +130,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '2.2';
+const VERSION = '2.3';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -1506,8 +1506,13 @@ function hintWish(wi) {
 // art), visitors, scene and constellations. You move between them on the
 // map (openMap); each keeps its own board. Glow, the garden's wonders, the
 // sky and the stats belong to the whole town. An area opens when you first
-// grow the `opens.tier`-th item in the area before it.
+// grow the `opens.tier`-th item (OPEN_TIER) in the area before it.
 const AREA_KEYS = ['board', 'best', 'wishes', 'skyMoons', 'ended'];
+// The next area opens when this one grows its OPEN_TIER-th item (of 12): most
+// of the way through it, about 290 pouch taps of the ~490 to its last item.
+// (It was the 5th, which let you skip most of an area.) An area already open
+// in a save stays open.
+const OPEN_TIER = 10;
 
 /** Point the live bindings (ITEMS, ART, …) at an area's chain and redraw its scene. */
 function useArea(a) {
@@ -1540,7 +1545,7 @@ let arrivedAt = -1e9;     // a moment's fade-in after walking to an area
 /**
  * Open any area whose way has opened: its `opens` area has grown the item it
  * needs. Runs when something new is grown and at start-up (a save from before
- * the town already has gardens past a Moonflower).
+ * the town already has gardens past a Firefly jar).
  */
 function checkOpenings() {
   for (const a of AREAS) {
@@ -2280,7 +2285,7 @@ function openBook() {
    ============================================================ */
 // A sleepy farm under the stars. Its chain runs from an egg to a sky lantern,
 // which rises like the garden's moon. Opens when the garden grows its first
-// Moonflower.
+// Firefly jar.
 const FARM_ITEMS = [null,
   { name: 'Egg',        many: 'Eggs',        blurb: 'Warm, and wobbling a little.' },
   { name: 'Chick',      many: 'Chicks',      blurb: 'Fluff with feet.' },
@@ -2620,7 +2625,7 @@ function liveFarm(c, V, t) {
    ============================================================ */
 // The town park after closing time. Its chain runs from an acorn to a kite,
 // which rises like the garden's moon. Opens when the farm raises its first
-// Sheep.
+// Red barn.
 const PARK_ITEMS = [null,
   { name: 'Acorn',       many: 'Acorns',        blurb: 'A whole oak, folded up very small.' },
   { name: 'Sapling',     many: 'Saplings',      blurb: 'Tied to a stick, for now.' },
@@ -3051,7 +3056,7 @@ function livePark(c, V, t) {
    ============================================================ */
 // A lane of little homes at night, mostly asleep. Its chain runs from a teabag
 // to a lullaby, which floats up like the garden's moon. Opens when the park
-// hangs its first Bird box.
+// puts up its first Bandstand.
 const LANE_ITEMS = [null,
   { name: 'Teabag',       many: 'Teabags',       blurb: 'Waiting for the kettle, like everyone.' },
   { name: 'Mug of tea',   many: 'Mugs of tea',   blurb: 'Made hot, drunk cold. It still counts.' },
@@ -3528,7 +3533,7 @@ function liveLane(c, V, t) {
 // A little harbour at night: a calm sea with the moon on it, a lighthouse
 // on the far headland, two boats in, and a stone quay where the visitors
 // sit. Its chain runs from a pebble to a guiding star, which rises like the
-// garden's moon. Opens when the lane winds its first Ball of wool.
+// garden's moon. Opens when the lane lights its first Fireplace.
 const HARBOUR_ITEMS = [null,
   { name: 'Pebble',       many: 'Pebbles',       blurb: 'Smooth, and still a little cold from the sea.' },
   { name: 'Shell',        many: 'Shells',        blurb: 'Hold it to your ear. Shh.' },
@@ -4123,7 +4128,7 @@ function liveHarbour(c, V, t) {
 // churchyard wall, and candles in jars along the path. Its chain runs from
 // a tealight to an evening prayer, which rises like the garden's moon
 // ("Let my prayer be set forth before thee as incense", Psalm 141:2).
-// Opens when the harbour pulls in its first Rowing boat.
+// Opens when the harbour builds its first Pier.
 const CHAPEL_ITEMS = [null,
   { name: 'Tealight',            many: 'Tealights',            blurb: 'A small light, and enough to see by.' },
   { name: 'Candle',              many: 'Candles',              blurb: 'Lit for someone.' },
@@ -4666,7 +4671,8 @@ function liveChapel(c, V, t) {
    ============================================================ */
 // A family house on a hill at night, one window still lit upstairs. Its chain
 // runs from a rattle to a sweet dream, which drifts up like the garden's moon.
-// It's the last area of the town, and opens when the chapel finds a Hymnal.
+// It's the last area of the town, and opens when the chapel lights its first
+// Stained-glass window.
 // The art is things only, never a baby: what rises is a dream.
 const NURSERY_ITEMS = [null,
   { name: 'Rattle',        many: 'Rattles',        blurb: 'Best not shaken after midnight.' },
@@ -5147,7 +5153,7 @@ const AREAS = [
   {
     id: 'farm', name: 'The Farm', items: FARM_ITEMS, art: FARM_ART, visitors: FARM_VISITORS,
     shapes: FARM_SHAPES, spots: FARM_SPOTS, renderLand: landFarm, drawLive: liveFarm, pond: null,
-    opens: { from: 'garden', tier: 5, need: 'Grow a Moonflower in the garden to open the lane.' },
+    opens: { from: 'garden', tier: OPEN_TIER, need: 'Grow a Firefly jar in the garden to open the lane to the farm.' },
     map: { x: 68, y: 80, icon: 3 },
     words: { pouch: 'Eggs', last: 'the last light of all', book: 'Farm book',
       welcome: 'A sleepy farm under the stars. Pair things up, just like in the garden.',
@@ -5159,7 +5165,7 @@ const AREAS = [
   {
     id: 'park', name: 'The Park', items: PARK_ITEMS, art: PARK_ART, visitors: PARK_VISITORS,
     shapes: PARK_SHAPES, spots: PARK_SPOTS, renderLand: landPark, drawLive: livePark, pond: () => true,
-    opens: { from: 'farm', tier: 5, need: 'Raise a Sheep on the farm to open the gate to the park.' },
+    opens: { from: 'farm', tier: OPEN_TIER, need: 'Raise a Red barn on the farm to open the gate to the park.' },
     map: { x: 82, y: 58, icon: 2 },
     words: { pouch: 'Acorns', last: 'the highest of all', book: 'Park book',
       welcome: 'The park after closing time. Pair things up, just like in the garden.',
@@ -5171,7 +5177,7 @@ const AREAS = [
   {
     id: 'lane', name: 'The Lane', items: LANE_ITEMS, art: LANE_ART, visitors: LANE_VISITORS,
     shapes: LANE_SHAPES, spots: LANE_SPOTS, renderLand: landLane, drawLive: liveLane, pond: null,
-    opens: { from: 'park', tier: 5, need: 'Hang a Bird box in the park to open the lane.' },
+    opens: { from: 'park', tier: OPEN_TIER, need: 'Put up a Bandstand in the park to open the lane.' },
     map: { x: 42, y: 60, icon: 3 },
     words: { pouch: 'Teabags', last: 'the last song of all', book: 'Lane book',
       welcome: 'A lane of little homes, nearly all asleep. Pair things up, just like in the garden.',
@@ -5183,7 +5189,7 @@ const AREAS = [
   {
     id: 'harbour', name: 'The Harbour', items: HARBOUR_ITEMS, art: HARBOUR_ART, visitors: HARBOUR_VISITORS,
     shapes: HARBOUR_SHAPES, spots: HARBOUR_SPOTS, renderLand: landHarbour, drawLive: liveHarbour, pond: () => true,
-    opens: { from: 'lane', tier: 5, need: 'Wind a Ball of wool on the lane to open the way down to the harbour.' },
+    opens: { from: 'lane', tier: OPEN_TIER, need: 'Light a Fireplace on the lane to open the way down to the harbour.' },
     map: { x: 16, y: 38, icon: 4 },
     words: { pouch: 'Pebbles', last: 'the star to steer home by', book: 'Harbour book',
       welcome: 'A little harbour, all the boats in. Pair things up, just like in the garden.',
@@ -5195,7 +5201,7 @@ const AREAS = [
   {
     id: 'chapel', name: 'The Chapel', items: CHAPEL_ITEMS, art: CHAPEL_ART, visitors: CHAPEL_VISITORS,
     shapes: CHAPEL_SHAPES, spots: CHAPEL_SPOTS, renderLand: landChapel, drawLive: liveChapel, pond: null,
-    opens: { from: 'harbour', tier: 5, need: 'Pull a Rowing boat in at the harbour to open the path up to the chapel.' },
+    opens: { from: 'harbour', tier: OPEN_TIER, need: 'Build a Pier at the harbour to open the path up to the chapel.' },
     map: { x: 50, y: 28, icon: 2 },
     words: { pouch: 'Tealights', last: 'the last prayer of the night', book: 'Chapel book',
       welcome: 'A little chapel, its door left on the latch. Pair things up, just like in the garden.',
@@ -5207,7 +5213,7 @@ const AREAS = [
   {
     id: 'nursery', name: 'The Nursery', items: NURSERY_ITEMS, art: NURSERY_ART, visitors: NURSERY_VISITORS,
     shapes: NURSERY_SHAPES, spots: NURSERY_SPOTS, renderLand: landNursery, drawLive: liveNursery, pond: null,
-    opens: { from: 'chapel', tier: 5, need: 'Find a Hymnal in the chapel to open the way to the nursery.' },
+    opens: { from: 'chapel', tier: OPEN_TIER, need: 'Light a Stained-glass window in the chapel to open the way to the nursery.' },
     map: { x: 76, y: 15, icon: 5 },
     words: { pouch: 'Rattles', last: 'sweet dreams, at last', book: 'Nursery book',
       welcome: 'A house on the hill, one window still lit. Pair things up, just like in the garden.',
@@ -5271,7 +5277,7 @@ applySettings();
 layout();
 if (document.fonts && document.fonts.load) document.fonts.load(font(16, 700)).then(() => { lastInput = now(); }).catch(() => {});
 onReturn();
-checkOpenings();   // a garden already past a Moonflower opens the farm (after onReturn: it saves, which resets S.last)
+checkOpenings();   // a garden already past a Firefly jar opens the farm (after onReturn: it saves, which resets S.last)
 if (!S.intro) openIntro();
 else {
   // A save from before 1.2 can hold moons on the board: send them up now,

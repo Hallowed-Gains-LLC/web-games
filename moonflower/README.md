@@ -122,15 +122,15 @@ lit spot on a winding lane, the one you're in circled, closed ones dim with
 what opens them. Tap an open spot to walk there. A gold dot on the map icon
 means a lane has opened that you haven't walked down yet.
 
-| Area | Chain | Opens when |
+| Area | Chain | Opens when (the 10th item of the area before; `OPEN_TIER`) |
 | --- | --- | --- |
 | The Garden | Seed → … → Little moon | from the start |
-| The Farm | Egg → Chick → Hen → Lamb → Sheep → Calf → Cow → Pony → Hay cart → Red barn → Windmill → Sky lantern | the garden grows its first Moonflower |
-| The Park | Acorn → Sapling → Oak tree → Squirrel → Bird box → Park bench → Lamp post → Swing set → Fountain → Bandstand → Carousel → Kite | the farm raises its first Sheep |
-| The Lane | Teabag → Mug of tea → Teapot → Biscuit tin → Ball of wool → Knitted scarf → Quilt → Armchair → Bookshelf → Fireplace → Little house → Lullaby | the park hangs its first Bird box |
-| The Harbour | Pebble → Shell → Starfish → Paper boat → Rowing boat → Lobster pot → Bell buoy → Fishing boat → Beach hut → Pier → Lighthouse → Guiding star | the lane winds its first Ball of wool |
-| The Chapel | Tealight → Candle → Candlestick → Prayer book → Hymnal → Pew → Font → Lectern → Organ → Stained-glass window → Bell tower → Evening prayer | the harbour pulls in its first Rowing boat |
-| The Nursery | Rattle → Baby sock → Bib → Bottle → Teddy bear → Blanket → Mobile → Rocking horse → Rocking chair → Crib → Night-light → Sweet dream | the chapel finds its first Hymnal; the last place, at the top of the map |
+| The Farm | Egg → Chick → Hen → Lamb → Sheep → Calf → Cow → Pony → Hay cart → Red barn → Windmill → Sky lantern | the garden grows its first Firefly jar |
+| The Park | Acorn → Sapling → Oak tree → Squirrel → Bird box → Park bench → Lamp post → Swing set → Fountain → Bandstand → Carousel → Kite | the farm raises its first Red barn |
+| The Lane | Teabag → Mug of tea → Teapot → Biscuit tin → Ball of wool → Knitted scarf → Quilt → Armchair → Bookshelf → Fireplace → Little house → Lullaby | the park puts up its first Bandstand |
+| The Harbour | Pebble → Shell → Starfish → Paper boat → Rowing boat → Lobster pot → Bell buoy → Fishing boat → Beach hut → Pier → Lighthouse → Guiding star | the lane lights its first Fireplace |
+| The Chapel | Tealight → Candle → Candlestick → Prayer book → Hymnal → Pew → Font → Lectern → Organ → Stained-glass window → Bell tower → Evening prayer | the harbour builds its first Pier |
+| The Nursery | Rattle → Baby sock → Bib → Bottle → Teddy bear → Blanket → Mobile → Rocking horse → Rocking chair → Crib → Night-light → Sweet dream | the chapel lights its first Stained-glass window; the last place, at the top of the map |
 
 - **Each area keeps its own board** (and pouch, wishes, visitors, best item and
   constellations), just as you left it. **Glow is the whole town's**, and so
