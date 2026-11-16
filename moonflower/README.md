@@ -65,6 +65,60 @@ Live at [hallowedgains.com/games/moonflower/](https://hallowedgains.com/games/mo
   hovers). Grant a wish and that visitor hops, then wanders off, and the next
   one walks in (`VISITOR_ART`, `drawVisitors`).
 
+## Faith, quietly
+
+Hallowed Gains is a Christian company, and Moonflower keeps a parent company
+at the hour when prayer comes easiest and hardest. None of this asks
+anything of the player or gets in the way of the game.
+
+- **Night verses.** Come back in the night (after 45 minutes away) and,
+  once the toasts are done, a verse fades in over the open sky, holds long
+  enough to read twice and fades out: Isaiah 40:11 ("…and shall gently lead
+  those that are with young"), Psalm 4:8, Psalm 139:12, Matthew 11:28,
+  Isaiah 49:15, and seven more. "You made it to morning" brings a morning
+  one instead (Lamentations 3:22–23, Psalm 30:5, …). Each list takes its
+  turn (`S.verseAt`), so a verse doesn't come round again until the rest
+  have. On a small phone, where the sky is too short, the verse goes on a
+  dark card above the line under the scene. Each place's ending card has a
+  verse about the heavens (Psalm 8:3–4 for the garden). On by default;
+  Settings → Night verses (`VERSES`, `queueVerse`, `drawVerse`).
+  The verses are the **King James Version** (public domain), word for word.
+  A verse cut short ends at a natural pause and changes none of its words;
+  they were checked against the KJV text A Simple Way to Pray bundles
+  (`devotions/data/kjv.json`).
+- **A prayer for the night**, from a button at the top of the garden book:
+  "In the night feeds" (written for Moonflower), "For those who wake"
+  ("Watch thou, dear Lord…", from the Book of Common Prayer), and Luther's
+  Evening Prayer, each with its credit line, and a link to
+  [A Simple Way to Pray](https://asimplewaytopray.com/) (`openPrayer`).
+- **The Church's year, by the phone's date** (`churchSeason`):
+  - From Advent Sunday, a **star** hangs low over the middle of the town in
+    every place, brightening as Christmas comes, at full from Christmas Eve
+    to Epiphany (January 6; `drawStar`).
+  - From Christmas Eve to Epiphany, a **crèche** stands on the green by the
+    chapel: a lamplit stable, Mary kneeling, Joseph with his staff and the
+    child in the manger (`drawCreche`).
+  - On **Easter Day**, a sunrise glows along the hills whatever the hour,
+    and for the week after it **Easter lilies** stand on the far bank of
+    the garden pond (`drawEasterLilies`). Easter is the Western date, from
+    the Gregorian computus (`easterDay`).
+  - In those seasons the verses come from the season (Isaiah 9 and John 1 in
+    Advent, Luke 2 at Christmas, the empty tomb at Easter). On Christmas Day
+    and Easter Day, once, a greeting: "Merry Christmas" and "Christ is
+    risen! He is risen indeed. Alleluia!" (`checkFeast`, `S.feastOf`).
+
+**The prayers come from A Simple Way to Pray**, the one home for the prayers
+Hallowed Gains apps share; pastors review them there. Moonflower keeps a copy,
+written into `index.html` between the `PRAYERS:BEGIN` and `PRAYERS:END` lines
+by [`tools/sync-prayers.mjs`](tools/sync-prayers.mjs). This is the same
+pattern Early Bloom uses. The game never fetches prayers while it runs, so it
+works offline and no request says who was praying. To change a prayer, edit
+it in A Simple Way to Pray (`devotions/data/prayer_library.json`), deploy
+that, then run `node tools/sync-prayers.mjs` here and push. `--check` says
+whether the copy is current. `--from FILE.json` uses a saved export instead
+of the live one. The script picks prayers by id (`WANTED`), and ids never
+change. Scripture is never in the library: each app keeps its own.
+
 ## How it works
 
 | Thing | What it does |
@@ -200,7 +254,7 @@ and `ending`.
 ## Code
 
 Everything is in [`index.html`](index.html): one canvas, plus an HTML bottom
-sheet for the intro, settings and garden book.
+sheet for the intro, settings, garden book and night prayer.
 
 - All art is drawn in code. Each item has a function in `ART` that draws it
   in a 100×100 box, cached as a sprite per cell size. The garden scene is two
@@ -211,3 +265,5 @@ sheet for the intro, settings and garden book.
   first for icons and fonts). Bump `CACHE` when the icons or manifest change.
 - [`tools/make-icons.mjs`](tools/make-icons.mjs) draws the home-screen icons
   with the game's own moonflower art.
+- [`tools/sync-prayers.mjs`](tools/sync-prayers.mjs) copies the night
+  prayers from A Simple Way to Pray's library (see "Faith, quietly").
