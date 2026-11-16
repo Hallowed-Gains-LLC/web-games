@@ -129,6 +129,8 @@ means a lane has opened that you haven't walked down yet.
 | The Park | Acorn → Sapling → Oak tree → Squirrel → Bird box → Park bench → Lamp post → Swing set → Fountain → Bandstand → Carousel → Kite | the farm raises its first Sheep |
 | The Lane | Teabag → Mug of tea → Teapot → Biscuit tin → Ball of wool → Knitted scarf → Quilt → Armchair → Bookshelf → Fireplace → Little house → Lullaby | the park hangs its first Bird box |
 | The Harbour | Pebble → Shell → Starfish → Paper boat → Rowing boat → Lobster pot → Bell buoy → Fishing boat → Beach hut → Pier → Lighthouse → Guiding star | the lane winds its first Ball of wool |
+| The Chapel | Tealight → Candle → Candlestick → Prayer book → Hymnal → Pew → Font → Lectern → Organ → Stained-glass window → Bell tower → Evening prayer | the harbour pulls in its first Rowing boat |
+| The Nursery | Rattle → Baby sock → Bib → Bottle → Teddy bear → Blanket → Mobile → Rocking horse → Rocking chair → Crib → Night-light → Sweet dream | the chapel finds its first Hymnal; the last place, at the top of the map |
 
 - **Each area keeps its own board** (and pouch, wishes, visitors, best item and
   constellations), just as you left it. **Glow is the whole town's**, and so
@@ -147,6 +149,14 @@ means a lane has opened that you haven't walked down yet.
   reflection, bobbing boats, a lighthouse whose soft beam turns slowly
   (never across the moon) and a stone quay with a footbridge over a slip; a
   seagull, seal, crab, otter, puffin and heron.
+  The chapel: a squat stone chapel with a bell tower (the bell never rings),
+  a stained-glass window that shimmers as if a candle burns inside, a yew,
+  a lychgate and candles in jars up the path; a dove. The nursery, the end
+  of the lane: a house on a hill, the nursery window lit with a mobile
+  turning and a paper-star garland, a pram by the door and a washing line of
+  tiny clothes swaying; no new visitors, just gentle ones from everywhere.
+  Nothing in the nursery is a baby, and nothing suggests one going up into
+  the sky: what rises there is a Sweet dream (keep it that way).
 - **Each area has its own ending.** Its last item rises like the moon and
   becomes that area's constellations (the farm's: the Sky Lantern, the Hen,
   the Sheep, the Pony, the Windmill, the Barn, the Cartwheel, the Scarecrow),
