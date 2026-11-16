@@ -296,6 +296,10 @@ means a lane has opened that you haven't walked down yet.
   tiny clothes swaying; no new visitors, just gentle ones from everywhere.
   Nothing in the nursery is a baby, and nothing suggests one going up into
   the sky: what rises there is a Sweet dream (keep it that way).
+- **Each area has its own goal** on the line under the scene, with a bar. The garden's is its next wonder (then, once all 24 have come, the next glow constellation). Elsewhere, in turn:
+  - the way to the next place, until it opens ("Next: the way to the park", "6 of 10 found");
+  - then the area's last item ("Next: the last light of all", "11 of 12 found");
+  - once that's grown, another one for the sky ("Next: another sky lantern"). The bar here shows how much of the next one is already on the board, by its worth in seeds (`areaProgress`).
 - **Each area has its own ending.** Its last item rises like the moon and
   becomes that area's constellations (the farm's: the Sky Lantern, the Hen,
   the Sheep, the Pony, the Windmill, the Barn, the Cartwheel, the Scarecrow),
