@@ -59,6 +59,13 @@ Live at [hallowedgains.com/games/moonflower/](https://hallowedgains.com/games/mo
   five otherwise (more in spring) with clouds, dimmer stars and rings on the
   pond. The same all day for everyone on a date (`weather`). Settings →
   Weather turns it off.
+- **Expand the scene.** Tap the open sky or land, or the corners icon under
+  the gear, and the board slides away: the scene fills the screen, under the
+  place's name, with a taller sky that holds up to 32 of the constellations
+  you've grown, four to a row with each one's name beneath it. Any tap brings
+  the board back; it isn't offered while something is flying, so nothing
+  lands on a board that isn't there (`toggleExpand`, `drawExpanded`; the
+  rows and columns are in `makeStars`).
 - **Visitors sit in the garden.** The three animals with a wish open wait in
   the scene, by the fence, on the stones under the lamp and by the pond: a
   moonlit shape with glinting eyes that blinks now and then (and a bat that
@@ -91,6 +98,16 @@ anything of the player or gets in the way of the game.
   ("Watch thou, dear Lord…", from the Book of Common Prayer), and Luther's
   Evening Prayer, each with its credit line, and a link to
   [A Simple Way to Pray](https://asimplewaytopray.com/) (`openPrayer`).
+- **The chapel, far off.** From every other place, the chapel's steeple
+  stands over the far hills: a tower and spire with a cross, one window lit.
+  You can see the town has a church long before the lane reaches it (each
+  area's `steeple`, `drawFarSteeple`).
+- **A breath prayer.** With the breathing glow and Night verses both on,
+  once the garden has faded (or the scene is expanded) and you're resting,
+  Psalm 46:10 comes and goes with the breath: "Be still," as you breathe in,
+  "and know that I am God." as you breathe out (`drawBreath`).
+- **Soli Deo gloria** under the version in Settings: the maker's mark Bach
+  wrote at the end of his scores.
 - **The Church's year, by the phone's date** (`churchSeason`):
   - From Advent Sunday, a **star** hangs low over the middle of the town in
     every place, brightening as Christmas comes, at full from Christmas Eve
