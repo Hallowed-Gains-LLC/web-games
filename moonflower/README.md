@@ -126,8 +126,9 @@ means a lane has opened that you haven't walked down yet.
 | --- | --- | --- |
 | The Garden | Seed → … → Little moon | from the start |
 | The Farm | Egg → Chick → Hen → Lamb → Sheep → Calf → Cow → Pony → Hay cart → Red barn → Windmill → Sky lantern | the garden grows its first Moonflower |
-
-Coming next, one per update: the Park, the Lane (homes) and the Harbour.
+| The Park | Acorn → Sapling → Oak tree → Squirrel → Bird box → Park bench → Lamp post → Swing set → Fountain → Bandstand → Carousel → Kite | the farm raises its first Sheep |
+| The Lane | Teabag → Mug of tea → Teapot → Biscuit tin → Ball of wool → Knitted scarf → Quilt → Armchair → Bookshelf → Fireplace → Little house → Lullaby | the park hangs its first Bird box |
+| The Harbour | Pebble → Shell → Starfish → Paper boat → Rowing boat → Lobster pot → Bell buoy → Fishing boat → Beach hut → Pier → Lighthouse → Guiding star | the lane winds its first Ball of wool |
 
 - **Each area keeps its own board** (and pouch, wishes, visitors, best item and
   constellations), just as you left it. **Glow is the whole town's**, and so
@@ -137,6 +138,15 @@ Coming next, one per update: the Park, the Lane (homes) and the Harbour.
   hills, a windmill turning slowly, a red barn with a lit loft and a lantern
   by the door, a silo, hay bales and an old oak; visited by a barn owl, cat,
   sheepdog, goose, piglet, goat, duck and donkey (and some garden regulars).
+  The park: an oak, lamp posts, a bench with a forgotten mitten, a fountain
+  and a bandstand twinkling on the far slope; a squirrel, pigeon and robin
+  join the regulars. The lane: a terrace of little homes and a thatched
+  cottage, windows flickering like firelight (one upstairs light comes on
+  now and then: someone else up for a feed), chimney smoke, lamps and a post
+  box; a moth and a dormouse. The harbour: a calm sea with the moon's
+  reflection, bobbing boats, a lighthouse whose soft beam turns slowly
+  (never across the moon) and a stone quay with a footbridge over a slip; a
+  seagull, seal, crab, otter, puffin and heron.
 - **Each area has its own ending.** Its last item rises like the moon and
   becomes that area's constellations (the farm's: the Sky Lantern, the Hen,
   the Sheep, the Pony, the Windmill, the Barn, the Cartwheel, the Scarecrow),
