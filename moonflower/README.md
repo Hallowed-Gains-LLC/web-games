@@ -114,6 +114,53 @@ every 3,000 glow adds a constellation.
 The garden book (📖 at the top) shows everything grown so far, the wonders,
 and a few gentle stats.
 
+## The town
+
+The garden is the first place in a small sleeping town. A **map** (the icon
+at the top, next to the garden book) shows the town at night: each area as a
+lit spot on a winding lane, the one you're in circled, closed ones dim with
+what opens them. Tap an open spot to walk there. A gold dot on the map icon
+means a lane has opened that you haven't walked down yet.
+
+| Area | Chain | Opens when |
+| --- | --- | --- |
+| The Garden | Seed → … → Little moon | from the start |
+| The Farm | Egg → Chick → Hen → Lamb → Sheep → Calf → Cow → Pony → Hay cart → Red barn → Windmill → Sky lantern | the garden grows its first Moonflower |
+
+Coming next, one per update: the Park, the Lane (homes) and the Harbour.
+
+- **Each area keeps its own board** (and pouch, wishes, visitors, best item and
+  constellations), just as you left it. **Glow is the whole town's**, and so
+  are the garden's wonders: the sky ones (clouds, shooting stars, the Milky
+  Way, the glow constellations) show over every area.
+- **Each area has its own scene and visitors.** The farm: fields on the far
+  hills, a windmill turning slowly, a red barn with a lit loft and a lantern
+  by the door, a silo, hay bales and an old oak; visited by a barn owl, cat,
+  sheepdog, goose, piglet, goat, duck and donkey (and some garden regulars).
+- **Each area has its own ending.** Its last item rises like the moon and
+  becomes that area's constellations (the farm's: the Sky Lantern, the Hen,
+  the Sheep, the Pony, the Windmill, the Barn, the Cartwheel, the Scarecrow),
+  and the first one opens its own card ("A light let go").
+
+In the code (`index.html`): `AREAS` lists the areas, each with its items, art,
+visitors, constellation shapes, visitor spots, scene (`renderLand` for the
+cached land, `drawLive` for the moving parts), map position, words and ending.
+`ITEMS`, `ART`, `VISITORS`, `MOON_SHAPES` and `VISIT_SPOTS` always hold the
+current area's (`useArea`), so the rest of the game doesn't know which area
+it's in. `S.area` is where you are; the current area's `board`, `best`,
+`wishes`, `skyMoons` and `ended` (`AREA_KEYS`) live on `S` itself and the
+others' in `S.away` (`goToArea` swaps them). `S.opened` and `S.visited` list
+the areas opened and walked to; `checkOpenings` opens an area once its
+`opens.from` area has grown its `opens.tier`-th item. A save from before the
+town is a garden that starts where it was (and opens the farm at once if it
+already has a Moonflower).
+
+**Adding an area:** its `ITEMS`/`ART` (12 each, drawn in the 100×100 box), a
+visitor list (new visitor drawings go in `VISITOR_ART`), constellation shapes,
+three visitor spots that suit its scene, `land…`/`live…` scene functions, and
+an entry in `AREAS` with `opens`, `map` (its spot on the map, in %), `words`
+and `ending`.
+
 ## Code
 
 Everything is in [`index.html`](index.html): one canvas, plus an HTML bottom
