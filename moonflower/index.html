@@ -97,7 +97,7 @@
   .ver { text-align: center; opacity: .35; font-size: 12px; }
   .book { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .book div { background: #121836; border-radius: 14px; padding: 8px 4px 10px; text-align: center; font-size: 13px; line-height: 1.25; }
-  .map { position: relative; height: 270px; margin: 12px 0 4px; border-radius: 18px; overflow: hidden;
+  .map { position: relative; height: 360px; margin: 12px 0 4px; border-radius: 18px; overflow: hidden;
          background: radial-gradient(circle at 80% 15%, rgba(246,232,192,.18), transparent 30%), linear-gradient(#060914, #10173a); }
   .map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
   .spot { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px;
@@ -2620,7 +2620,7 @@ const AREAS = [
   {
     id: 'garden', name: 'The Garden', items: GARDEN_ITEMS, art: GARDEN_ART, visitors: GARDEN_VISITORS,
     shapes: GARDEN_SHAPES, spots: GARDEN_SPOTS, renderLand: landGarden, drawLive: liveGarden, pond: () => has('pond'),
-    map: { x: 22, y: 76, icon: 5 },
+    map: { x: 20, y: 86, icon: 5 },
     words: { pouch: 'Seeds', last: 'the last bloom of all', book: 'Garden book', welcome: 'Home again.',
       done: 'You grew a moon. There\'s nothing left to find, only more to grow: every moon rises into the sky as a new constellation.' },
     ending: { title: 'Goodnight, moon',
@@ -2631,7 +2631,7 @@ const AREAS = [
     id: 'farm', name: 'The Farm', items: FARM_ITEMS, art: FARM_ART, visitors: FARM_VISITORS,
     shapes: FARM_SHAPES, spots: FARM_SPOTS, renderLand: landFarm, drawLive: liveFarm, pond: null,
     opens: { from: 'garden', tier: 5, need: 'Grow a Moonflower in the garden to open the lane.' },
-    map: { x: 72, y: 40, icon: 3 },
+    map: { x: 70, y: 72, icon: 3 },
     words: { pouch: 'Eggs', last: 'the last light of all', book: 'Farm book',
       welcome: 'A sleepy farm under the stars. Pair things up, just like in the garden.',
       done: 'You let a sky lantern go. There\'s nothing left to find, only more to raise: every lantern rises into the sky as a new constellation.' },
@@ -2669,7 +2669,7 @@ function openMap() {
       </svg>
       ${spots}
     </div>
-    <p class="mapnote" id="mapnote">${shut ? `<b>${shut.name}</b>: ${shut.opens.need}` : 'Further along, the rest of the town is still asleep.'}</p>
+    <p class="mapnote" id="mapnote">${shut ? `<b>${shut.name}</b>: ${shut.opens.need}` : 'Every lane is open. Wander wherever you like.'}</p>
     <button class="btn done" data-close>Back to ${AREA.name.toLowerCase()}</button>`);
   for (const el of sheetEl.querySelectorAll('canvas[data-icon]')) {
     const a = areaById(el.dataset.icon);
