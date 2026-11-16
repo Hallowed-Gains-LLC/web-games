@@ -117,9 +117,13 @@ and a few gentle stats.
 ## The town
 
 The garden is the first place in a small sleeping town. A **map** (the icon
-at the top, next to the garden book) shows the town at night: each area as a
-lit spot on a winding lane, the one you're in circled, closed ones dim with
-what opens them. Tap an open spot to walk there. A gold dot on the map icon
+at the top, next to the garden book) shows the town at night: an illustrated
+map (stars, the moon, hills, the sea by the harbour) with each area as a lit
+spot on a winding road, lit as far as you've opened. Each place has a little
+drawing beside it (flowers, a barn, trees, a terrace, a lighthouse, a
+steeple, the house on the hill; `MAP_DECOR`) that sleeps under a mist until
+it opens. The one you're in is circled, closed ones say what opens them, and
+a gold "!" marks a place where someone is waiting on an errand. Tap an open spot to walk there. A gold dot on the map icon
 means a lane has opened that you haven't walked down yet.
 
 | Area | Chain | Opens when (the 10th item of the area before; `OPEN_TIER`) |
