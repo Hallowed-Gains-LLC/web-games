@@ -56,14 +56,17 @@
   /* ---------- the bottom sheet ---------- */
   #wrap { position: fixed; inset: 0; z-index: 40; display: none; }
   #wrap.open { display: block; }
-  #back { position: absolute; inset: 0; background: rgba(2, 3, 9, .62); }
+  #back { position: absolute; inset: 0; background: rgba(2, 3, 9, .55);
+          -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); animation: fadein .3s ease-out; }
+  @keyframes fadein { from { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { #sheet, #back { animation: none; } }
   #sheet {
     position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
     width: min(520px, 100%); max-height: 88%; overflow-y: auto; overscroll-behavior: contain;
     background: #0e1328; border: 1px solid rgba(242, 196, 109, .12); border-bottom: 0;
     border-radius: 24px 24px 0 0; box-shadow: 0 -12px 40px rgba(0, 0, 0, .55);
     padding: 20px 22px calc(18px + env(safe-area-inset-bottom));
-    animation: rise .28s ease-out;
+    animation: rise .42s cubic-bezier(.2, .9, .25, 1.06);
   }
   @keyframes rise { from { transform: translate(-50%, 40px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
   #sheet h2 { font-weight: 700; font-size: 21px; color: #efd9a8; margin: 2px 0 10px; }
@@ -151,7 +154,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '2.7.0';
+const VERSION = '2.8.0';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -1772,13 +1775,39 @@ let anims = [], parts = [], floats = [], toasts = [];
 let sel = -1, drag = null, ptr = null;
 let lastInput = 0, lastDraw = 0, dispGlow = S.glow;
 let basketBump = -1e9, pouchShake = -1e9, lastFullHint = -1e9;
+let glowBump = -1e9, pouchTap = -1e9;   // the ✦ counter as glow lands on it; the pouch, squashed by a tap
+let twinkles = [], nextTwinkle = 0;     // glints on the higher things on the board (kept out of anims: they don't speed the frame up)
 let undoStack = [];
 
 function fly(tier, from, to, dur, o = {}) {
   const a = { k: 'fly', tier, from, to, t0: now(), dur, s0: o.s0 ?? 1, s1: o.s1 ?? 1, arc: o.arc || 0, hide: o.hide ?? -1, alpha: o.alpha ?? 1, area: o.area || null };
   anims.push(a); return a;
 }
-function pop(cell, delay = 0, dur = 380) { anims.push({ k: 'pop', cell, t0: now() + delay, dur }); }
+function pop(cell, delay = 0, dur = 560) { anims.push({ k: 'pop', cell, t0: now() + delay, dur }); }
+
+/* ---------- Flourishes: the small touches that make a merge feel good ----------
+   All soft light, nothing that flashes the room: a bloom where two things
+   meet, a ring that spreads and fades, a warm afterglow on the tile, motes
+   of glow flying home to the counter, and for a new discovery a pillar of
+   light. With the phone's "reduce motion" on, only the bloom and afterglow
+   stay (`calm`). */
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const calm = () => reduceMotion.matches;
+/** The pop's scale at p (0..1): a damped spring from .4 that overshoots a little, then settles at 1. */
+const springPop = p => 1 - .6 * Math.exp(-6 * p) * Math.cos(10 * p);
+function flash(x, y, r, delay = 0) { anims.push({ k: 'flash', x, y, r, t0: now() + delay, dur: 420 }); }
+function ring(x, y, r, delay = 0, dur = 700) { if (!calm()) anims.push({ k: 'ring', x, y, r, t0: now() + delay, dur }); }
+function tileGlow(cell, delay = 0, dur = 1100) { anims.push({ k: 'tglow', cell, t0: now() + delay, dur }); }
+function beam(x, y, delay = 0) { if (!calm()) anims.push({ k: 'beam', x, y, t0: now() + delay, dur: 1500 }); }
+/** Motes of glow from `from` up to the ✦ counter; the counter bumps as each one lands (update). */
+function homeMotes(from, n, delay = 0) {
+  if (calm()) { later(delay + 300, () => { glowBump = now(); }); return; }
+  for (let i = 0; i < n; i++) {
+    const side = (i % 2 ? 1 : -1) * (20 + Math.random() * 40);
+    anims.push({ k: 'mote', from: { ...from }, side, t0: now() + delay + i * 70, dur: 620 + Math.random() * 160 });
+  }
+}
+const counterAt = () => ({ x: L.cx + 10, y: L.st + L.headerH / 2 });
 const later = (ms, fn) => setTimeout(fn, ms);
 
 function cellCenter(i) { return { x: L.bx + (i % COLS) * L.cell + L.cell / 2, y: L.by + Math.floor(i / COLS) * L.cell + L.cell / 2 }; }
@@ -1843,7 +1872,7 @@ function tock(vol = .05) {
 const sfx = {
   seed: () => tock(.06),
   tick: () => tock(.03),
-  merge: t => chime(NOTES[clamp(t - 1, 0, 12)], 0, .09),
+  merge: t => { chime(NOTES[clamp(t - 1, 0, 12)], 0, .09); if (t >= 5) chime(NOTES[clamp(t + 1, 0, 12)], .07, .035, 1.8); },   // a soft third above, on the bigger ones
   discover: () => [4, 6, 8].forEach((n, i) => chime(NOTES[n], i * .14, .07, 2)),
   wish: () => { chime(NOTES[9], 0, .07); chime(NOTES[11], .12, .06, 2); },
   gather: () => chime(NOTES[2], 0, .06, 1.1),
@@ -1890,7 +1919,7 @@ function discover(t, at) {
   if (t < MAX_TIER) {   // a moon gets the ending instead (riseMoon)
     toast({ title: `New: ${ITEMS[t].name}`, sub: ITEMS[t].blurb, tier: t, dur: 3400 });
     later(120, sfx.discover);
-    if (at) later(150, () => burst(at.x, at.y, 26, 1.5));
+    if (at) { later(150, () => burst(at.x, at.y, 26, 1.5)); beam(at.x, at.y, 150); }
   }
   const pouch = pouchTier();
   if (pouch > pouchBefore && t < MAX_TIER) toast({ title: 'The pouch has grown', sub: `It gives ${ITEMS[pouch].many.toLowerCase()} now.`, tier: pouch, dur: 3400 });
@@ -1919,7 +1948,7 @@ function plantSeed() {
   }
   pushUndo();
   const t = pouchTier() + (Math.random() < pouchUpChance() ? 1 : 0);
-  S.board[i] = t; S.stats.seeds++;
+  S.board[i] = t; S.stats.seeds++; pouchTap = now();
   fly(t, { x: L.pouch.x, y: L.pouch.y - 12 }, cellCenter(i), 280, { s0: .35, s1: 1, arc: 30, hide: i });
   sfx.seed(); save();
 }
@@ -1935,13 +1964,21 @@ function doMerge(src, dst, from) {
   const t = S.board[src], c = cellCenter(dst);
   pushUndo();
   S.board[src] = 0; S.board[dst] = t + 1; S.stats.merges++;
-  const delay = from ? 70 : 160;
-  fly(t, c, c, delay);
-  fly(t, from || cellCenter(src), c, delay);
+  const delay = from ? 90 : 180;
+  // The two shrink into each other; where they meet, a bloom of light, a
+  // ring spreading out and a warm afterglow on the tile, and the new one
+  // springs out of it. Bigger things get a bigger moment.
+  fly(t, c, c, delay, { s1: .55 });
+  fly(t, from || cellCenter(src), c, delay, { s1: .55 });
   pop(dst, delay);
+  flash(c.x, c.y, L.cell * (.55 + t * .03), delay);
+  ring(c.x, c.y, L.cell * (.6 + t * .05), delay);
+  if (t >= 6) ring(c.x, c.y, L.cell * (.9 + t * .05), delay + 120, 900);
+  tileGlow(dst, delay);
+  homeMotes(c, Math.min(6, 1 + Math.floor(t / 2)), delay + 120);
   gain(t + 1, c, delay);
   discover(t + 1, c);
-  later(delay, () => { burst(c.x, c.y, 8 + t); sfx.merge(t + 1); buzz(8); });
+  later(delay, () => { burst(c.x, c.y, 6 + t); sfx.merge(t + 1); buzz(8); });
   if (t + 1 === MAX_TIER) later(delay + MOON_PAUSE_MS, () => riseMoon(dst));
   save();
 }
@@ -1957,6 +1994,7 @@ function deliver(wi, cell, from) {
   S.wishes[wi] = nw;
   gain(w.reward, { x: r.x + r.w / 2, y: r.y + 10 }, 320);
   later(320, () => { burst(to.x, to.y, 12); sfx.wish(); buzz(12); });
+  homeMotes({ x: r.x + r.w / 2, y: r.y + r.h / 2 }, 5, 380);
   save();
 }
 /** Where an area is, as said in a sentence: "on the farm", "in the garden". */
@@ -2023,6 +2061,7 @@ function gather(cell, from) {
   S.board[cell] = 0;
   fly(t, from || cellCenter(cell), { x: L.basket.x, y: L.basket.y - 4 }, 280, { s1: .3, arc: 30 });
   later(280, () => { basketBump = now(); sfx.gather(); });
+  homeMotes({ x: L.basket.x, y: L.basket.y - 10 }, 2, 300);
   gain(value(t), { x: L.basket.x, y: L.basket.y - 24 }, 280);
   save();
 }
@@ -2266,8 +2305,12 @@ function drawItem(c, tier, x, y, size, ms, seed = 0, scale = 1, area = null) {
 function drawHeader(c) {
   const y = L.st + L.headerH / 2;
   c.textBaseline = 'middle'; c.textAlign = 'left';
+  const bump = clamp(1 - (now() - glowBump) / 380, 0, 1);   // glow just landed
+  if (bump) drawGlow(c, L.cx + 10, y, 18 + 6 * bump, COL.gold, .35 * bump);
+  c.save(); c.translate(L.cx + 2, y); c.scale(1 + .1 * bump, 1 + .1 * bump);
   c.font = font(18, 700); c.fillStyle = rgba(COL.textHi, .9);
-  c.fillText(`✦ ${fmt(dispGlow)}`, L.cx + 2, y);
+  c.fillText(`✦ ${fmt(dispGlow)}`, 0, 0);
+  c.restore();
   c.strokeStyle = rgba(COL.text, .7); c.lineWidth = 1.8; c.lineCap = 'round'; c.lineJoin = 'round';
   // garden book
   c.save(); c.translate(L.book.x, L.book.y); c.beginPath();
@@ -2395,23 +2438,40 @@ function drawBoard(c, ms) {
   for (let i = 0; i < N; i++) {
     const x = bx + (i % COLS) * cell, y = by + Math.floor(i / COLS) * cell;
     rr(c, x + gap / 2, y + gap / 2, cell - gap, cell - gap, cell * .2);
-    c.fillStyle = i === target && target !== drag.src ? 'rgba(242,196,109,.13)' : '#10162d'; c.fill();
+    if (i === target && target !== drag.src) c.fillStyle = 'rgba(242,196,109,.13)';
+    else {   // a little glassy: lighter at the top, with a faint rim of light
+      const g = c.createLinearGradient(0, y, 0, y + cell);
+      g.addColorStop(0, '#141b36'); g.addColorStop(1, '#0d1328'); c.fillStyle = g;
+    }
+    c.fill();
+    c.strokeStyle = 'rgba(255,240,210,.035)'; c.lineWidth = 1; c.stroke();
+    for (const a of anims) if (a.k === 'tglow' && a.cell === i && ms >= a.t0) {   // the afterglow of a merge
+      const p = (ms - a.t0) / a.dur; c.fillStyle = rgba(COL.gold, .16 * (1 - p) * (1 - p)); c.fill();
+    }
     if (i === sel) { c.strokeStyle = rgba(COL.gold, .8); c.lineWidth = 2; c.stroke(); }
     else if (selTier && selTier < MAX_TIER && S.board[i] === selTier && !(drag && drag.src === i)) {
       c.strokeStyle = rgba(COL.gold, .18 + .28 * pulse); c.lineWidth = 1.6; c.stroke();
+      drawGlow(c, x + cell / 2, y + cell / 2, cell * .62, COL.gold, .07 + .07 * pulse);   // its twins glow softly
     }
   }
   for (let i = 0; i < N; i++) {
     const t = S.board[i];
     if (!t || (drag && drag.src === i)) continue;
     if (anims.some(a => a.k === 'fly' && a.hide === i)) continue;
-    let scale = 1;
+    let scale = 1, hop = 0;
     for (const a of anims) if (a.k === 'pop' && a.cell === i) {
       const p = (ms - a.t0) / a.dur;
-      scale = p < 0 ? 0 : p >= 1 ? 1 : .55 + .45 * easeOutBack(p);
+      scale = p < 0 ? 0 : p >= 1 ? 1 : calm() ? .55 + .45 * easeOutBack(Math.min(1, p * 1.5)) : springPop(p);
+      if (p > 0 && p < 1 && !calm()) hop = Math.sin(Math.min(1, p * 2.2) * Math.PI) * cell * .07;   // a small hop up out of the merge
     }
     const p = cellCenter(i);
-    drawItem(c, t, p.x, p.y, cell, ms, i, scale);
+    drawItem(c, t, p.x, p.y - hop, cell, ms, i, scale);
+  }
+  for (const tw of twinkles) {   // a glint on something, now and then
+    const p = (ms - tw.t0) / tw.dur; if (p < 0 || p > 1 || !S.board[tw.cell]) continue;
+    const q = cellCenter(tw.cell), r = cell * .09 * Math.sin(p * Math.PI);
+    drawGlow(c, q.x + tw.dx * cell, q.y + tw.dy * cell, r * 3, '#fff3d0', .5 * Math.sin(p * Math.PI));
+    sparkle(c, q.x + tw.dx * cell, q.y + tw.dy * cell, r, 'rgba(255,248,226,.9)');
   }
 }
 
@@ -2439,7 +2499,8 @@ function drawBar(c, ms) {
   const breathe = .5 + .5 * Math.sin(ms / 900);
   drawGlow(c, P.x, P.y, P.r * 1.9, COL.gold, empties ? .08 + .07 * breathe : .02);
   const sh = clamp(1 - (ms - pouchShake) / 400, 0, 1);
-  c.save(); c.translate(P.x + Math.sin(ms / 25) * 4 * sh, P.y); c.scale(P.r / 40, P.r / 40);
+  const tp = clamp((ms - pouchTap) / 260, 0, 1), squash = calm() ? 0 : Math.sin(tp * Math.PI) * .09;   // a little squash when tapped
+  c.save(); c.translate(P.x + Math.sin(ms / 25) * 4 * sh, P.y + 30 * P.r / 40); c.scale(P.r / 40 * (1 + squash), P.r / 40 * (1 - squash)); c.translate(0, -30);
   if (!empties) c.globalAlpha = .55;
   c.fillStyle = '#6e5641'; c.beginPath();
   c.moveTo(-14, -18); c.bezierCurveTo(-36, -6, -38, 26, -18, 32); c.quadraticCurveTo(0, 38, 18, 32); c.bezierCurveTo(38, 26, 36, -6, 14, -18); c.closePath(); c.fill();
@@ -2464,6 +2525,34 @@ function drawBar(c, ms) {
 
 function drawFlights(c, ms) {
   for (const a of anims) {
+    const p = (ms - a.t0) / a.dur;
+    if (p < 0 || p > 1) continue;
+    if (a.k === 'flash') {   // a soft bloom where two things meet: quick in, slower out
+      const k = p < .25 ? p / .25 : 1 - (p - .25) / .75;
+      drawGlow(c, a.x, a.y, a.r * (.6 + .5 * p), '#fff1cf', .55 * k);
+    } else if (a.k === 'ring') {
+      const e = 1 - Math.pow(1 - p, 3);
+      c.strokeStyle = rgba(COL.gold, .4 * (1 - p)); c.lineWidth = 1.6 * (1 - p) + .4;
+      c.beginPath(); c.arc(a.x, a.y, a.r * (.35 + .65 * e), 0, TAU); c.stroke();
+    } else if (a.k === 'beam') {   // a new discovery: a pillar of soft light, up from the tile
+      const k = Math.sin(p * Math.PI), h = L.cell * 2.6, w = L.cell * .36;
+      const g = c.createLinearGradient(0, a.y - h, 0, a.y);
+      g.addColorStop(0, 'rgba(255,236,190,0)'); g.addColorStop(1, `rgba(255,236,190,${.22 * k})`);
+      c.fillStyle = g; c.beginPath(); c.moveTo(a.x - w * .5, a.y); c.lineTo(a.x - w * .2, a.y - h); c.lineTo(a.x + w * .2, a.y - h); c.lineTo(a.x + w * .5, a.y); c.closePath(); c.fill();
+      for (let i = 0; i < 4; i++) {   // and motes rising in it
+        const u = (p * 1.4 + i * .25) % 1;
+        drawGlow(c, a.x + Math.sin(i * 2.1 + p * 5) * w * .25, a.y - u * h, 4, COL.gold, .6 * k * (1 - u));
+      }
+    } else if (a.k === 'mote') {   // glow flying home to the counter, on a curve
+      const to = counterAt(), e = easeInOut(p);
+      const mx = (a.from.x + to.x) / 2 + a.side, my = Math.min(a.from.y, to.y) - 30;
+      const x = (1 - e) * (1 - e) * a.from.x + 2 * (1 - e) * e * mx + e * e * to.x;
+      const y = (1 - e) * (1 - e) * a.from.y + 2 * (1 - e) * e * my + e * e * to.y;
+      drawGlow(c, x, y, 7 - 3 * e, COL.gold, .85);
+      c.fillStyle = '#fff3d0'; c.fillRect(x - .8, y - .8, 1.6, 1.6);
+    }
+  }
+  for (const a of anims) {
     if (a.k !== 'fly') continue;
     const p = clamp((ms - a.t0) / a.dur, 0, 1), e = easeInOut(p);
     const x = lerp(a.from.x, a.to.x, e), y = lerp(a.from.y, a.to.y, e) - Math.sin(p * Math.PI) * a.arc;
@@ -2482,8 +2571,11 @@ function drawParticles(c) {
 function drawDrag(c, ms) {
   if (!drag) return;
   const x = ptr.x, y = ptr.y - L.lift;
+  c.fillStyle = 'rgba(0,0,0,.32)'; c.beginPath(); c.ellipse(x + 4, y + L.cell * .5, L.cell * .32, L.cell * .09, 0, 0, TAU); c.fill();   // its shadow on the board
   drawGlow(c, x, y, L.cell * .75, COL.gold, .14);
-  drawItem(c, drag.tier, x, y, L.cell * 1.12, ms, 0, 1);
+  c.save(); c.translate(x, y); if (!calm()) c.rotate(clamp((ptr.vx || 0) * .012, -.22, .22));   // leaning into the move
+  drawItem(c, drag.tier, 0, 0, L.cell * 1.12, ms, 0, 1);
+  c.restore();
 }
 function drawToast(c, ms) {
   const t = toasts[0]; if (!t) return;
@@ -2548,7 +2640,15 @@ function drawBreath(c, ms) {
 
 function update(dt, ms) {
   updateHush(dt, ms);
+  for (const a of anims) if (a.k === 'mote' && ms >= a.t0 + a.dur) glowBump = ms;   // landed on the counter
   anims = anims.filter(a => ms < a.t0 + a.dur);
+  // Now and then a glint on one of the higher things on the board (sixth step up).
+  twinkles = twinkles.filter(tw => ms < tw.t0 + tw.dur);
+  if (ms > nextTwinkle && !calm() && hushA > .5) {
+    const high = S.board.map((t, i) => t >= 6 ? i : -1).filter(i => i >= 0 && !busy(i));
+    if (high.length) twinkles.push({ cell: high[Math.floor(Math.random() * high.length)], dx: (Math.random() - .5) * .4, dy: -.1 - Math.random() * .2, t0: ms, dur: 900 });
+    nextTwinkle = ms + 1800 + Math.random() * 2600;
+  }
   for (const p of parts) { p.life += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .94; p.vy = p.vy * .94 - 14 * dt; }
   parts = parts.filter(p => p.life < p.max);
   floats = floats.filter(f => ms - f.t0 < f.dur);
@@ -2684,6 +2784,7 @@ cv.addEventListener('pointerdown', e => {
 cv.addEventListener('pointermove', e => {
   if (!ptr || e.pointerId !== ptr.id) return;
   lastInput = now();
+  ptr.vx = lerp(ptr.vx || 0, e.clientX - ptr.x, .35);   // smoothed sideways speed, for the dragged item's tilt
   ptr.x = e.clientX; ptr.y = e.clientY;
   if (!ptr.moved && !ptr.wake && Math.hypot(ptr.x - ptr.x0, ptr.y - ptr.y0) > 9) {
     ptr.moved = true;
@@ -2830,7 +2931,7 @@ function startOver() {
   const keep = S.set; S = freshState(); S.set = keep; S.intro = true;
   townAge++; risingMoons = 0; newest = null; leaving.fill(null);
   useArea(areaById('garden')); makeStars();
-  ensureWishes(); undoStack = []; anims = []; parts = []; floats = []; toasts.length = 0;
+  ensureWishes(); undoStack = []; anims = []; parts = []; floats = []; twinkles = []; toasts.length = 0;
   sel = -1; drag = null; dispGlow = 0; sceneDirty = true;
   save(); closeSheet(); toast({ title: 'A fresh garden', sub: 'Tap the seed pouch to begin.' });
 }
