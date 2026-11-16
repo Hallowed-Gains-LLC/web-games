@@ -85,6 +85,49 @@ Live at [hallowedgains.com/games/moonflower/](https://hallowedgains.com/games/mo
   hovers). Grant a wish and that visitor hops, then wanders off, and the next
   one walks in (`VISITOR_ART`, `drawVisitors`).
 
+## Little things
+
+- **Neighbours and letters.** A visitor is the same animal all over town
+  (the Owl in the garden is the Owl at the chapel), and it remembers every
+  wish you grant it. A letter comes "under the door" after the 1st, 3rd,
+  6th and 10th wish. The first two letters are in the animal's own voice
+  (two lines each, `VISITOR_NOTES`). The sixth brings a small gift, a
+  couple of steps better than the pouch, onto the board. After the tenth
+  it's a friend. The garden book has a Neighbours page listing everyone
+  you've met, with their hearts (♥ for each letter) and their letters, and
+  a gold dot on the book icon means a letter is waiting. Wish counts are
+  part of the undo snapshot; letters are kept and never sent twice
+  (`befriend`, `openNeighbours`, `S.friends`, `S.letters`).
+- **The real moon.** The big moon follows tonight's phase, worked out from
+  a known new moon and the mean synodic month. The dark part shows faintly
+  (earthshine), and the sky's glow follows how much is lit. The expanded
+  view names it ("Waxing gibbous tonight") (`moonPhase`, `drawMoon`).
+- **Wishing stars.** Every few minutes of play, a slow, bright falling star
+  crosses the sky. Tap it and it leaves two things a step better than the
+  pouch, or glow if the board is full. Missed, it just goes by. These are
+  separate from the garden's quick shooting stars, which are only to look
+  at (`updateWishStar`, `catchWishStar`).
+- **Seasons**, in every place, by the month: blossom drifting down in
+  spring, fireflies over the ground in summer, leaves falling and lying in
+  autumn, frost glittering in winter. In the southern hemisphere (guessed
+  from the phone's time zone) the seasons and the weather turn half a year.
+  Settings → Weather and seasons (`season`, `drawSeason`).
+- **Constellation stories.** In the expanded sky, tap a constellation you
+  grew to read a line about it, e.g. "The Owl: It keeps watch so you don't
+  have to." There's one for each of the 60 (`STAR_STORIES`, by place, since
+  the harbour and the chapel each have a Fish).
+- **Sounds for the little one** (the note icon at the top): a **shush**,
+  either soft brown noise, a rhythmic "shh… shh…" or gentle rain, and a
+  **music box** lullaby that makes itself up as it goes (a slow pentatonic
+  tune that wanders and comes home, with a soft echo). There are three
+  volumes and a "stop after" timer (15 min, 30 min, 1 hour, never) that
+  fades out over the last half minute. Everything is generated in the
+  browser: the noise is a few seconds looped with a crossfade so the seam
+  can't be heard, and nothing is downloaded. The sounds play whatever the
+  Sound setting says, never start by themselves, and keep the screen awake
+  (dimmed by the hush) while they play, so a locking phone doesn't stop
+  them (`openSounds`, `applySounds`, `startNoise`, `startBox`).
+
 ## Faith, quietly
 
 Hallowed Gains is a Christian company, and Moonflower keeps a parent company

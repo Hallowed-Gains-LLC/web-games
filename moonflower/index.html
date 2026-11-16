@@ -100,6 +100,17 @@
   .ver { text-align: center; opacity: .35; font-size: 12px; }
   #sheet a { color: #efd9a8; }
   .pray { margin: 0 0 14px; padding: 12px; font-size: 15px; color: #efd9a8; } .pray span { opacity: .8; margin-right: 4px; }
+  .bookbtns { display: flex; gap: 8px; } .bookbtns .pray { flex: 1; padding: 12px 6px; font-size: 14px; }
+  .newdot { font-style: normal; font-size: 11px; background: #f2c46d; color: #1a1406; border-radius: 999px; padding: 1px 7px; margin-left: 4px; }
+  .neighbours details { border-top: 1px solid rgba(255,255,255,.06); }
+  .neighbours summary { list-style: none; display: flex; align-items: center; gap: 12px; padding: 8px 0; cursor: pointer; }
+  .neighbours summary::-webkit-details-marker { display: none; }
+  .neighbours summary canvas { width: 48px; height: 48px; flex: 0 0 48px; border-radius: 12px; background: #121836; }
+  .neighbours summary span:first-of-type { flex: 1; } .neighbours summary small i { color: #f2c46d; font-style: normal; }
+  .hearts { color: #f2c46d; letter-spacing: 2px; font-size: 13px; }
+  .letter { background: #151b38; border-radius: 14px; padding: 4px 16px 6px; margin: 4px 0 10px; font-style: italic; line-height: 1.55; }
+  .letter.new { box-shadow: 0 0 0 1px rgba(242,196,109,.35); }
+  .letter p { margin: 8px 0 !important; } .letter .sig { text-align: right; opacity: .75; }
   .prayer { font-size: 16px; line-height: 1.65 !important; color: #ebe3cf; }
   .credit { font-style: italic; margin-bottom: 6px; }
   .verse { text-align: center; font-style: italic; opacity: .85; margin-top: 14px !important; }
@@ -154,7 +165,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '2.8.0';
+const VERSION = '2.9.0';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -623,8 +634,11 @@ function freshState() {
     morningOf: '',    // the last morning that was said
     feastOf: '',      // the last Christmas Day or Easter Day that was greeted (dayKey)
     verseAt: {},      // each verse list's next turn (VERSES)
-    psalmAt: { p: 0, v: 0 },   // the next psalm verse to read in the dark (NIGHT_PSALMS)
-    set: { dim: 1, warm: false, sound: false, buzz: false, hush: true, breathe: false, weather: true, verses: true, psalms: true },
+    psalmAt: { p: 0, v: 0 },
+    friends: {},      // wishes granted to each visitor, by name, town-wide (Neighbours)
+    letters: [],      // the letters they've sent: { who, k, item, day, read }   // the next psalm verse to read in the dark (NIGHT_PSALMS)
+    set: { dim: 1, warm: false, sound: false, buzz: false, hush: true, breathe: false, weather: true, verses: true, psalms: true,
+           shush: 'off', mbox: false, vol: 1, timer: 30 },   // the sounds sheet (openSounds); shush and mbox are reset at start-up
   };
 }
 function load() {
@@ -704,6 +718,7 @@ function layout() {
   L.gear = { x: L.cx + L.cw - 18, y: hy, r: 22 };
   L.book = { x: L.cx + L.cw - 62, y: hy, r: 22 };
   L.map = { x: L.cx + L.cw - 106, y: hy, r: 22 };
+  L.sounds = { x: L.cx + L.cw - 150, y: hy, r: 22 };
   L.expand = { x: L.gear.x, y: st + L.headerH + 16, r: 20 };   // in the sky's corner, under the gear
 
   sprites = []; silhouettes = []; foreignSprites = {};
@@ -793,11 +808,88 @@ function renderSky() {
     }
   }
   if (AREA.steeple) drawFarSteeple(c, V, AREA.steeple);
-  const m = moonPos(V);
-  drawGlow(c, m.x, m.y, 64, COL.moon, .22);
-  c.fillStyle = '#efe3c0'; c.beginPath(); c.arc(m.x, m.y, 12, 0, TAU); c.fill();
-  c.fillStyle = 'rgba(205,190,150,.45)';
-  for (const [dx, dy, r] of [[-4, -3, 2.6], [3, 4, 2], [4, -5, 1.4], [-3, 5, 1.2]]) { c.beginPath(); c.arc(m.x + dx, m.y + dy, r, 0, TAU); c.fill(); }
+  const m = moonPos(V), ph = moonPhase(), lit = (1 - Math.cos(ph * TAU)) / 2;
+  drawGlow(c, m.x, m.y, 64, COL.moon, .04 + .18 * lit);
+  drawMoon(c, m.x, m.y, 12, ph);
+}
+
+/* ---------- The real moon ---------- */
+/** Tonight's phase, 0 to 1 (0 new, .25 first quarter, .5 full, .75 last quarter), from a known new moon and the mean synodic month. */
+function moonPhase(d = new Date()) {
+  const days = (d.getTime() - Date.UTC(2000, 0, 6, 18, 14)) / 864e5;
+  return ((days / 29.530588853) % 1 + 1) % 1;
+}
+function moonPhaseName(ph = moonPhase()) {
+  return ph < .03 || ph > .97 ? 'New moon' : ph < .22 ? 'Waxing crescent' : ph < .28 ? 'First quarter' : ph < .47 ? 'Waxing gibbous'
+    : ph < .53 ? 'Full moon' : ph < .72 ? 'Waning gibbous' : ph < .78 ? 'Last quarter' : 'Waning crescent';
+}
+/**
+ * The big moon at phase `ph`: the dark part faintly there (earthshine), the
+ * lit part bounded by the limb on one side and the terminator, a half
+ * ellipse, on the other. Waxing, it's lit on the right (as seen from the
+ * northern hemisphere, where most of the players are).
+ */
+function drawMoon(c, x, y, r, ph) {
+  c.fillStyle = 'rgba(70,74,104,.4)'; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+  const k = Math.cos(ph * TAU);   // 1 new, 0 quarter, -1 full
+  c.save(); c.translate(x, y); if (ph > .5) c.scale(-1, 1);   // waning: the mirror image
+  c.beginPath(); c.arc(0, 0, r, -Math.PI / 2, Math.PI / 2);   // the lit limb, top to bottom
+  c.ellipse(0, 0, Math.max(.01, r * Math.abs(k)), r, 0, Math.PI / 2, -Math.PI / 2, k > 0);   // back up the terminator
+  c.closePath(); c.fillStyle = '#efe3c0'; c.fill(); c.clip();
+  c.fillStyle = 'rgba(205,190,150,.45)';   // craters, on the lit part only
+  for (const [dx, dy, cr] of [[-4, -3, 2.6], [3, 4, 2], [4, -5, 1.4], [-3, 5, 1.2]]) { c.beginPath(); c.arc((ph > .5 ? -dx : dx), dy, cr, 0, TAU); c.fill(); }
+  c.restore();
+}
+
+/* ---------- Wishing stars ---------- */
+// Now and then (every few minutes of play) a slow, bright falling star
+// crosses the sky, slow enough to catch: tap it and it leaves a small gift.
+// Missed, it just goes by. Not the garden's quick shooting stars, which are
+// only for looking at.
+let wishStar = null, nextWishStar = now() + 70000 + Math.random() * 60000;
+const WISH_STAR_MS = 3200;
+function updateWishStar(ms) {
+  if (wishStar && ms > wishStar.t0 + WISH_STAR_MS) wishStar = null;
+  if (wishStar || ms < nextWishStar) return;
+  nextWishStar = ms + 150000 + Math.random() * 150000;
+  if (!S.intro || hushA < 1 || wrap.classList.contains('open') || L.rotate) return;
+  const V = sceneView(), m = moonPos(V), left = Math.random() < .5;
+  const x0 = left ? lerp(V.xl + 30, 160, Math.random()) : lerp(200, m.x - 40, Math.random()), y0 = V.top + 8 + Math.random() * Math.max(6, (V.G - 70 - V.top) * .4);
+  wishStar = { t0: ms, x0, y0, dx: (left ? 1 : -1) * (90 + Math.random() * 40), dy: 34 + Math.random() * 16 };
+}
+/** Where the wishing star's head is, in scene units, at `ms` (a gentle curve, slowing as it falls). */
+function wishStarAt(ms) {
+  const p = (ms - wishStar.t0) / WISH_STAR_MS, e = 1 - Math.pow(1 - p, 1.6);
+  return { x: wishStar.x0 + wishStar.dx * e, y: wishStar.y0 + wishStar.dy * e * e, p };
+}
+function drawWishStar(c, ms) {
+  if (!wishStar) return;
+  const h = wishStarAt(ms), a = Math.sin(h.p * Math.PI);
+  for (let k = 1; k <= 14; k++) {   // its trail, sparkling as it fades
+    const q = Math.max(0, h.p - k * .012), e = 1 - Math.pow(1 - q, 1.6);
+    const x = wishStar.x0 + wishStar.dx * e, y = wishStar.y0 + wishStar.dy * e * e;
+    c.globalAlpha = a * (1 - k / 15) * (.5 + .5 * Math.sin(ms / 60 + k)); c.fillStyle = '#fff1cc'; c.fillRect(x - .9, y - .9, 1.8, 1.8);
+  }
+  c.globalAlpha = 1;
+  drawGlow(c, h.x, h.y, 24, '#ffe2a0', .8 * a);
+  sparkle(c, h.x, h.y, 6 * a, `rgba(255,250,232,${a})`);
+}
+/** The wishing star was tapped: a toast, and a couple of things a step better than the pouch fly down from it onto the board. */
+function catchWishStar(ms) {
+  const V = sceneView(), h = wishStarAt(ms), from = { x: V.ox + h.x * V.s, y: h.y * V.s };
+  wishStar = null; S.stats.stars = (S.stats.stars || 0) + 1;
+  burst(from.x, from.y, 18, 1.2); ring(from.x, from.y, 40); sfx.discover();
+  const tier = Math.min(pouchTier() + 1, S.best);
+  let n = 0;
+  for (let k = 0; k < 2; k++) {
+    const i = pickSpawnCell(); if (i < 0) break;
+    S.board[i] = tier; n++;
+    fly(tier, from, cellCenter(i), 700 + k * 160, { s0: .2, arc: -20, hide: i });
+  }
+  if (!n) gain(value(tier) * 3, from);
+  const what = n === 2 ? `two ${ITEMS[tier].many.toLowerCase()}` : n ? an(ITEMS[tier].name.toLowerCase()) : 'a little glow';
+  toast({ title: 'You wished on a star', sub: `It left you ${what}.`, wonder: true, dur: 3600 });
+  undoStack = []; save();
 }
 
 function renderLand() {
@@ -991,6 +1083,7 @@ function drawScene(c, ms) {
   }
   c.globalAlpha = 1;
   drawConstellations(c, t, ms);
+  drawWishStar(c, ms);
   const sea = churchSeason();
   if (sea.star) drawStar(c, V, t, sea.star, starMul);
   if (has('shooting')) {
@@ -1024,6 +1117,7 @@ function drawScene(c, ms) {
 
   c.save(); c.translate(V.ox, 0); c.scale(V.s, V.s);
   AREA.drawLive(c, V, t);
+  const sn = season(); if (sn) drawSeason(c, V, t, sn);
   drawVisitors(c, V, t, ms);
   if (wx) drawWeather(c, V, t, wx);
   c.restore();
@@ -1140,11 +1234,74 @@ function checkMorning() {
  */
 function weather() {
   if (!S.set.weather) return null;
-  const d = new Date(), mo = d.getMonth();
+  const d = new Date(), mo = localMonth(d);
   const r = mulberry32(d.getFullYear() * 400 + mo * 31 + d.getDate())();
   if (mo === 11 || mo <= 1) return r < .45 ? 'snow' : null;
   return r < (mo >= 2 && mo <= 4 ? .3 : .2) ? 'rain' : null;
 }
+/* ---------- Seasons ---------- */
+// The month as the weather knows it: in the southern hemisphere (guessed
+// from the phone's time zone) the seasons are turned half a year, so it
+// snows in July there, not at Christmas.
+const SOUTHERN = /^(Australia|Antarctica)\/|^Pacific\/(Auckland|Chatham|Fiji|Noumea|Tongatapu)|^America\/(Argentina|Santiago|Sao_Paulo|Montevideo|Asuncion|Punta_Arenas)|^Africa\/(Johannesburg|Maputo|Harare|Windhoek|Gaborone|Lusaka|Maseru|Mbabane)|^Indian\/(Mauritius|Reunion)/;
+const southern = (() => { try { return SOUTHERN.test(Intl.DateTimeFormat().resolvedOptions().timeZone || ''); } catch (e) { return false; } })();
+const localMonth = (d = new Date()) => (d.getMonth() + (southern ? 6 : 0)) % 12;
+/** Tonight's season, for the scenes (Settings → Weather and seasons): spring from March, summer from June, autumn from September, winter from December. */
+function season() {
+  if (!S.set.weather) return null;
+  return ['winter', 'spring', 'summer', 'autumn'][Math.floor(((localMonth() + 1) % 12) / 3)];
+}
+/**
+ * The season in every place, drawn from the clock alone like the weather
+ * (scene units, over the land and under the visitors): blossom drifting
+ * down in spring, fireflies low over the ground in summer, leaves falling
+ * and lying in autumn, frost glittering on the ground in winter. With
+ * "reduce motion" on, only what lies on the ground.
+ */
+function drawSeason(c, V, t, sn) {
+  const span = V.xr - V.xl, top = V.top - 10, fall = V.vh - top, still = calm();
+  if (sn === 'spring' && !still) {
+    for (let i = 0; i < 18; i++) {   // petals, fluttering down on a breeze
+      const y = top + ((i * 53.1 + t * 11) % fall), x = V.xl + ((i * 71.3 + t * 7) % span) + Math.sin(t * 1.3 + i) * 5;
+      c.save(); c.translate(x, y); c.rotate(t * (.8 + (i % 3) * .3) + i); c.scale(1, .45 + .45 * Math.sin(t * 2 + i));
+      c.fillStyle = i % 3 ? 'rgba(240,190,206,.8)' : 'rgba(250,226,234,.75)'; c.beginPath(); c.ellipse(0, 0, 3, 1.9, 0, 0, TAU); c.fill();
+      c.restore();
+    }
+  } else if (sn === 'summer' && !still) {
+    for (let i = 0; i < 14; i++) {   // fireflies, low over the ground and up into the dark
+      const x = V.xl + ((i * 97.3) % span) + 18 * Math.sin(t * (.23 + i * .02) + i * 2.1);
+      const y = nearY(V, x) - 6 - (i % 3 ? 12 : 30) * (.5 + .5 * Math.sin(t * (.31 + i * .015) + i));
+      const a = Math.pow(Math.max(0, Math.sin(t * (.8 + i * .07) + i * 1.3)), 2);
+      if (a < .02) continue;
+      drawGlow(c, x, y, 8, COL.fly, a * .85); c.globalAlpha = a; c.fillStyle = '#fff6c8'; c.fillRect(x - .8, y - .8, 1.6, 1.6); c.globalAlpha = 1;
+    }
+  } else if (sn === 'autumn') {
+    const cols = ['#b5652e', '#c9883a', '#8e4b2a', '#d4a24a'];
+    for (let i = 0; i < 26; i++) {   // leaves already down
+      const x = V.xl + ((i * 37.9) % span), y = nearY(V, x) + 1.5 + (i % 3) * .8;
+      c.fillStyle = rgba(cols[i % 4], .7); c.beginPath(); c.ellipse(x, y, 2.8, 1.1, (i % 5) * .6 - 1.2, 0, TAU); c.fill();
+    }
+    if (!still) for (let i = 0; i < 12; i++) {   // and a few still falling, tumbling as they go
+      const y = top + ((i * 61.7 + t * 9) % fall), x = V.xl + ((i * 83.1) % span) + Math.sin(t * .9 + i * 1.7) * 9;
+      c.save(); c.translate(x, y); c.rotate(Math.sin(t * 1.6 + i) * 1.2); c.scale(1, .5 + .5 * Math.abs(Math.sin(t * 1.2 + i)));
+      c.fillStyle = rgba(cols[i % 4], .9); c.beginPath(); c.moveTo(-3.6, 0); c.quadraticCurveTo(0, -2.6, 3.6, 0); c.quadraticCurveTo(0, 2.6, -3.6, 0); c.fill();
+      c.restore();
+    }
+  } else if (sn === 'winter') {
+    c.fillStyle = 'rgba(214,224,250,.13)';   // a rime of frost along the ground
+    c.beginPath(); c.moveTo(V.xl, nearY(V, V.xl) + 2.4);
+    for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, nearY(V, x) - .4);
+    for (let x = V.xr + 4; x >= V.xl; x -= 4) c.lineTo(x, nearY(V, x) + 2.4);
+    c.fill();
+    for (let i = 0; i < 44; i++) {   // glittering
+      const x = V.xl + ((i * 29.7) % span), y = nearY(V, x) + .3 + (i % 4) * .7;
+      const a = still ? .5 : .15 + .85 * Math.pow(Math.max(0, Math.sin(t * (.7 + (i % 5) * .13) + i * 2.3)), 4);
+      if (a > .5) drawGlow(c, x, y, 3, '#e8eeff', a * .5);
+      c.fillStyle = `rgba(236,242,255,${a})`; c.fillRect(x - .7, y - .7, 1.4, 1.4);
+    }
+  }
+}
+
 /** Soft clouds over the sky on a rainy night, the moon half behind one (scene units). */
 function drawRainClouds(c, V, t) {
   const m = moonPos(V);
@@ -1838,19 +1995,8 @@ function toast(o) {
    ============================================================ */
 let AC = null, master = null;
 const NOTES = [196, 220, 261.63, 293.66, 329.63, 392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
-function audio() {
-  if (!S.set.sound) return null;
-  try {
-    if (!AC) {
-      AC = new (window.AudioContext || window.webkitAudioContext)();
-      master = AC.createGain(); master.gain.value = .55;
-      const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2600;
-      master.connect(lp); lp.connect(AC.destination);
-    }
-    if (AC.state === 'suspended') AC.resume();
-  } catch (e) { return null; }
-  return AC;
-}
+/** The audio context for the game's own chimes: none while Sound is off (the shush and music box use audioCtx directly). */
+function audio() { return S.set.sound ? audioCtx() : null; }
 function chime(freq, when = 0, vol = .1, dur = 1.6) {
   const ac = audio(); if (!ac) return;
   const t = ac.currentTime + when;
@@ -1884,17 +2030,217 @@ const sfx = {
 function buzz(ms) { if (S.set.buzz && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} }
 
 /* ============================================================
+   Sounds for the little one: shush and a music box
+   ============================================================ */
+// Opened from the note icon at the top. Soft sounds for settling a baby,
+// all made here in the browser (nothing to download, works offline):
+//   * Shush: soft (brown) noise, a rhythmic "shh… shh…", or gentle rain,
+//     each a few seconds of generated noise looped with a crossfade so the
+//     seam can't be heard.
+//   * A music box: a slow lullaby made up as it goes (a pentatonic tune
+//     that wanders and comes home to its first note), with a soft echo.
+// They play whatever the game's Sound setting says (they're asked for),
+// stop on their own after the chosen time (fading out over 30 s), and keep
+// the screen awake while they play (dimmed by the hush) so a locked phone
+// doesn't cut them off. Choices are kept in S.set (shush, mbox, vol,
+// timer); nothing starts by itself when the game opens.
+const SND_VOL = [.35, .6, 1];   // Soft, Medium, Louder
+const SND_FADE_MS = 30000;
+let snd = { kind: 'off', mbox: false, stopAt: 0, out: null, noise: null, box: null, wake: null, fading: false };
+
+/** The shared AudioContext, made on first use (from a tap, as browsers require) whatever the Sound setting. */
+function audioCtx() {
+  try {
+    if (!AC) {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      master = AC.createGain(); master.gain.value = .55;
+      const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2600;
+      master.connect(lp); lp.connect(AC.destination);
+    }
+    if (AC.state === 'suspended') AC.resume();
+  } catch (e) { return null; }
+  return AC;
+}
+const noiseCache = {};
+/** `secs` of noise of a kind ('brown' or 'pink'), made to loop: the last half second is crossfaded into the start. */
+function noiseLoop(ac, kind, secs = 8) {
+  if (noiseCache[kind]) return noiseCache[kind];
+  const sr = ac.sampleRate, n = Math.floor(secs * sr), f = Math.floor(.5 * sr), d = new Float32Array(n + f);
+  let last = 0, b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+  for (let i = 0; i < n + f; i++) {
+    const w = Math.random() * 2 - 1;
+    if (kind === 'brown') { last = (last + .02 * w) / 1.02; d[i] = last * 3.5; }
+    else {   // pink, by Paul Kellet's filter
+      b0 = .99886 * b0 + w * .0555179; b1 = .99332 * b1 + w * .0750759; b2 = .969 * b2 + w * .153852;
+      b3 = .8665 * b3 + w * .3104856; b4 = .55 * b4 + w * .5329522; b5 = -.7616 * b5 - w * .016898;
+      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * .5362) * .11; b6 = w * .115926;
+    }
+  }
+  for (let i = 0; i < f; i++) d[i] = d[i] * (i / f) + d[n + i] * (1 - i / f);
+  const buf = ac.createBuffer(1, n, sr); buf.getChannelData(0).set(d.subarray(0, n));
+  return noiseCache[kind] = buf;
+}
+/** The output both sounds go through: the volume, and the timer's fade. */
+function sndOut(ac) {
+  if (!snd.out) { snd.out = ac.createGain(); snd.out.connect(ac.destination); }
+  return snd.out;
+}
+function startNoise(kind) {
+  stopNoise();
+  const ac = audioCtx(); if (!ac) return;
+  const src = ac.createBufferSource(); src.buffer = noiseLoop(ac, kind === 'noise' ? 'brown' : 'pink'); src.loop = true;
+  const g = ac.createGain(), nodes = [src, g];
+  if (kind === 'noise') { g.gain.value = .5; src.connect(g); }
+  else if (kind === 'rain') {   // pink noise, with the rumble and the hiss taken off, swelling a little now and then
+    const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 450;
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5200;
+    const lfo = ac.createOscillator(), depth = ac.createGain(); lfo.frequency.value = .07; depth.gain.value = .08;
+    g.gain.value = .32; lfo.connect(depth); depth.connect(g.gain); lfo.start();
+    src.connect(hp); hp.connect(lp); lp.connect(g); nodes.push(hp, lp, lfo, depth);
+  } else {   // shushing: the hiss of "shh", coming and going about once a second and a half, like a parent's
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = .7;
+    const lfo = ac.createOscillator(), depth = ac.createGain(); lfo.frequency.value = .68; depth.gain.value = .42;
+    g.gain.value = .5; lfo.connect(depth); depth.connect(g.gain); lfo.start();
+    src.connect(bp); bp.connect(g); nodes.push(bp, lfo, depth);
+  }
+  g.connect(sndOut(ac)); src.start();
+  snd.noise = nodes;
+}
+function stopNoise() {
+  if (!snd.noise) return;
+  for (const n of snd.noise) { try { if (n.stop) n.stop(); n.disconnect(); } catch (e) {} }
+  snd.noise = null;
+}
+
+/* ---------- The music box ---------- */
+let reverbBuf = null;
+/** A soft room: two seconds of decaying noise, for the music box's echo. */
+function reverb(ac) {
+  if (!reverbBuf) {
+    const sr = ac.sampleRate, n = Math.floor(2.4 * sr);
+    reverbBuf = ac.createBuffer(2, n, sr);
+    for (let ch = 0; ch < 2; ch++) { const d = reverbBuf.getChannelData(ch); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3); }
+  }
+  const cv = ac.createConvolver(); cv.buffer = reverbBuf; return cv;
+}
+/** One music-box tine: a pure note with a couple of quick-dying overtones, as a comb's teeth sound. */
+function tine(ac, dest, freq, t, vol) {
+  const g = ac.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .005); g.gain.exponentialRampToValueAtTime(.0001, t + 2.6);
+  g.connect(dest);
+  for (const [mul, amp, dur] of [[1, 1, 2.6], [2.76, .22, .5], [5.4, .08, .18]]) {
+    const o = ac.createOscillator(), og = ac.createGain(); o.type = 'sine'; o.frequency.value = freq * mul;
+    og.gain.setValueAtTime(amp, t); og.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(og); og.connect(g); o.start(t); o.stop(t + dur + .05);
+  }
+}
+const BOX_BEAT = .62;   // seconds a beat: slow, about a heartbeat at rest
+/** The next phrase of the lullaby: eight beats wandering the pentatonic scale, the last coming home. */
+function boxPhrase(prev) {
+  const notes = [], scale = [5, 6, 7, 8, 9, 10, 11, 12];   // G4 up to C6 in NOTES
+  let at = prev ?? 2;
+  for (let b = 0; b < 8; b++) {
+    if (b === 7) { notes.push({ b, n: scale[Math.random() < .5 ? 2 : 7] }); break; }   // home to C
+    if (b % 2 && Math.random() < .35) continue;   // a rest now and then
+    at = clamp(at + [-2, -1, -1, 1, 1, 2][Math.floor(Math.random() * 6)], 0, scale.length - 1);
+    notes.push({ b, n: scale[at] });
+  }
+  return { notes, last: at };
+}
+function startBox() {
+  stopBox();
+  const ac = audioCtx(); if (!ac) return;
+  const dry = ac.createGain(), wet = ac.createGain(), rv = reverb(ac), bus = ac.createGain();
+  dry.gain.value = .75; wet.gain.value = .4; bus.gain.value = .11;
+  bus.connect(dry); bus.connect(rv); rv.connect(wet); dry.connect(sndOut(ac)); wet.connect(sndOut(ac));
+  const box = { bus, nodes: [dry, wet, rv, bus], next: ac.currentTime + .3, phrase: 0, last: 2 };
+  // Schedule a little ahead on a timer, so the tune keeps time even if a frame is slow.
+  box.timer = setInterval(() => {
+    while (box.next < ac.currentTime + 1.5) {
+      const ph = boxPhrase(box.last); box.last = ph.last;
+      for (const { b, n } of ph.notes) tine(ac, bus, NOTES[n], box.next + b * BOX_BEAT, b === 7 ? .7 : .55 + Math.random() * .2);
+      if (box.phrase % 2 === 0) tine(ac, bus, NOTES[box.phrase % 4 ? 0 : 2] / 2, box.next, .3);   // a low C or G under every other phrase
+      box.next += 8 * BOX_BEAT + (box.phrase % 4 === 3 ? BOX_BEAT * 2 : 0);   // a breath every fourth phrase
+      box.phrase++;
+    }
+  }, 250);
+  snd.box = box;
+}
+function stopBox() {
+  if (!snd.box) return;
+  clearInterval(snd.box.timer);
+  for (const n of snd.box.nodes) { try { n.disconnect(); } catch (e) {} }
+  snd.box = null;
+}
+
+/* ---------- Playing, the timer, the screen ---------- */
+const sndPlaying = () => !!(snd.noise || snd.box);
+/** Make the sounds match the choices in S.set (called when one changes in the sheet). */
+function applySounds() {
+  const ac = audioCtx(); if (!ac) return;
+  const want = S.set.shush || 'off';
+  if (want !== snd.kind || (want !== 'off' && !snd.noise)) { if (want === 'off') stopNoise(); else startNoise(want); snd.kind = want; }
+  if (S.set.mbox && !snd.box) startBox(); else if (!S.set.mbox && snd.box) stopBox();
+  const out = sndOut(ac);
+  out.gain.cancelScheduledValues(ac.currentTime); out.gain.setTargetAtTime(SND_VOL[S.set.vol ?? 1], ac.currentTime, .3);
+  snd.fading = false;
+  snd.stopAt = sndPlaying() && S.set.timer ? Date.now() + S.set.timer * 60000 : 0;
+  keepAwake(sndPlaying());
+}
+/** Every frame: fade out over the last 30 s of the timer, then stop. */
+function updateSounds() {
+  if (!snd.stopAt || !sndPlaying()) return;
+  const left = snd.stopAt - Date.now();
+  if (left <= SND_FADE_MS && !snd.fading && AC) { snd.fading = true; snd.out.gain.setTargetAtTime(0, AC.currentTime, SND_FADE_MS / 4000); }
+  if (left <= 0) { stopAllSounds(); toast({ title: 'The sounds have faded out', sub: 'Sweet dreams.' }); }
+}
+function stopAllSounds() {
+  stopNoise(); stopBox(); snd.kind = 'off'; snd.stopAt = 0; snd.fading = false;
+  S.set.shush = 'off'; S.set.mbox = false; save();
+  keepAwake(false);
+  if (wrap.classList.contains('open') && document.getElementById('sndnote')) openSounds();
+}
+/** Keep the screen on while sounds play (where the browser allows it), so a locked phone doesn't stop them. */
+async function keepAwake(on) {
+  try {
+    if (on && !snd.wake && navigator.wakeLock) snd.wake = await navigator.wakeLock.request('screen');
+    else if (!on && snd.wake) { await snd.wake.release(); snd.wake = null; }
+  } catch (e) { snd.wake = null; }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && sndPlaying()) { snd.wake = null; keepAwake(true); if (AC && AC.state === 'suspended') AC.resume(); } });
+
+/** The sounds sheet. */
+function openSounds() {
+  const seg = (k, opts) => `<div class="seg">${opts.map(([v, n]) => `<button data-snd="${k}" data-val="${v}" aria-pressed="${String(S.set[k]) === String(v)}">${n}</button>`).join('')}</div>`;
+  const time = new Date(snd.stopAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const note = !sndPlaying() ? 'Nothing playing.' : snd.stopAt ? `Playing. It fades out at ${time}.` : 'Playing until you stop it.';
+  openSheet(`
+    <h2>Sounds for the little one</h2>
+    <p><small>Soft sounds to help settle a baby, played from this phone. They carry on while you play, and the screen stays on (dimmed) so they don't stop.</small></p>
+    <div class="row col"><b>Shush</b></div>
+    ${seg('shush', [['off', 'Off'], ['noise', 'Soft noise'], ['shush', 'Shushing'], ['rain', 'Rain']])}
+    <div class="row col"><b>Music box</b><small>A slow lullaby that makes itself up as it goes, never quite the same twice.</small></div>
+    ${seg('mbox', [[false, 'Off'], [true, 'On']])}
+    <div class="row col"><b>Volume</b></div>
+    ${seg('vol', [[0, 'Soft'], [1, 'Medium'], [2, 'Louder']])}
+    <div class="row col"><b>Stop after</b><small>It fades out gently over the last half minute.</small></div>
+    ${seg('timer', [[15, '15 min'], [30, '30 min'], [60, '1 hour'], [0, 'Never']])}
+    <p class="mapnote" id="sndnote">${note}</p>
+    ${sndPlaying() ? '<button class="btn ghost" data-sndstop>Stop all sounds</button>' : ''}
+    <button class="btn done" data-close>Done</button>`);
+}
+
+/* ============================================================
    The rules
    ============================================================ */
 function pushUndo() {
-  undoStack.push(JSON.stringify({ b: S.board, g: S.glow, w: S.wishes.map(w => ({ tier: w.tier, who: w.who, reward: w.reward, from: w.from })), st: S.stats, sa: S.satchel }));
+  undoStack.push(JSON.stringify({ b: S.board, g: S.glow, w: S.wishes.map(w => ({ tier: w.tier, who: w.who, reward: w.reward, from: w.from })), st: S.stats, sa: S.satchel, fr: S.friends }));
   if (undoStack.length > 40) undoStack.shift();
 }
 function doUndo() {
   const snap = undoStack.pop();
   if (!snap) { toast({ title: 'Nothing to undo' }); return; }
   const d = JSON.parse(snap);
-  S.board = d.b; S.glow = d.g; S.stats = d.st; S.satchel = d.sa || S.satchel;
+  S.board = d.b; S.glow = d.g; S.stats = d.st; S.satchel = d.sa || S.satchel; S.friends = d.fr || S.friends;
   S.wishes = d.w.map(w => Object.assign(w, { born: now() }));
   anims = []; sel = -1;
   sfx.undo(); save();
@@ -1994,6 +2340,8 @@ function deliver(wi, cell, from) {
   S.wishes[wi] = nw;
   gain(w.reward, { x: r.x + r.w / 2, y: r.y + 10 }, 320);
   later(320, () => { burst(to.x, to.y, 12); sfx.wish(); buzz(12); });
+  const age = townAge, name = ITEMS[t].name;
+  later(700, () => { if (age === townAge) befriend(w.who, name, to); });
   homeMotes({ x: r.x + r.w / 2, y: r.y + r.h / 2 }, 5, 380);
   save();
 }
@@ -2037,6 +2385,8 @@ function deliverErrand(wi, k) {
   S.wishes[wi] = nw;
   gain(w.reward, { x: r.x + r.w / 2, y: r.y + 10 }, 420);
   later(420, () => { burst(to.x, to.y, 16); sfx.wish(); buzz(12); });
+  const age = townAge, name = areaById(item.area).items[item.tier].name;
+  later(800, () => { if (age === townAge) befriend(w.who, name, to); });
   save();
 }
 /** Take something out of the satchel: it goes back to its own area's board. */
@@ -2316,6 +2666,7 @@ function drawHeader(c) {
   c.save(); c.translate(L.book.x, L.book.y); c.beginPath();
   c.moveTo(0, -6); c.quadraticCurveTo(-6, -9, -11, -7); c.lineTo(-11, 7); c.quadraticCurveTo(-6, 5, 0, 8);
   c.quadraticCurveTo(6, 5, 11, 7); c.lineTo(11, -7); c.quadraticCurveTo(6, -9, 0, -6); c.lineTo(0, 8); c.stroke();
+  if (unreadLetters()) { c.fillStyle = COL.gold; c.beginPath(); c.arc(11, -9, 3.2, 0, TAU); c.fill(); }   // a letter waiting
   c.restore();
   // the town map (a gold dot while an open area hasn't been visited)
   c.save(); c.translate(L.map.x, L.map.y); c.beginPath();
@@ -2335,6 +2686,17 @@ function drawHeader(c) {
   c.restore();
   // expand the scene: four corners pointing out, faint, in the sky under the gear
   c.strokeStyle = rgba(COL.text, .4); c.lineWidth = 1.5; expandGlyph(c, L.expand.x, L.expand.y, 1);
+  // sounds for the little one: a note, gold with soft waves while something plays
+  const on = sndPlaying(), col = on ? COL.gold : rgba(COL.text, .7);
+  c.save(); c.translate(L.sounds.x, L.sounds.y);
+  c.fillStyle = col; c.strokeStyle = col; c.lineWidth = 1.8; c.lineCap = 'round';
+  c.beginPath(); c.ellipse(-4, 6, 3.6, 2.7, -.4, 0, TAU); c.fill();
+  c.beginPath(); c.moveTo(-.8, 5.4); c.lineTo(-.8, -9); c.quadraticCurveTo(4, -6, 5.6, -1.6); c.stroke();
+  if (on) for (let k = 0; k < 2; k++) {
+    const a = .3 + .3 * Math.sin(now() / 400 - k);
+    c.strokeStyle = rgba(COL.gold, a); c.beginPath(); c.arc(4, 3, 6 + k * 4, -.6, .6); c.stroke();
+  }
+  c.restore();
 }
 /** Four corners of a frame: pointing out (`dir` 1, expand) or in (-1, back). */
 function expandGlyph(c, x, y, dir) {
@@ -2640,6 +3002,8 @@ function drawBreath(c, ms) {
 
 function update(dt, ms) {
   updateHush(dt, ms);
+  updateWishStar(ms);
+  updateSounds();
   for (const a of anims) if (a.k === 'mote' && ms >= a.t0 + a.dur) glowBump = ms;   // landed on the counter
   anims = anims.filter(a => ms < a.t0 + a.dur);
   // Now and then a glint on one of the higher things on the board (sixth step up).
@@ -2659,7 +3023,7 @@ function frame() {
   requestAnimationFrame(frame);
   const ms = now();
   const active = drag || anims.length || parts.length || floats.length || toasts.length
-    || ms - lastInput < 1500 || dispGlow !== S.glow || (hushA > 0 && hushA < 1) || ms - arrivedAt < 700;
+    || ms - lastInput < 1500 || wishStar || dispGlow !== S.glow || (hushA > 0 && hushA < 1) || ms - arrivedAt < 700;
   if (!active && ms - lastDraw < 1000 / 20) return;
   const dt = Math.min(.05, (ms - lastDraw) / 1000); lastDraw = ms;
   update(dt, ms);
@@ -2706,7 +3070,7 @@ function drawUI(c, ms) {
  */
 function toggleExpand() {
   if (!expanded && (anims.length || risingMoons || drag)) return;
-  expanded = !expanded; expandedAt = now(); sel = -1;
+  expanded = !expanded; expandedAt = now(); sel = -1; starStory = null;
   layout();
   arrivedAt = now(); lastInput = now();   // the same short fade-in as walking somewhere
 }
@@ -2716,7 +3080,8 @@ function drawExpanded(c, ms) {
   c.save(); c.textAlign = 'center'; c.textBaseline = 'middle';
   c.font = font(16, 600); c.fillStyle = rgba(COL.textHi, .78); c.fillText(AREA.name, W / 2, y);
   const hint = clamp(1 - (ms - expandedAt - 3500) / 1200, 0, 1);
-  if (hint) { c.globalAlpha = hint * .6; c.font = font(12, 500); c.fillStyle = COL.text; c.fillText('Tap anywhere to go back', W / 2, y + 20); c.globalAlpha = 1; }
+  if (hint) { c.globalAlpha = hint * .6; c.font = font(12, 500); c.fillStyle = COL.text; c.fillText(S.skyMoons ? 'Tap a constellation for its story, or anywhere else to go back' : 'Tap anywhere to go back', W / 2, y + 20); c.globalAlpha = 1; }
+  else { c.font = font(12, 500); c.fillStyle = rgba(COL.text, .45); c.fillText(`${moonPhaseName()} tonight`, W / 2, y + 20); }
   // Names under the constellations, faint enough to stay out of the way.
   const moons = Math.min(S.skyMoons - risingMoons, skySlots.length);
   c.font = font(10.5, 500); c.fillStyle = rgba(COL.text, .42);
@@ -2727,7 +3092,110 @@ function drawExpanded(c, ms) {
   }
   c.restore();
   c.strokeStyle = rgba(COL.text, .55); c.lineWidth = 1.6; expandGlyph(c, L.gear.x, y, -1);
+  drawStarStory(c, ms, V);
 }
+/** The story of the constellation just tapped: a ring around it, and a card under the place's name; it fades after a while. */
+function drawStarStory(c, ms, V) {
+  if (!starStory) return;
+  const p = ms - starStory.t0, a = Math.min(1, p / 300, (9000 - p) / 900);
+  if (a <= 0) { starStory = null; return; }
+  const sl = skySlots[starStory.k]; if (!sl) return;
+  const shape = moonShape(starStory.k), text = (STAR_STORIES[AREA.id] || {})[shape.name] || '';
+  c.save(); c.globalAlpha = a;
+  c.strokeStyle = rgba(COL.gold, .5); c.lineWidth = 1; c.beginPath(); c.arc(V.ox + sl.x * V.s, sl.y * V.s, (SHAPE_R + 8) * V.s, 0, TAU); c.stroke();
+  const maxW = Math.min(L.cw - 40, 340); c.font = font(14, 500);
+  const lines = [];
+  for (const word of text.split(' ')) { const last = lines[lines.length - 1]; if (last !== undefined && c.measureText(`${last} ${word}`).width <= maxW) lines[lines.length - 1] = `${last} ${word}`; else lines.push(word); }
+  const h = 40 + lines.length * 20, top = L.st + L.headerH + 30;
+  rr(c, W / 2 - maxW / 2 - 16, top, maxW + 32, h, 16); c.fillStyle = 'rgba(10,13,30,.9)'; c.fill(); c.strokeStyle = rgba(COL.gold, .25); c.stroke();
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = font(14, 700); c.fillStyle = COL.gold; c.fillText(shape.name, W / 2, top + 18);
+  c.font = font(14, 500); c.fillStyle = rgba(COL.textHi, .9);
+  lines.forEach((ln, i) => c.fillText(ln, W / 2, top + 40 + i * 20));
+  c.restore();
+}
+
+/* ---------- Constellation stories ---------- */
+// One line for each constellation you can grow, shown when you tap it in
+// the expanded sky (by place, since two places each have a Fish: the
+// harbour's, and the chapel's, the old Christian sign).
+const STAR_STORIES = {
+  garden: {
+    'The Sleeping Moon': 'The first moon you grew. It keeps watch over the garden, so you can close your eyes.',
+    'The Luna Moth': 'Luna moths live for a week and never eat. They spend it all on the night. Some nights feel like that.',
+    'The Moonflower': 'It only opens after dark. Some of the best things do.',
+    'The Owl': 'It keeps watch so you don\'t have to. Not every hour needs you awake.',
+    'The Lantern': 'Someone left a light on for you.',
+    'The Fox': 'Curled up, nose under tail. Sleep is coming, even if it\'s slow.',
+    'The Firefly Jar': 'A jar of small lights, let go at the end of summer. Every one of them came home.',
+    'The Rabbit': 'Rabbits are most awake at dusk and dawn. You\'re in good company.',
+    'The Wishing Tree': 'Hang a wish on it: sleep for the little one, and a little for you, too.',
+    'The Hedgehog': 'Prickly on the outside, snoring on the inside.',
+    'The Sprout': 'Everything starts small. Everything grows. So will they.',
+    'The Cottage': 'One window lit. Someone else is up with a little one, too.',
+  },
+  farm: {
+    'The Sky Lantern': 'Let a little light go, and watch it rise. Some worries go the same way.',
+    'The Hen': 'Hens tuck their chicks under their wings all night. You know the feeling.',
+    'The Sheep': 'Count it if you like. Just the one. It\'s very soft.',
+    'The Pony': 'It sleeps standing up. Please don\'t try this.',
+    'The Windmill': 'Slow sails, turning all night. Things keep moving, even when you\'re tired.',
+    'The Barn': 'Warm, and full of sleepers breathing slow.',
+    'The Cartwheel': 'Feed, nap, change, again. Round and round, and it does roll on.',
+    'The Scarecrow': 'Up all night in the field, and never once complains. It can\'t. You can.',
+  },
+  park: {
+    'The Kite': 'Caught by the wind and carried up. Let something lift you tonight.',
+    'The Acorn': 'Small and quiet, and holding a whole oak.',
+    'The Oak': 'A hundred years to grow this big, one slow ring at a time.',
+    'The Bench': 'Somewhere to sit for a while. You\'re allowed.',
+    'The Lamp': 'A light on the path all night, for whoever is out walking.',
+    'The Fountain': 'The water keeps falling, soft and steady, like breathing.',
+    'The Squirrel': 'It hid an acorn and forgot it. Now there\'s a tree. Forgetting isn\'t always failing.',
+    'The Carousel': 'The horses rest at night. Their painted eyes stay open, just in case.',
+  },
+  lane: {
+    'The Lullaby': 'Every house on the lane has sung this one. You probably know the words.',
+    'The Teapot': 'Put the kettle on. Nobody is judging the hour.',
+    'The Mug': 'Still warm. Drink it before it isn\'t.',
+    'The House': 'Doors locked, lights low, and everyone you love under one roof.',
+    'The Armchair': 'This chair has held more sleeping babies than anyone can count.',
+    'The Book': 'A story read so often the pages fall open at the good part.',
+    'The Chimney': 'Smoke rising slow. Someone banked the fire for the night.',
+    'The Scarf': 'Knitted one row at a time, on nights like this one.',
+  },
+  harbour: {
+    'The Guiding Star': 'Sailors steered home by it. It\'s still there, every night.',
+    'The Anchor': 'Holding fast while the water moves. You don\'t have to go anywhere.',
+    'The Boat': 'Rocked by the sea all night, and sleeping through it.',
+    'The Lighthouse': 'It doesn\'t chase the ships. It just stays lit.',
+    'The Shell': 'Hold it to your ear: the sea, saying shh.',
+    'The Crab': 'It carries its home on its back. Some nights you carry yours.',
+    'The Fish': 'Swimming on through the dark water, as if it were nothing at all.',
+    'The Wave': 'In and out, all night long. The tide always turns.',
+  },
+  chapel: {
+    'The Evening Prayer': '"Lighten our darkness, we beseech thee, O Lord." Prayed here at dusk for hundreds of years.',
+    'The Cross': 'Over the town, over every house, all night long.',
+    'The Dove': 'Peace, coming down gently, the way it does.',
+    'The Bell': 'It doesn\'t ring at night. It waits for the morning, like you.',
+    'The Candle': 'One small flame. Enough to see by.',
+    'The Window': 'Dark from outside tonight. In the morning the sun will come through it in every colour.',
+    'The Lamb': 'Carried close, the way you carry yours. "He shall gather the lambs with his arm."',
+    'The Fish': 'An old sign the first Christians scratched on walls. Its letters spell: Jesus Christ, God\'s Son, Saviour.',
+  },
+  nursery: {
+    'The Sweet Dream': 'The one you\'re wishing them. May it come, for both of you.',
+    'The Teddy': 'Loved bald in places. That\'s how you can tell.',
+    'The Rattle': 'Shake gently. Then put it somewhere very quiet.',
+    'The Rocking Horse': 'Going nowhere, slowly, and that\'s the point.',
+    'The Bottle': 'Warm, and tested on the wrist. You\'ve done this a hundred times now.',
+    'The Mobile': 'Turning slowly in the dark, keeping a small someone company.',
+    'The Bath Duck': 'Bath time is over. It\'s resting too.',
+    'The Crib': 'Small and safe, and somebody\'s whole world tonight.',
+  },
+};
+let starStory = null;   // { k, t0 }: the constellation whose story is showing (expanded sky)
 
 /**
  * The chapel's steeple, far off over the hills of every other place (each
@@ -2754,7 +3222,18 @@ function drawFarSteeple(c, V, at) {
    ============================================================ */
 function hitTest(x, y, dropping) {
   const inC = (o, k = 1) => Math.hypot(x - o.x, y - o.y) <= o.r * k;
-  if (expanded) return { kind: 'expand' };   // any tap goes back
+  if (!dropping && wishStar) {   // a wishing star going by: generous, since it's moving
+    const V = sceneView(), h = wishStarAt(now());
+    if (Math.hypot(x - (V.ox + h.x * V.s), y - h.y * V.s) < 38) return { kind: 'star' };
+  }
+  if (expanded) {   // a constellation tells its story; any other tap goes back
+    const V = sceneView(), moons = Math.min(S.skyMoons - risingMoons, skySlots.length);
+    for (let k = 0; k < moons; k++) {
+      const sl = skySlots[k];
+      if (Math.hypot(x - (V.ox + sl.x * V.s), y - sl.y * V.s) < (SHAPE_R + 6) * V.s) return { kind: 'story', k };
+    }
+    return { kind: 'expand' };
+  }
   for (let i = 0; i < 3; i++) {
     const r = L.wish[i], m = dropping ? 8 : 0;
     if (x >= r.x - m && x <= r.x + r.w + m && y >= r.y - m && y <= r.y + r.h + m) return { kind: 'wish', i };
@@ -2766,6 +3245,7 @@ function hitTest(x, y, dropping) {
   if (!dropping && inC(L.undo, 1.5)) return { kind: 'undo' };
   if (!dropping && inC(L.book, 1)) return { kind: 'book' };
   if (!dropping && inC(L.map, 1)) return { kind: 'map' };
+  if (!dropping && inC(L.sounds, 1)) return { kind: 'sounds' };
   if (dropping && inC(L.map, 1.8)) return { kind: 'satchel' };   // drop on the map icon: into the satchel
   if (!dropping && inC(L.gear, 1)) return { kind: 'gear' };
   // The open sky and land (not the header, not the line under the scene): expand the scene.
@@ -2836,7 +3316,10 @@ function tap(h) {
     case 'book': openBook(); break;
     case 'map': if (sel >= 0 && S.board[sel]) { pack(sel, null); sel = -1; } else openMap(); break;
     case 'gear': openSettings(); break;
+    case 'sounds': openSounds(); break;
     case 'expand': toggleExpand(); break;
+    case 'star': catchWishStar(now()); break;
+    case 'story': starStory = { k: h.k, t0: now() }; sfx.tick(); break;
     default: sel = -1;
   }
 }
@@ -2863,6 +3346,124 @@ function tapWish(wi) {
 }
 
 /* ============================================================
+   Neighbours: the visitors remember you
+   ============================================================ */
+// A visitor is the same animal all over town (the Owl in the garden is the
+// Owl at the chapel), and remembers every wish you grant it (S.friends,
+// part of the undo snapshot). At the 1st, 3rd, 6th and 10th a letter comes
+// under the door (S.letters, kept even if the wish is undone, and never
+// sent twice); the 6th brings a small gift, and at the 10th it's a friend.
+// They're read in the garden book, under Neighbours (openNeighbours).
+//
+// Each visitor has two lines of its own for the letters: `a`, said with the
+// first thank-you, and `b`, an aside in the third-wish letter.
+const VISITOR_NOTES = {
+  'Owl':      { a: 'I was up anyway. I am always up anyway.', b: 'I see your light on at all hours. I nod at it. You may not have noticed.' },
+  'Hedgehog': { a: 'I will treasure it, once I have had a little nap.', b: 'I have been asleep for most of this week. I hope you have managed some too.' },
+  'Fox':      { a: 'I buried it somewhere safe. I will remember where. Probably.', b: 'I walk past your window most nights. You always look like you are doing your best.' },
+  'Rabbit':   { a: 'My children all wanted a turn holding it. There are eleven of them.', b: 'Eleven children. I know what tired is. You are doing well.' },
+  'Toad':     { a: 'I have put it beside my favourite stone.', b: 'I am not one for fuss. But I thought you should know it was kind.' },
+  'Mouse':    { a: 'It is very nearly bigger than me, and I love it.', b: 'Small things are still things. I would know.' },
+  'Badger':   { a: 'Gruff thanks are still thanks.', b: 'I do not say much. I am saying this: well done, getting up again.' },
+  'Deer':     { a: 'I came to the edge of the woods to say so.', b: 'I am shy of most people. Not of you, any more.' },
+  'Mole':     { a: 'I cannot see it very well, but it smells wonderful.', b: 'Most of my life is spent in the dark. It is not so bad with company.' },
+  'Bat':      { a: 'Hanging it up beside me, upside down, where all good things go.', b: 'The night is my day. You are welcome in it whenever you need to be.' },
+  'Vole':     { a: 'I have shown it to everyone in the hedgerow.', b: 'The hedgerow says hello. All of it. At once. They mean well.' },
+  'Nightjar': { a: 'I sang about it all night. You may have heard me churring.', b: 'If you hear a long low churr out there, that is me, keeping you company.' },
+  'Barn owl': { a: 'I flew a whole lap of the farm with it before I put it down.', b: 'I glide past the barn at midnight and two and four. Look out for a pale shape. That is me, saying hello.' },
+  'Cat':      { a: 'I knocked it off a shelf only once, which is a sign of great respect.', b: 'I sat on your windowsill for a while last night. I hope you did not mind.' },
+  'Sheepdog': { a: 'I would have brought you a stick in return, but I could not choose which one.', b: 'I keep an eye on everyone. I keep one on you too, now.' },
+  'Goose':    { a: 'I have honked about it to the whole pond.', b: 'I am loud. I know. I am loud because I care.' },
+  'Piglet':   { a: 'I rolled about in happiness. Then in mud. Then in happiness again.', b: 'Mum says I should let you rest. So this letter is short.' },
+  'Goat':     { a: 'I did try to eat it, just a little. That is how you know it is good.', b: 'I climb on things when I cannot sleep. What do you do?' },
+  'Duck':     { a: 'It floats beautifully. I checked.', b: 'Nothing bothers me much. Water off a duck. Try it.' },
+  'Donkey':   { a: 'It has made my whole week, and I have had a long week.', b: 'Some nights are long. We carry on, you and I.' },
+  'Squirrel': { a: 'I have hidden it with my nuts, which is the highest honour I can give.', b: 'I have planted an acorn for you. In a hundred years it will be an oak.' },
+  'Pigeon':   { a: 'I strutted all the way home with it.', b: 'I have spread the word round town that you are good for a favour. Sorry.' },
+  'Robin':    { a: 'I sang about it at dawn, so you can thank me for the singing too.', b: 'I am the first to sing in the morning. When you hear me, you have nearly made it.' },
+  'Moth':     { a: 'I flew round your lamp three times to say thank you.', b: 'Every light at night is a little bit for me. Yours most of all.' },
+  'Dormouse': { a: 'I am going to sleep curled round it until spring.', b: 'I am mostly asleep, but in my dreams you are doing marvellously.' },
+  'Seagull':  { a: 'I have not stolen a single chip since. Well. Hardly any.', b: 'I know the tides, and here is what they say: everything comes back round.' },
+  'Seal':     { a: 'I balanced it on my nose for a whole hour.', b: 'When the sea is rough I float and wait. It usually passes.' },
+  'Crab':     { a: 'I scuttled sideways with joy, which is the only way I scuttle.', b: 'A hard shell and a soft heart. That is the trick.' },
+  'Otter':    { a: 'I held it while I slept, so it would not float away.', b: 'Otters hold hands in their sleep. I am holding this letter, which is nearly the same.' },
+  'Puffin':   { a: 'It is the most colourful thing I own, apart from my beak.', b: 'I came a long way over the sea to live here. It was worth it.' },
+  'Heron':    { a: 'I stood very still and admired it for an hour.', b: 'Patience is mostly standing in cold water. You are better at it than you think.' },
+  'Dove':     { a: 'Peace to you, and to the little one.', b: 'I sit in the chapel tower and pray for this house. I thought you would like to know.' },
+};
+const LETTER_AT = [1, 3, 6, 10];   // wishes granted to one visitor when each of its four letters comes
+/** The body of letter `k` from `who` (its item: what it was given). */
+function letterText(who, k, item) {
+  const n = VISITOR_NOTES[who] || { a: 'It was very kind of you.', b: 'You are a good neighbour.' };
+  return [
+    [`Thank you for the ${item.toLowerCase()}.`, n.a],
+    ['That is three now. I have started looking out for your light.', n.b],
+    ['I found this and thought of you. It is not much, but it is yours.'],
+    ['Ten wishes. I do not think anyone has ever been so kind to me at this hour.', 'Whatever you are up for, I hope it goes gently. I will keep coming by.'],
+  ][k];
+}
+/** A wish for `who` was granted (with an item called `item`): count it, and send a letter at the right number. */
+function befriend(who, item, at) {
+  const n = S.friends[who] = (S.friends[who] || 0) + 1;
+  const k = LETTER_AT.indexOf(n);
+  if (k < 0 || S.letters.some(l => l.who === who && l.k === k)) return;
+  S.letters.push({ who, k, item, day: dayKey(new Date()), read: false });
+  if (k === 2) {   // the sixth wish: a small gift, a couple of steps better than the pouch
+    const tier = Math.min(Math.max(2, pouchTier() + 2), S.best), i = pickSpawnCell();
+    if (i >= 0) {
+      S.board[i] = tier;
+      fly(tier, at, cellCenter(i), 520, { s0: .3, arc: 50, hide: i });
+      later(520, () => pop(i));
+    } else gain(value(tier) * 2, at);
+    toast({ title: `A gift from the ${who.toLowerCase()}`, sub: i >= 0 ? `${an(ITEMS[tier].name).replace(/^a/, 'A')}, and a letter in the book.` : 'Some glow, and a letter in the book.', dur: 3800 });
+  } else toast({ title: k === 3 ? `The ${who.toLowerCase()} is your friend now` : `A letter from the ${who.toLowerCase()}`, sub: 'It\'s in the book, under Neighbours.', dur: 3600 });
+  later(200, () => sfx.wish());
+  save();
+}
+const unreadLetters = () => S.letters.filter(l => !l.read).length;
+
+/** The Neighbours page: everyone you've granted a wish, with their hearts and letters. Opening it reads the letters. */
+function openNeighbours() {
+  const met = Object.entries(S.friends).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+  const rows = met.map(([who, n]) => {
+    const hearts = LETTER_AT.map(at => n >= at ? '♥' : '♡').join('');
+    const letters = S.letters.filter(l => l.who === who).sort((a, b) => a.k - b.k);
+    const body = letters.map(l => `<div class="letter${l.read ? '' : ' new'}"><p>${l.k === 3 ? 'Dear friend,' : 'Dear neighbour,'}</p>
+      ${letterText(who, l.k, l.item).map(t => `<p>${t}</p>`).join('')}<p class="sig">The ${who.toLowerCase()}</p></div>`).join('');
+    const fresh = letters.some(l => !l.read);
+    return `<details${fresh ? ' open' : ''}><summary><canvas data-v="${who}"></canvas><span><b>The ${who.toLowerCase()}</b>
+      <small>${n >= 10 ? 'A friend · ' : ''}${n} ${n === 1 ? 'wish' : 'wishes'} granted${fresh ? ' · <i>new letter</i>' : ''}</small></span>
+      <span class="hearts">${hearts}</span></summary>${body || '<p class="none"><small>No letters yet.</small></p>'}</details>`;
+  }).join('');
+  openSheet(`
+    <h2>Neighbours</h2>
+    <p><small>Grant a visitor wishes and they get to know you: a letter after the first, the third, the sixth (with a little gift) and the tenth, when they're a friend. They're the same animals all over town.</small></p>
+    <div class="neighbours">${rows || '<p><small>No one yet. Grant a wish, and the visitor will remember.</small></p>'}</div>
+    <button class="btn done" data-book>Back to the book</button>`);
+  for (const l of S.letters) l.read = true;
+  save();
+}
+/** A visitor's drawing in a small canvas (the Neighbours page), lit a little so it shows on the sheet. */
+function paintVisitor(cv, who) {
+  const px = cv.width = cv.height = 96, c = cv.getContext('2d'), art = VISITOR_ART[who];
+  if (!art) return;
+  // Draw it once big on a scratch canvas to find its size, then fit it to the frame.
+  const tmp = document.createElement('canvas'); tmp.width = tmp.height = 200; const tc = tmp.getContext('2d');
+  tc.translate(100, 160); tc.scale(4, 4); const eyes = art(tc, 0) || [];
+  const d = tc.getImageData(0, 0, 200, 200).data; let x0 = 200, y0 = 200, x1 = 0, y1 = 0;
+  for (let y = 0; y < 200; y++) for (let x = 0; x < 200; x++) if (d[(y * 200 + x) * 4 + 3] > 20) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < x0) return;
+  const k = Math.min(76 / (x1 - x0 + 1), 70 / (y1 - y0 + 1)), ox = px / 2 - (x0 + x1) / 2 * k, oy = px * .88 - y1 * k;
+  c.drawImage(tmp, ox, oy, 200 * k, 200 * k);
+  c.globalCompositeOperation = 'source-atop'; c.fillStyle = '#4b5384'; c.fillRect(0, 0, px, px);   // moonlit, a shade lighter than in the scene
+  c.globalCompositeOperation = 'source-over';
+  for (const [ex, ey, er] of eyes) {   // the eyes, where they land after the fit
+    const gx = ox + (100 + ex * 4) * k, gy = oy + (160 + ey * 4) * k, r = Math.max(1.6, er * 4 * k * .8);
+    c.fillStyle = '#f6dc98'; c.fillRect(gx - r / 2, gy - r / 2, r, r);
+  }
+}
+
+/* ============================================================
    The sheet: intro, settings, garden book
    ============================================================ */
 const wrap = document.getElementById('wrap'), sheetEl = document.getElementById('sheet');
@@ -2886,6 +3487,7 @@ function openSheet(html, onClose) {
   // sheet ignores scrollTop and would open where the last sheet was left.
   sheetEl.scrollTop = 0;
   for (const el of sheetEl.querySelectorAll('canvas[data-t]')) paintItem(el, +el.dataset.t, el.dataset.k !== '0');
+  for (const el of sheetEl.querySelectorAll('canvas[data-v]')) paintVisitor(el, el.dataset.v);
   if (ptr) { ptr = null; drag = null; }
 }
 function closeSheet() {
@@ -2898,6 +3500,13 @@ sheetEl.addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.hasAttribute('data-close')) { closeSheet(); return; }
   if (b.hasAttribute('data-pray')) { openPrayer(); return; }
+  if (b.hasAttribute('data-neighbours')) { openNeighbours(); return; }
+  if (b.dataset.snd) {
+    const k = b.dataset.snd, v = b.dataset.val;
+    S.set[k] = k === 'mbox' ? v === 'true' : k === 'shush' ? v : +v;
+    save(); applySounds(); openSounds(); return;
+  }
+  if (b.hasAttribute('data-sndstop')) { stopAllSounds(); openSounds(); return; }
   if (b.hasAttribute('data-book')) { openBook(); return; }
   if (b.dataset.unpack !== undefined) { unpack(+b.dataset.unpack); openMap(); return; }
   if (b.dataset.area) {
@@ -3001,7 +3610,7 @@ function openSettings() {
     ${navigator.vibrate ? toggleRow('buzz', 'Gentle vibration', 'A tiny tap when things grow.') : ''}
     ${toggleRow('hush', 'Fade to the garden', 'After 20 seconds untouched, only the garden stays lit. Tap anywhere to bring it back.')}
     ${toggleRow('breathe', 'Breathing glow', 'When you rest, the seed pouch glows in and out, six breaths a minute. Breathe along if it helps.')}
-    ${toggleRow('weather', 'Weather', 'Gentle rain on some nights, snow on some winter ones.')}
+    ${toggleRow('weather', 'Weather and seasons', 'Gentle rain on some nights, snow on some winter ones; blossom in spring, fireflies in summer, falling leaves in autumn, frost in winter.')}
     ${toggleRow('verses', 'Night verses', 'A line of Scripture (King James Version) when you come back in the night, and when morning comes.')}
     ${toggleRow('psalms', 'Psalms in the night', 'Once the garden has faded, a psalm for lying awake, a verse at a time, in the dark below it (King James Version). It picks up where you left off.')}
     <div class="row col"><b>Keep it on your phone</b><small>${install}</small></div>
@@ -3023,7 +3632,10 @@ function openBook() {
     : `<p><small>${AREA.words.done}</small></p>`;
   openSheet(`
     <h2>${AREA.words.book}</h2>
-    <button class="btn pray" data-pray><span>☾</span> A prayer for the night</button>
+    <div class="bookbtns">
+      <button class="btn pray" data-pray><span>☾</span> A prayer for the night</button>
+      <button class="btn pray" data-neighbours><span>✉</span> Neighbours${unreadLetters() ? ` <i class="newdot">${unreadLetters()} new</i>` : ''}</button>
+    </div>
     <div class="book">${items}</div>
     ${nextItem}
     <h3>Garden wonders · ${S.decor} of ${DECOR.length}</h3>
@@ -6116,6 +6728,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
 
+S.set.shush = 'off'; S.set.mbox = false;   // sounds never start by themselves (and couldn't, without a tap)
 useArea(areaById(S.area));
 ensureWishes();
 retireUnreachableWishes();   // a save from before the pouch grew, or from 1.0
