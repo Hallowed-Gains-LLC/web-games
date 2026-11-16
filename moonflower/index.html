@@ -145,7 +145,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '2.4';
+const VERSION = '2.4.1';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -1719,6 +1719,7 @@ const GARDEN_SHAPES = [
 let MOON_SHAPES = GARDEN_SHAPES;
 const moonShape = k => MOON_SHAPES[k % MOON_SHAPES.length];
 let risingMoons = 0;            // on their way up: counted, not drawn in the sky yet
+let townAge = 0;                // bumped by startOver, so timers from before it know to stop
 let newest = null;              // { k, t0 }: the constellation whose stars are still appearing
 
 function riseMoon(cell) {
@@ -1736,7 +1737,9 @@ function riseMoon(cell) {
   S.board[cell] = 0; S.skyMoons++; risingMoons++;
   fly(MAX_TIER, cellCenter(cell), to, MOON_RISE_MS, { s1: .12, arc: L.cell * .6 });
   sfx.rise(); buzz(10);
+  const age = townAge;
   later(MOON_RISE_MS, () => {
+    if (age !== townAge) return;   // the town was started over meanwhile
     risingMoons--;
     newest = { k, t0: now() };
     burst(to.x, to.y, 10, .6);
@@ -2314,12 +2317,25 @@ sheetEl.addEventListener('click', e => {
   }
   if (b.id === 'inst' && installPrompt) { installPrompt.prompt(); installPrompt = null; return; }
   if (b.id === 'reset') {
-    if (!resetArmed) { resetArmed = true; b.textContent = 'Tap again to clear your whole garden'; return; }
-    const keep = S.set; S = freshState(); S.set = keep; S.intro = true;
-    ensureWishes(); undoStack = []; anims = []; sel = -1; dispGlow = 0; sceneDirty = true;
-    save(); closeSheet(); toast({ title: 'A fresh garden', sub: 'Tap the seed pouch to begin.' });
+    if (!resetArmed) { resetArmed = true; b.textContent = 'Tap again to clear the whole town'; return; }
+    startOver();
   }
 });
+
+/**
+ * Start the whole town over: a fresh garden, every other place closed again,
+ * the satchel empty; settings kept. Back in the garden whichever place you
+ * were in (useArea), with anything still in flight from before (a rising
+ * moon, a visitor wandering off) dropped (townAge).
+ */
+function startOver() {
+  const keep = S.set; S = freshState(); S.set = keep; S.intro = true;
+  townAge++; risingMoons = 0; newest = null; leaving.fill(null);
+  useArea(areaById('garden')); makeStars();
+  ensureWishes(); undoStack = []; anims = []; parts = []; floats = []; toasts.length = 0;
+  sel = -1; drag = null; dispGlow = 0; sceneDirty = true;
+  save(); closeSheet(); toast({ title: 'A fresh garden', sub: 'Tap the seed pouch to begin.' });
+}
 
 function applySettings() {
   document.getElementById('dim').style.opacity = DIM[S.set.dim] ?? DIM[1];
@@ -2387,7 +2403,7 @@ function openSettings() {
     ${toggleRow('breathe', 'Breathing glow', 'When you rest, the seed pouch glows in and out, six breaths a minute. Breathe along if it helps.')}
     ${toggleRow('weather', 'Weather', 'Gentle rain on some nights, snow on some winter ones.')}
     <div class="row col"><b>Keep it on your phone</b><small>${install}</small></div>
-    <div class="row col"><button class="btn ghost" id="reset">Start a new garden</button></div>
+    <div class="row col"><button class="btn ghost" id="reset">Start the town over</button><small style="text-align:center">A fresh garden, and every other place closes again.</small></div>
     <button class="btn done" data-close>Done</button>
     <p class="ver">Moonflower ${VERSION}</p>`);
 }
