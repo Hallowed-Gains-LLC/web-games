@@ -95,6 +95,12 @@
   .btn.done { margin-top: 18px; background: #3a3020; color: #f3dca8; border-color: rgba(242, 196, 109, .35); }
   .btn.ghost { background: transparent; opacity: .7; }
   .ver { text-align: center; opacity: .35; font-size: 12px; }
+  #sheet a { color: #efd9a8; }
+  .pray { margin: 0 0 14px; padding: 12px; font-size: 15px; color: #efd9a8; } .pray span { opacity: .8; margin-right: 4px; }
+  .prayer { font-size: 16px; line-height: 1.65 !important; color: #ebe3cf; }
+  .credit { font-style: italic; margin-bottom: 6px; }
+  .verse { text-align: center; font-style: italic; opacity: .85; margin-top: 14px !important; }
+  .verse small { font-style: normal; color: #e3cf9f; margin-top: 4px; }
   .book { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .book div { background: #121836; border-radius: 14px; padding: 8px 4px 10px; text-align: center; font-size: 13px; line-height: 1.25; }
   .map { position: relative; width: 100%; max-width: 440px; aspect-ratio: 10 / 13; margin: 12px auto 4px; border-radius: 18px; overflow: hidden;
@@ -145,7 +151,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '2.4.1';
+const VERSION = '2.5.0';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -612,7 +618,9 @@ function freshState() {
     satchel: [null, null],   // things carried between areas for errands: { area, tier } or null
     nightOf: '',      // the morning after the last night you played in (dayKey), for "You made it to morning"
     morningOf: '',    // the last morning that was said
-    set: { dim: 1, warm: false, sound: false, buzz: false, hush: true, breathe: false, weather: true },
+    feastOf: '',      // the last Christmas Day or Easter Day that was greeted (dayKey)
+    verseAt: {},      // each verse list's next turn (VERSES)
+    set: { dim: 1, warm: false, sound: false, buzz: false, hush: true, breathe: false, weather: true, verses: true },
   };
 }
 function load() {
@@ -971,6 +979,8 @@ function drawScene(c, ms) {
   }
   c.globalAlpha = 1;
   drawConstellations(c, t, ms);
+  const sea = churchSeason();
+  if (sea.star) drawStar(c, V, t, sea.star, starMul);
   if (has('shooting')) {
     if (!shoot && t > nextShoot) shoot = { t0: t, x: lerp(V.xl + 40, V.xr - 60, Math.random()), y: 6 + Math.random() * Math.max(6, V.G - 90) };
     if (shoot) {
@@ -1047,6 +1057,7 @@ function liveGarden(c, V, t) {
     c.globalAlpha = Math.sin(p * Math.PI) * .45; c.fillStyle = COL.text; c.font = font(5, 700);
     c.fillText('z', 236 + p * 6, y - 4 - p * 12); c.globalAlpha = 1;
   }
+  if (churchSeason().name === 'easter') drawEasterLilies(c, V, t);
   const flies = (has('fireflies') ? 5 : 0) + (has('moreflies') ? 8 : 0);
   for (let i = 0; i < flies; i++) {
     const bx = ((i * 83.7) % 400), x = bx + 22 * Math.sin(t * (.21 + i * .017) + i * 2.3);
@@ -1080,9 +1091,11 @@ function nightClock() {
   later(0, checkMorning);
   return clockCache.v;
 }
-/** The glow along the hills: warm at dawn, rose at dusk, a pale haze by day. */
+/** The glow along the hills: warm at dawn, rose at dusk, a pale haze by day, gold on Easter Day. */
 function drawHorizon(c, V, clk) {
-  for (const [amt, col, a] of [[clk.dawn, '233,163,107', .34], [clk.dusk, '176,106,138', .3], [clk.day, '143,163,199', .16]]) {
+  // On Easter Day, a sunrise along the hills whatever the hour.
+  const easter = churchSeason().feast === 'easter' ? 1 : 0;
+  for (const [amt, col, a] of [[clk.dawn, '233,163,107', .34], [clk.dusk, '176,106,138', .3], [clk.day, '143,163,199', .16], [easter, '246,190,112', .42]]) {
     if (amt < .01) continue;
     const y1 = (V.G - 20) * V.s, y0 = Math.max(0, (V.G - 110) * V.s);
     const g = c.createLinearGradient(0, y0, 0, y1);
@@ -1101,6 +1114,7 @@ function checkMorning() {
   if (wrap.classList.contains('open')) { later(4000, checkMorning); return; }
   S.morningOf = key; save();
   toast({ title: 'You made it to morning.', sub: 'Well done, you. Rest when you can.', dur: 5600 });
+  queueVerse('morning');
 }
 
 /* ============================================================
@@ -1159,6 +1173,308 @@ function drawWeather(c, V, t, wx) {
     for (let x = V.xr + 4; x >= V.xl; x -= 4) c.lineTo(x, nearY(V, x) + 1.6);
     c.fill();
   }
+}
+
+/* ============================================================
+   Faith: night verses, a prayer for the night, and the Church's year
+   ============================================================ */
+// Hallowed Gains is a Christian company, and Moonflower keeps a parent
+// company at the hour when prayer comes easiest and hardest. So, quietly:
+// a line of Scripture when you come back in the night and when morning
+// comes (Settings → Night verses), a prayer for the night in the book, and
+// the star over the town from Advent to Epiphany, a crèche at the chapel at
+// Christmas, and lilies and a sunrise at Easter. Nothing here asks anything
+// of the player or gets in the way of the game.
+//
+// The prayers come from A Simple Way to Pray's prayer library, the one home
+// for the prayers Hallowed Gains apps share (reviewed by pastors there). The
+// block below is a copy written by tools/sync-prayers.mjs: never fetched while
+// the game runs, so it works offline and no request says who was praying.
+// PRAYERS:BEGIN: generated by tools/sync-prayers.mjs from A Simple Way to Pray's prayer
+// library (https://asimplewaytopray.com/api/prayers/v1/library.json, version 6a1a5a341dda4e0e). Edit the prayers there, not here.
+const PRAYERS = [
+  {
+    "id": "night-feed",
+    "title": "In the night feeds",
+    "paragraphs": [
+      "Lord Jesus, You were once a little child, fed and held in the night by Your mother. Hold this little one now, and hold me as I hold them.",
+      "When I am tired, be my strength; when I am short of patience, be my peace. Keep us both in Your care through this night and into the morning, for You neither slumber nor sleep. Amen."
+    ],
+    "credit": "Written for Moonflower",
+    "url": "https://asimplewaytopray.com/pregnancy_prayers/night-feed"
+  },
+  {
+    "id": "watch-thou-dear-lord",
+    "title": "For those who wake",
+    "paragraphs": [
+      "Watch thou, dear Lord, with those who wake, or watch, or weep tonight, and give thine angels charge over those who sleep. Tend thy sick ones, O Lord Christ; rest thy weary ones; bless thy dying ones; soothe thy suffering ones; pity thine afflicted ones; shield thy joyous ones; and all for thy love’s sake. Amen."
+    ],
+    "credit": "Attributed to St. Augustine; The Book of Common Prayer (1928)",
+    "url": "https://asimplewaytopray.com/pregnancy_prayers/watch-thou-dear-lord"
+  },
+  {
+    "id": "luther-evening",
+    "title": "Luther's Evening Prayer",
+    "paragraphs": [
+      "I thank Thee, my Heavenly Father, through Jesus Christ, Thy dear Son, that Thou hast graciously kept me this day, and I pray Thee to forgive me all my sins, where I have done wrong, and graciously keep me this night. For into Thy hands I commend myself, my body and soul, and all things. Let Thy holy angel be with me, that the Wicked Foe may have no power over me. Amen."
+    ],
+    "credit": "Small Catechism, Triglot Concordia (Concordia Publishing House, 1921)",
+    "url": null
+  }
+];
+// PRAYERS:END
+
+// The verses are the King James Version (public domain), word for word: a
+// verse cut short ends at a natural pause and keeps its own words. Each list
+// takes its turn (S.verseAt), so the same verse doesn't come round again until
+// the rest have.
+const VERSES = {
+  night: [
+    { text: 'He shall feed his flock like a shepherd: he shall gather the lambs with his arm, and carry them in his bosom, and shall gently lead those that are with young.', ref: 'Isaiah 40:11' },
+    { text: 'I will both lay me down in peace, and sleep: for thou, LORD, only makest me dwell in safety.', ref: 'Psalm 4:8' },
+    { text: 'Yea, the darkness hideth not from thee; but the night shineth as the day: the darkness and the light are both alike to thee.', ref: 'Psalm 139:12' },
+    { text: 'Come unto me, all ye that labour and are heavy laden, and I will give you rest.', ref: 'Matthew 11:28' },
+    { text: 'Can a woman forget her sucking child, that she should not have compassion on the son of her womb? yea, they may forget, yet will I not forget thee.', ref: 'Isaiah 49:15' },
+    { text: 'Behold, he that keepeth Israel shall neither slumber nor sleep.', ref: 'Psalm 121:4' },
+    { text: 'He giveth power to the faint; and to them that have no might he increaseth strength.', ref: 'Isaiah 40:29' },
+    { text: 'When I remember thee upon my bed, and meditate on thee in the night watches. Because thou hast been my help, therefore in the shadow of thy wings will I rejoice.', ref: 'Psalm 63:6–7' },
+    { text: 'As one whom his mother comforteth, so will I comfort you.', ref: 'Isaiah 66:13' },
+    { text: 'Yet the LORD will command his lovingkindness in the daytime, and in the night his song shall be with me, and my prayer unto the God of my life.', ref: 'Psalm 42:8' },
+    { text: 'He shall cover thee with his feathers, and under his wings shalt thou trust.', ref: 'Psalm 91:4' },
+    { text: 'Casting all your care upon him; for he careth for you.', ref: '1 Peter 5:7' },
+  ],
+  morning: [
+    { text: 'It is of the LORD’s mercies that we are not consumed, because his compassions fail not. They are new every morning: great is thy faithfulness.', ref: 'Lamentations 3:22–23' },
+    { text: 'Weeping may endure for a night, but joy cometh in the morning.', ref: 'Psalm 30:5' },
+    { text: 'My voice shalt thou hear in the morning, O LORD; in the morning will I direct my prayer unto thee, and will look up.', ref: 'Psalm 5:3' },
+    { text: 'Cause me to hear thy lovingkindness in the morning; for in thee do I trust.', ref: 'Psalm 143:8' },
+    { text: 'This is the day which the LORD hath made; we will rejoice and be glad in it.', ref: 'Psalm 118:24' },
+  ],
+  // In Advent, at Christmas and at Easter these take the place of both lists above.
+  advent: [
+    { text: 'The people that walked in darkness have seen a great light: they that dwell in the land of the shadow of death, upon them hath the light shined.', ref: 'Isaiah 9:2' },
+    { text: 'And the light shineth in darkness; and the darkness comprehended it not.', ref: 'John 1:5' },
+    { text: 'For unto us a child is born, unto us a son is given: and the government shall be upon his shoulder: and his name shall be called Wonderful, Counsellor, The mighty God, The everlasting Father, The Prince of Peace.', ref: 'Isaiah 9:6' },
+  ],
+  christmas: [
+    { text: 'And she brought forth her firstborn son, and wrapped him in swaddling clothes, and laid him in a manger; because there was no room for them in the inn.', ref: 'Luke 2:7' },
+    { text: 'Fear not: for, behold, I bring you good tidings of great joy, which shall be to all people. For unto you is born this day in the city of David a Saviour, which is Christ the Lord.', ref: 'Luke 2:10–11' },
+    { text: 'But Mary kept all these things, and pondered them in her heart.', ref: 'Luke 2:19' },
+    { text: 'When they saw the star, they rejoiced with exceeding great joy.', ref: 'Matthew 2:10' },
+  ],
+  easter: [
+    { text: 'And very early in the morning the first day of the week, they came unto the sepulchre at the rising of the sun.', ref: 'Mark 16:2' },
+    { text: 'He is not here: for he is risen, as he said. Come, see the place where the Lord lay.', ref: 'Matthew 28:6' },
+    { text: 'Why seek ye the living among the dead? He is not here, but is risen.', ref: 'Luke 24:5–6' },
+    { text: 'I am the resurrection, and the life: he that believeth in me, though he were dead, yet shall he live.', ref: 'John 11:25' },
+  ],
+  // On each place's ending card, when its first moon (or lantern, or …) goes up into the stars. One per place, in AREAS order.
+  stars: [
+    { text: 'When I consider thy heavens, the work of thy fingers, the moon and the stars, which thou hast ordained; What is man, that thou art mindful of him?', ref: 'Psalm 8:3–4' },
+    { text: 'And God made two great lights; the greater light to rule the day, and the lesser light to rule the night: he made the stars also.', ref: 'Genesis 1:16' },
+    { text: 'The heavens declare the glory of God; and the firmament sheweth his handywork.', ref: 'Psalm 19:1' },
+    { text: 'He telleth the number of the stars; he calleth them all by their names.', ref: 'Psalm 147:4' },
+    { text: 'He appointed the moon for seasons: the sun knoweth his going down.', ref: 'Psalm 104:19' },
+    { text: 'The moon and stars to rule by night: for his mercy endureth for ever.', ref: 'Psalm 136:9' },
+    { text: 'Praise ye him, sun and moon: praise him, all ye stars of light.', ref: 'Psalm 148:3' },
+  ],
+};
+
+/** Easter Day in year `y` (Western; the Gregorian computus, as in Meeus's "anonymous" algorithm). */
+function easterDay(y) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const n = h + l - 7 * m + 114;
+  return new Date(y, Math.floor(n / 31) - 1, (n % 31) + 1);
+}
+let seasonCache = { key: '', v: null };
+/**
+ * Where tonight falls in the Church's year, by the phone's date:
+ *   advent     Advent Sunday (the fourth Sunday before Christmas) to Dec 23;
+ *              the star brightens as Christmas comes (`star` .35 → .8)
+ *   christmas  Christmas Eve to Epiphany (Jan 6): the star at full, the crèche
+ *   easter     Easter Day and the week after it: lilies by the pond
+ * `feast` names Christmas Day or Easter Day itself (a greeting, and Easter's
+ * sunrise). Otherwise everything is null and 0.
+ */
+function churchSeason() {
+  const d = new Date(), key = dayKey(d);
+  if (seasonCache.key === key) return seasonCache.v;
+  const y = d.getFullYear(), mo = d.getMonth(), date = d.getDate(), day = new Date(y, mo, date);
+  const days = (a, b) => Math.round((b - a) / 864e5);   // rounded: a day across a clock change is 23 or 25 hours
+  const advent = new Date(y, 11, 25 - (new Date(y, 11, 25).getDay() || 7) - 21), eve = new Date(y, 11, 24);
+  const sinceEaster = days(easterDay(y), day);
+  let v = { name: null, star: 0, feast: null };
+  if (day >= advent && day < eve) v = { name: 'advent', star: lerp(.35, .8, days(advent, day) / days(advent, eve)), feast: null };
+  else if ((mo === 11 && date >= 24) || (mo === 0 && date <= 6)) v = { name: 'christmas', star: 1, feast: mo === 11 && date === 25 ? 'christmas' : null };
+  else if (sinceEaster >= 0 && sinceEaster <= 7) v = { name: 'easter', star: 0, feast: sinceEaster ? null : 'easter' };
+  seasonCache = { key, v };
+  return v;
+}
+
+/** On Christmas Day and Easter Day, once, the greeting of the day. */
+function checkFeast() {
+  const f = churchSeason().feast, key = dayKey(new Date());
+  if (!f || !S.intro || S.feastOf === key) return;
+  S.feastOf = key; save();
+  toast(f === 'christmas' ? { title: 'Merry Christmas', sub: 'Unto us a child is born.', dur: 5200, wonder: true }
+    : { title: 'Christ is risen!', sub: 'He is risen indeed. Alleluia!', dur: 5200, wonder: true });
+}
+
+/** The next verse from a list, taking turns (S.verseAt[kind]); in a season, the season's list instead. */
+function nextVerse(kind) {
+  kind = churchSeason().name || kind;
+  const list = VERSES[kind], n = S.verseAt[kind] || 0;
+  S.verseAt[kind] = (n + 1) % list.length;
+  return list[n % list.length];
+}
+let verseQ = null, verseNow = null;   // the kind of verse waiting for the toasts to finish; the verse on screen now
+/**
+ * A verse to show once the toasts have gone: 'night' (coming back) or
+ * 'morning'. Only the kind is kept until then, so a morning that replaces a
+ * night verse doesn't use up the night verse's turn.
+ */
+function queueVerse(kind) { if (S.set.verses) verseQ = kind; }
+const VERSE_IN = 1400, VERSE_OUT = 1800;
+/**
+ * The verse, in the open sky above the town: words fading in over a soft
+ * patch of dark, held long enough to read twice, then fading out. Drawn over
+ * the hush, like the toasts, and never over a sheet. It asks nothing: the
+ * game carries on underneath.
+ */
+function drawVerse(c, ms) {
+  if (!verseNow) {
+    if (!verseQ || toasts.length || wrap.classList.contains('open')) return;
+    const v = nextVerse(verseQ); save();
+    verseNow = { ...v, t0: ms, dur: clamp(3500 + v.text.length * 60, 8000, 16000) }; verseQ = null;
+  }
+  const v = verseNow, p = ms - v.t0;
+  if (p > v.dur) { verseNow = null; return; }
+  const a = Math.min(1, p / VERSE_IN, (v.dur - p) / VERSE_OUT);
+  // Wrap the words to the open sky, centred and clear of the moon on the
+  // right, in smaller type if they need it. Where even that won't fit (the
+  // short sky of a small phone) they go on a dark card over the whole scene
+  // instead, so they're never laid over the town or the line under it.
+  const V = sceneView(), m = moonPos(V), clear = V.ox + (m.x - 12) * V.s - 14 - W / 2;
+  const bottom = L.scene.h - 32;
+  const wrapAt = (px, maxW) => {
+    c.font = font(px, 500); const lines = [];
+    for (const word of v.text.split(' ')) {
+      const last = lines[lines.length - 1];
+      if (last !== undefined && c.measureText(`${last} ${word}`).width <= maxW) lines[lines.length - 1] = `${last} ${word}`;
+      else lines.push(word);
+    }
+    return { px, maxW, lines, h: lines.length * px * 1.42 + px * 1.5 };
+  };
+  const fit = (top, maxW) => {
+    for (let px = 15; px >= 11.5; px -= .5) { const f = wrapAt(px, maxW); if (f.h <= bottom - top) return { ...f, top }; }
+    return null;
+  };
+  const sky = fit(L.st + L.headerH + 6, Math.min(L.cw - 36, 360, Math.max(240, clear * 2)));
+  const f = sky || fit(L.st + 14, Math.min(L.cw - 36, 360)) || { ...wrapAt(11.5, Math.min(L.cw - 36, 360)), top: L.st + 14 };
+  const { px, maxW, lines } = f, lh = px * 1.42, cx = W / 2;
+  const y0 = clamp((f.top + bottom) / 2 - f.h / 2, f.top, Math.max(f.top, bottom - f.h));
+  c.save();
+  c.globalAlpha = a;
+  if (sky) {   // a soft patch of dark behind the words, no edges
+    c.save(); c.translate(cx, y0 + f.h / 2); c.scale(1, Math.max(.3, (f.h + 30) / (maxW + 50)));
+    drawGlow(c, 0, 0, (maxW + 50) * .62, '#05070f', .9); c.restore();
+  } else {
+    rr(c, cx - maxW / 2 - 14, y0 - 10, maxW + 28, f.h + 18, 18); c.fillStyle = 'rgba(10,13,30,.94)'; c.fill();
+  }
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = font(px, 500); c.fillStyle = rgba(COL.textHi, .92);
+  lines.forEach((ln, i) => c.fillText(ln, cx, y0 + lh * (i + .5)));
+  c.font = font(px * .82, 600); c.fillStyle = rgba(COL.gold, .8);
+  c.fillText(v.ref, cx, y0 + lines.length * lh + px * .85);
+  c.restore();
+}
+
+/** The night prayer page, from the garden book. */
+function openPrayer() {
+  const esc = s => s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+  const prayers = PRAYERS.map(p => `
+    <h3>${esc(p.title)}</h3>
+    ${p.paragraphs.map(x => `<p class="prayer">${esc(x)}</p>`).join('')}
+    <small class="credit">${esc(p.credit)}</small>`).join('');
+  openSheet(`
+    <h2 class="title">A prayer for the night</h2>
+    <p class="lede">For you, and for the little one in your arms.</p>
+    ${prayers}
+    <p><small>These come from <a href="https://asimplewaytopray.com/" target="_blank" rel="noopener">A Simple Way to Pray</a>,
+      our prayer app, with prayers for morning and evening and every day between.</small></p>
+    <button class="btn done" data-book>Back to the book</button>`);
+}
+
+/**
+ * The star over the town, from Advent to Epiphany (scene units, in the sky
+ * behind the land): low over the middle of the town, between the rows of
+ * constellations, with a long ray pointing down. It brightens through Advent.
+ */
+function drawStar(c, V, t, amt, starMul) {
+  const x = 236, y = lerp(V.top + 16, V.G - 58, .5) - 2;
+  const a = amt * Math.max(.55, starMul) * (.9 + .1 * Math.sin(t * 1.3));
+  drawGlow(c, x, y, 26, '#ffe6b0', .5 * a);
+  c.save(); c.globalAlpha = a; c.fillStyle = '#fff3d6';
+  // four long points, the lowest longest; four short ones between
+  for (const [ang, len, w] of [[0, 9, 1.1], [Math.PI / 2, 9, 1.1], [Math.PI, 24, 1.3], [-Math.PI / 2, 9, 1.1],
+                               [Math.PI / 4, 4, .7], [3 * Math.PI / 4, 4, .7], [-Math.PI / 4, 4, .7], [-3 * Math.PI / 4, 4, .7]]) {
+    const dx = Math.sin(ang), dy = Math.cos(ang);   // ang 0 points up, π down
+    c.beginPath(); c.moveTo(x - dy * w, y + dx * w); c.lineTo(x + dx * len, y - dy * len); c.lineTo(x + dy * w, y - dx * w); c.closePath(); c.fill();
+  }
+  c.beginPath(); c.arc(x, y, 1.6, 0, TAU); c.fill();
+  c.restore();
+}
+
+/** Easter lilies by the pond, the week of Easter (the garden's live layer). */
+function drawEasterLilies(c, V, t) {
+  const G = V.G;
+  for (const [x, h, k] of [[240, 13, 0], [249, 10, 1], [277, 14, 2], [287, 11, 3]]) {   // on the far bank, behind the water
+    const y = G - 4.5, sway = Math.sin(t * .6 + k * 1.7) * .6;
+    c.strokeStyle = '#1d3326'; c.lineWidth = 1.1; c.lineCap = 'round';
+    for (const [lx, ll] of [[-1, -.5], [1, .45]]) { c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + lx * 2, y - h * .3, x + lx * 4.5, y - h * .45 + ll); c.stroke(); }   // two strap leaves
+    c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x - .5, y - h * .6, x + sway, y - h); c.stroke();
+    drawGlow(c, x + sway, y - h, 8, '#f6f0dc', .32);
+    for (const s of k % 2 ? [-1] : [-1, 1]) {   // the trumpets, nodding outward from the top of the stem
+      c.save(); c.translate(x + sway, y - h); c.rotate(s * .95 + sway * .1); c.scale(s, 1);
+      c.fillStyle = '#efe9d6'; c.beginPath();   // a narrow tube flaring to a three-lobed mouth
+      c.moveTo(-.45, 0); c.quadraticCurveTo(-.7, 4, -3, 6.4); c.quadraticCurveTo(-2, 6.4, -1.4, 6.1);
+      c.quadraticCurveTo(-.6, 7.6, 0, 7.4); c.quadraticCurveTo(.6, 7.6, 1.4, 6.1); c.quadraticCurveTo(2, 6.4, 3, 6.4);
+      c.quadraticCurveTo(.7, 4, .45, 0); c.closePath(); c.fill();
+      c.fillStyle = 'rgba(160,150,120,.5)'; c.fillRect(-.3, .6, .6, 4.6);   // the shadowed throat
+      c.restore();
+    }
+  }
+}
+
+/**
+ * The crèche on the green by the chapel, Christmas Eve to Epiphany (the
+ * chapel's live layer): a little stable with a lamp inside, Mary kneeling,
+ * Joseph with his staff, and the child in the manger.
+ */
+function drawCreche(c, V, t) {
+  const x = 262, y = nearY(V, x) + 2, f = .85 + .08 * Math.sin(t * 1.7) + .05 * Math.sin(t * 4.3);
+  drawGlow(c, x, y - 6, 22, '#ffcf87', .38 * f);
+  c.fillStyle = '#120f14'; c.fillRect(x - 13, y - 17, 26, 17);                 // the back of the stable
+  c.globalAlpha = f; c.fillStyle = '#3d2c22'; c.fillRect(x - 11, y - 15, 22, 15); c.globalAlpha = 1;   // lit from inside
+  drawGlow(c, x, y - 5, 10, '#ffd796', .55 * f);
+  c.fillStyle = '#17121a';
+  c.fillRect(x - 14, y - 17, 2.2, 17); c.fillRect(x + 11.8, y - 17, 2.2, 17);   // posts
+  c.beginPath(); c.moveTo(x - 18, y - 15); c.lineTo(x, y - 26); c.lineTo(x + 18, y - 15); c.lineTo(x + 15, y - 14); c.lineTo(x, y - 23); c.lineTo(x - 15, y - 14); c.closePath(); c.fill();   // the roof
+  c.fillStyle = '#0d0b10';
+  // Mary, kneeling at the left, her head bowed toward the manger
+  c.beginPath(); c.moveTo(x - 9.8, y); c.quadraticCurveTo(x - 10.2, y - 4.4, x - 7.8, y - 6.6); c.quadraticCurveTo(x - 5, y - 7.4, x - 4.4, y - 5);
+  c.quadraticCurveTo(x - 5, y - 2.8, x - 3.6, y); c.closePath(); c.fill();
+  // Joseph, standing at the right, with his staff
+  c.beginPath(); c.moveTo(x + 4.4, y); c.lineTo(x + 5, y - 9); c.quadraticCurveTo(x + 6.4, y - 12.4, x + 8, y - 12); c.quadraticCurveTo(x + 9.4, y - 10.6, x + 9.2, y - 8.6); c.lineTo(x + 9.8, y); c.closePath(); c.fill();
+  c.strokeStyle = '#0d0b10'; c.lineWidth = .7; c.beginPath(); c.moveTo(x + 10.8, y); c.lineTo(x + 10.4, y - 13.4); c.stroke();
+  // the manger, the straw, and the child, a little pale in the lamplight
+  c.beginPath(); c.moveTo(x - 3.4, y - 4); c.lineTo(x + 3.4, y - 4); c.lineTo(x + 2.4, y - 1.4); c.lineTo(x - 2.4, y - 1.4); c.closePath(); c.fill();
+  c.fillRect(x - 2.6, y - 1.6, .8, 1.6); c.fillRect(x + 1.8, y - 1.6, .8, 1.6);
+  c.fillStyle = '#a07c48'; c.fillRect(x - 3.4, y - 4.6, 6.8, .8);
+  c.fillStyle = `rgba(250,232,196,${.85 * f})`; c.beginPath(); c.ellipse(x, y - 5.2, 2, 1.1, 0, 0, TAU); c.fill();
+  drawGlow(c, x, y - 5.4, 5, '#fff2cf', .5 * f);
 }
 
 /* ============================================================
@@ -1814,8 +2130,10 @@ function onReturn() {
     });
     const what = n === 1 ? `one ${ITEMS[tier].name.toLowerCase()}` : `${['', '', 'two', 'three'][n]} ${ITEMS[tier].many.toLowerCase()}`;
     toast({ title: 'Welcome back', sub: n ? GIFT_LINES[Math.floor(Math.random() * GIFT_LINES.length)](what) : 'Your garden waited for you.', dur: 3600 });
+    queueVerse('night');
   }
-  checkMorning();   // before save(), which would count this visit as the night's
+  checkMorning();   // before save(), which would count this visit as the night's; a morning verse replaces the night's
+  checkFeast();
   save();
 }
 
@@ -2143,6 +2461,7 @@ function frame() {
   drawBreath(ctx, ms);
   if (ms - arrivedAt < 700) { ctx.fillStyle = `rgba(5,7,15,${1 - (ms - arrivedAt) / 700})`; ctx.fillRect(0, 0, W, H); }
   drawToast(ctx, ms);   // over the hush, so a morning or a moon is still told
+  drawVerse(ctx, ms);   // likewise, once the toasts are done
 }
 /** Everything over the garden: the part that hush fades. */
 function drawUI(c, ms) {
@@ -2300,6 +2619,8 @@ document.getElementById('back').addEventListener('click', closeSheet);
 sheetEl.addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.hasAttribute('data-close')) { closeSheet(); return; }
+  if (b.hasAttribute('data-pray')) { openPrayer(); return; }
+  if (b.hasAttribute('data-book')) { openBook(); return; }
   if (b.dataset.unpack !== undefined) { unpack(+b.dataset.unpack); openMap(); return; }
   if (b.dataset.area) {
     const a = areaById(b.dataset.area);
@@ -2378,6 +2699,7 @@ function openEnding() {
       <span>Glow, all told</span><span>${fmt(S.peak)} ✦</span>
     </div>
     <p><small>${AREA.ending.more}${S.decor < DECOR.length ? ' The garden\'s wonders keep coming, too.' : ''} The pouch gives ${ITEMS[pouchTier()].many.toLowerCase()} now. Rest well.</small></p>
+    ${S.set.verses ? (v => `<p class="verse">${v.text}<small>${v.ref}</small></p>`)(VERSES.stars[AREAS.indexOf(AREA) % VERSES.stars.length]) : ''}
     <button class="btn done" data-close>Keep growing</button>`);
 }
 
@@ -2402,6 +2724,7 @@ function openSettings() {
     ${toggleRow('hush', 'Fade to the garden', 'After 20 seconds untouched, only the garden stays lit. Tap anywhere to bring it back.')}
     ${toggleRow('breathe', 'Breathing glow', 'When you rest, the seed pouch glows in and out, six breaths a minute. Breathe along if it helps.')}
     ${toggleRow('weather', 'Weather', 'Gentle rain on some nights, snow on some winter ones.')}
+    ${toggleRow('verses', 'Night verses', 'A line of Scripture (King James Version) when you come back in the night, and when morning comes.')}
     <div class="row col"><b>Keep it on your phone</b><small>${install}</small></div>
     <div class="row col"><button class="btn ghost" id="reset">Start the town over</button><small style="text-align:center">A fresh garden, and every other place closes again.</small></div>
     <button class="btn done" data-close>Done</button>
@@ -2421,6 +2744,7 @@ function openBook() {
     : `<p><small>${AREA.words.done}</small></p>`;
   openSheet(`
     <h2>${AREA.words.book}</h2>
+    <button class="btn pray" data-pray><span>☾</span> A prayer for the night</button>
     <div class="book">${items}</div>
     ${nextItem}
     <h3>Garden wonders · ${S.decor} of ${DECOR.length}</h3>
@@ -4824,6 +5148,7 @@ function liveChapel(c, V, t) {
     const fy = farY(V, fx) + 2 - 2.4, a = .6 + .2 * Math.sin(t * .4 + i * 2);
     drawGlow(c, fx + 10, fy, 4, '#ffd27a', a * .5); c.fillStyle = `rgba(255,214,140,${a})`; c.fillRect(fx + 9.6, fy - .5, 1, 1);
   }
+  if (churchSeason().name === 'christmas') drawCreche(c, V, t);
 }
 
 /* ============================================================
