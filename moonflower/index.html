@@ -97,6 +97,16 @@
   .ver { text-align: center; opacity: .35; font-size: 12px; }
   .book { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .book div { background: #121836; border-radius: 14px; padding: 8px 4px 10px; text-align: center; font-size: 13px; line-height: 1.25; }
+  .map { position: relative; height: 270px; margin: 12px 0 4px; border-radius: 18px; overflow: hidden;
+         background: radial-gradient(circle at 80% 15%, rgba(246,232,192,.18), transparent 30%), linear-gradient(#060914, #10173a); }
+  .map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .spot { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px;
+          background: none; border: 0; padding: 4px; color: #efd9a8; font: inherit; cursor: pointer; }
+  .spot canvas { width: 62px; height: 62px; border-radius: 50%; background: radial-gradient(rgba(242,196,109,.22), rgba(242,196,109,0) 70%); }
+  .spot.here canvas { box-shadow: 0 0 0 2px rgba(242,196,109,.7); }
+  .spot b { font-size: 13px; } .spot small { font-size: 11px; opacity: .65; }
+  .spot.shut { opacity: .5; }
+  .mapnote { text-align: center; min-height: 2.6em; opacity: .85; }
   .book canvas { width: 64px; height: 64px; display: block; margin: 0 auto 4px; }
   .book .unk { opacity: .45; }
   .wonders { columns: 2; column-gap: 18px; padding: 0; list-style: none; font-size: 14px; margin: 0; }
@@ -120,7 +130,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '1.4';
+const VERSION = '2.0';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -140,8 +150,10 @@ const POUCH_LAG = 7;
 const TAU = Math.PI * 2;
 const FONT = "'Quicksand', system-ui, -apple-system, 'Segoe UI', sans-serif";
 
-// The merge chain. Two of a kind make one of the next.
-const ITEMS = [null,
+// The garden's merge chain. Two of a kind make one of the next. Each area of
+// the town has its own chain (AREAS); ITEMS, ART, VISITORS, MOON_SHAPES and
+// VISIT_SPOTS always hold the current area's (useArea).
+const GARDEN_ITEMS = [null,
   { name: 'Seed',          many: 'Seeds',          blurb: 'Small, but full of plans.' },
   { name: 'Sprout',        many: 'Sprouts',        blurb: 'Two leaves, reaching.' },
   { name: 'Seedling',      many: 'Seedlings',      blurb: 'A little taller every night.' },
@@ -155,9 +167,11 @@ const ITEMS = [null,
   { name: 'Wishing tree',  many: 'Wishing trees',  blurb: 'Every fruit is a wish.' },
   { name: 'Little moon',   many: 'Little moons',   blurb: 'You grew a moon. Goodnight, moon.' },
 ];
+let ITEMS = GARDEN_ITEMS;
 const value = t => 2 ** (t - 1);             // how many seeds went into it
 
-const VISITORS = ['Owl', 'Hedgehog', 'Fox', 'Rabbit', 'Toad', 'Mouse', 'Badger', 'Deer', 'Mole', 'Bat', 'Vole', 'Nightjar'];
+const GARDEN_VISITORS = ['Owl', 'Hedgehog', 'Fox', 'Rabbit', 'Toad', 'Mouse', 'Badger', 'Deer', 'Mole', 'Bat', 'Vole', 'Nightjar'];
+let VISITORS = GARDEN_VISITORS;
 
 // Garden wonders: the scene above the board fills in as glow is earned.
 // The k-th wonder arrives at 40k² + 40k glow, so the first few come in the
@@ -322,7 +336,7 @@ function lanternFruit(c, x, y) {
   c.fillStyle = COL.stem; c.beginPath(); c.ellipse(x, y + 5, 4, 2, 0, 0, TAU); c.fill();
 }
 
-const ART = [null,
+const GARDEN_ART = [null,
   // 1 · Seed
   c => {
     soil(c, 22); drawGlow(c, 0, 10, 34, COL.seedL, .14);
@@ -511,6 +525,7 @@ const ART = [null,
     sparkle(c, 38, -10, 3.5, 'rgba(255,240,200,.7)');
   },
 ];
+let ART = GARDEN_ART;
 
 let sprites = [];
 function sprite(t) {
@@ -533,21 +548,29 @@ function silhouette(t) {
   return silhouettes[t] = cv;
 }
 // A standalone picture of an item, for the HTML sheet.
-function paintItem(cv, t, known = true) {
+function paintItem(cv, t, known = true, art = ART) {
   const px = cv.width = cv.height = 128;
   const c = cv.getContext('2d');
-  c.save(); c.translate(px / 2, px / 2); c.scale(px / 100 * .86, px / 100 * .86); ART[t](c); c.restore();
+  c.save(); c.translate(px / 2, px / 2); c.scale(px / 100 * .86, px / 100 * .86); art[t](c); c.restore();
   if (!known) { c.globalCompositeOperation = 'source-atop'; c.fillStyle = '#232a4c'; c.fillRect(0, 0, px, px); }
 }
 
 /* ============================================================
    State and saving
    ============================================================ */
-function freshState() {
+/** A new area's board: two pairs on the bottom row, and one of the second item above. */
+function freshBoard() {
   const board = Array(N).fill(0);
-  board[24] = 1; board[25] = 1; board[28] = 1; board[29] = 1; board[20] = 2;   // two pairs on the bottom row, a sprout above
+  board[24] = 1; board[25] = 1; board[28] = 1; board[29] = 1; board[20] = 2;
+  return board;
+}
+function freshState() {
+  const board = freshBoard();
   return {
     v: 1, board, glow: 0, peak: 0, best: 2, decor: 0, wishes: [],
+    // The town: S.area is where you are. board, best, wishes, skyMoons and
+    // ended (AREA_KEYS) are that area's; the others' wait in S.away[id].
+    area: 'garden', away: {}, opened: ['garden'], visited: ['garden'],
     skyMoons: 0,      // Little moons grown and risen into the sky (the end of the chain)
     ended: false,     // the "Goodnight, moon" card has been shown
     visits: 1, last: Date.now(), intro: false,
@@ -631,6 +654,7 @@ function layout() {
   const hy = st + L.headerH / 2;
   L.gear = { x: L.cx + L.cw - 18, y: hy, r: 22 };
   L.book = { x: L.cx + L.cw - 62, y: hy, r: 22 };
+  L.map = { x: L.cx + L.cw - 106, y: hy, r: 22 };
 
   sprites = []; silhouettes = [];
   sceneDirty = true;
@@ -721,9 +745,14 @@ function renderSky() {
 }
 
 function renderLand() {
-  const c = prepCanvas(landC), V = sceneView(), G = V.G;
+  const c = prepCanvas(landC), V = sceneView();
   c.translate(V.ox, 0); c.scale(V.s, V.s);
-  const rnd = mulberry32(5);
+  AREA.renderLand(c, V);
+}
+
+/** The garden's land: hills, then each wonder that has come (cached; see drawScene for the live parts). */
+function landGarden(c, V) {
+  const G = V.G, rnd = mulberry32(5);
 
   // far hills
   c.fillStyle = '#0c1127'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
@@ -936,6 +965,18 @@ function drawScene(c, ms) {
   c.drawImage(landC, 0, 0, w, h);
 
   c.save(); c.translate(V.ox, 0); c.scale(V.s, V.s);
+  AREA.drawLive(c, V, t);
+  drawVisitors(c, V, t, ms);
+  if (wx) drawWeather(c, V, t, wx);
+  c.restore();
+
+  const fade = c.createLinearGradient(0, h - 26, 0, h);
+  fade.addColorStop(0, 'rgba(5,7,15,0)'); fade.addColorStop(1, 'rgba(5,7,15,1)');
+  c.fillStyle = fade; c.fillRect(0, h - 26, w, 26);
+}
+
+/** The garden's live parts, over the cached land (scene units): water, lights, eyes, fireflies. */
+function liveGarden(c, V, t) {
   const G = V.G;
   if (has('pond')) {
     const m = moonPos(V);
@@ -979,13 +1020,6 @@ function drawScene(c, ms) {
     drawGlow(c, x, y, 6, COL.fly, a * .8);
     c.globalAlpha = a; c.fillStyle = '#fff6c8'; c.fillRect(x - .5, y - .5, 1, 1); c.globalAlpha = 1;
   }
-  drawVisitors(c, V, t, ms);
-  if (wx) drawWeather(c, V, t, wx);
-  c.restore();
-
-  const fade = c.createLinearGradient(0, h - 26, 0, h);
-  fade.addColorStop(0, 'rgba(5,7,15,0)'); fade.addColorStop(1, 'rgba(5,7,15,1)');
-  c.fillStyle = fade; c.fillRect(0, h - 26, w, 26);
 }
 
 /* ============================================================
@@ -1068,7 +1102,7 @@ function drawWeather(c, V, t, wx) {
       c.moveTo(x, y); c.lineTo(x - 1.2, y + 5);
     }
     c.stroke();
-    if (has('pond')) {   // rings on the pond, a few at a time
+    if (AREA.pond && AREA.pond()) {   // rings on the pond, a few at a time
       for (let k = 0; k < 4; k++) {
         const cyc = t / 1.3 + k * .25, n = Math.floor(cyc), p = cyc - n, r = mulberry32(n * 4 + k);
         const x = 262 + (r() - .5) * 70, y = V.G + 2 + (r() - .5) * 8;
@@ -1099,7 +1133,8 @@ function drawWeather(c, V, t, wx) {
 // on the stones under the lamp, by the pond). A granted one hops and wanders
 // off; the next one comes in. Each drawing has its feet at (0, 0), faces
 // right, and returns its eyes [x, y, r] for the glints.
-const VISIT_SPOTS = [{ x: 84, dir: 1 }, { x: 198, dir: 1 }, { x: 334, dir: -1 }];
+const GARDEN_SPOTS = [{ x: 84, dir: 1 }, { x: 198, dir: 1 }, { x: 334, dir: -1 }];
+let VISIT_SPOTS = GARDEN_SPOTS;
 const leaving = [null, null, null];      // { who, t0 }: a granted visitor on its way out
 const VISIT_IN_MS = 700, VISIT_OUT_MS = 1300;
 const SIL = '#2d3150';            // moonlit, a shade above the ground
@@ -1373,6 +1408,7 @@ function discover(t, at) {
   const pouchBefore = pouchTier();
   S.best = t;
   retireUnreachableWishes();
+  checkOpenings();
   if (t < 3) return;
   if (t < MAX_TIER) {   // a moon gets the ending instead (riseMoon)
     toast({ title: `New: ${ITEMS[t].name}`, sub: ITEMS[t].blurb, tier: t, dur: 3400 });
@@ -1401,7 +1437,7 @@ function plantSeed() {
   const i = pickSpawnCell();
   if (i < 0) {
     pouchShake = now();
-    if (now() - lastFullHint > 6000) { lastFullHint = now(); toast({ title: 'The garden is full', sub: 'Merge two alike, or tuck one into the basket.' }); }
+    if (now() - lastFullHint > 6000) { lastFullHint = now(); toast({ title: `${AREA.name} is full`, sub: 'Merge two alike, or tuck one into the basket.' }); }
     return;
   }
   pushUndo();
@@ -1462,6 +1498,58 @@ function hintWish(wi) {
 }
 
 /* ============================================================
+   The town: areas, each with its own board and chain
+   ============================================================ */
+// Each area is a place in the sleeping town with its own merge chain (items,
+// art), visitors, scene and constellations. You move between them on the
+// map (openMap); each keeps its own board. Glow, the garden's wonders, the
+// sky and the stats belong to the whole town. An area opens when you first
+// grow the `opens.tier`-th item in the area before it.
+const AREA_KEYS = ['board', 'best', 'wishes', 'skyMoons', 'ended'];
+
+/** Point the live bindings (ITEMS, ART, …) at an area's chain and redraw its scene. */
+function useArea(a) {
+  AREA = a; ITEMS = a.items; ART = a.art; VISITORS = a.visitors; MOON_SHAPES = a.shapes; VISIT_SPOTS = a.spots;
+  sprites = []; silhouettes = []; sceneDirty = true;
+}
+/** One area's saved state (its board and progress); the current area's lives on S itself. */
+function areaState(id) {
+  if (id === S.area) return S;
+  return S.away[id] || { board: freshBoard(), best: 2, wishes: [], skyMoons: 0, ended: false };
+}
+/** Walk to another area: put this one's board away, take out the other's. */
+function goToArea(id) {
+  if (id === S.area || !S.opened.includes(id)) return;
+  const here = {}; for (const k of AREA_KEYS) here[k] = S[k];
+  S.away[S.area] = here;
+  const there = areaState(id);
+  for (const k of AREA_KEYS) S[k] = there[k];
+  delete S.away[id];
+  const first = !S.visited.includes(id);
+  S.area = id; if (first) S.visited.push(id);
+  useArea(areaById(id));
+  undoStack = []; anims = []; sel = -1; drag = null; leaving.fill(null);
+  ensureWishes(); retireUnreachableWishes();
+  arrivedAt = now(); lastInput = now();
+  save();
+  toast({ title: AREA.name, sub: first ? AREA.words.welcome : 'Just as you left it.', tier: AREA.map.icon, dur: 3400 });
+}
+let arrivedAt = -1e9;     // a moment's fade-in after walking to an area
+/**
+ * Open any area whose way has opened: its `opens` area has grown the item it
+ * needs. Runs when something new is grown and at start-up (a save from before
+ * the town already has gardens past a Moonflower).
+ */
+function checkOpenings() {
+  for (const a of AREAS) {
+    if (!a.opens || S.opened.includes(a.id)) continue;
+    if (areaState(a.opens.from).best < a.opens.tier) continue;
+    S.opened.push(a.id); save();
+    toast({ title: `A lane has opened to ${a.name.toLowerCase()}`, sub: 'Tap the map at the top to wander over.', wonder: true, dur: 4200 });
+  }
+}
+
+/* ============================================================
    The end of the chain: moons rise into the sky
    ============================================================ */
 // A Little moon can't merge any further, so it doesn't stay on the board:
@@ -1478,7 +1566,7 @@ const SHAPE_R = 14;             // a moon constellation's half-size, in scene un
 // The moon constellations, in the order they're earned. Points are in a box
 // from -1 to 1 (y down); `lines` join points by index; a point no line
 // touches is a lone star (an owl's eye, a firefly, a lit window).
-const MOON_SHAPES = [
+const GARDEN_SHAPES = [
   { name: 'The Sleeping Moon', pts: [[.35, -.95], [-.25, -.8], [-.7, -.35], [-.75, .2], [-.4, .7], [.25, .9], [-.1, .35], [-.2, -.25]],
     lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 0]] },
   { name: 'The Luna Moth', pts: [[0, -.5], [0, .55], [-.95, -.75], [-.45, .05], [-.65, .95], [.95, -.75], [.45, .05], [.65, .95]],
@@ -1504,6 +1592,7 @@ const MOON_SHAPES = [
   { name: 'The Cottage', pts: [[-.75, .9], [.75, .9], [-.75, 0], [.75, 0], [0, -.8], [.45, -.75], [.45, -.4], [-.2, .45]],
     lines: [[0, 1], [0, 2], [1, 3], [2, 4], [4, 3], [5, 6]] },
 ];
+let MOON_SHAPES = GARDEN_SHAPES;
 const moonShape = k => MOON_SHAPES[k % MOON_SHAPES.length];
 let risingMoons = 0;            // on their way up: counted, not drawn in the sky yet
 let newest = null;              // { k, t0 }: the constellation whose stars are still appearing
@@ -1532,7 +1621,7 @@ function riseMoon(cell) {
     gain(value(MAX_TIER), to);
     if (!S.ended) later(1600, openEnding);   // after its stars have come out
     else if (slot) toast({ title: moonShape(k).name, sub: 'A new constellation, from the moon you grew', tier: MAX_TIER, dur: 3600 });
-    else toast({ title: 'Another moon for the sky', sub: `${fmt(S.skyMoons)} moons, and the sky is full of them.`, tier: MAX_TIER, dur: 3600 });
+    else toast({ title: `Another ${ITEMS[MAX_TIER].name.toLowerCase()} for the sky`, sub: `${fmt(S.skyMoons)} up there now, and the sky is full of them.`, tier: MAX_TIER, dur: 3600 });
   });
   save();
 }
@@ -1633,6 +1722,12 @@ function drawHeader(c) {
   c.moveTo(0, -6); c.quadraticCurveTo(-6, -9, -11, -7); c.lineTo(-11, 7); c.quadraticCurveTo(-6, 5, 0, 8);
   c.quadraticCurveTo(6, 5, 11, 7); c.lineTo(11, -7); c.quadraticCurveTo(6, -9, 0, -6); c.lineTo(0, 8); c.stroke();
   c.restore();
+  // the town map (a gold dot while an open area hasn't been visited)
+  c.save(); c.translate(L.map.x, L.map.y); c.beginPath();
+  c.moveTo(-11, -6); c.lineTo(-4, -9); c.lineTo(4, -6); c.lineTo(11, -9); c.lineTo(11, 7); c.lineTo(4, 10); c.lineTo(-4, 7); c.lineTo(-11, 10); c.closePath();
+  c.moveTo(-4, -9); c.lineTo(-4, 7); c.moveTo(4, -6); c.lineTo(4, 10); c.stroke();
+  if (S.opened.some(id => !S.visited.includes(id))) { c.fillStyle = COL.gold; c.beginPath(); c.arc(11, -9, 3.2, 0, TAU); c.fill(); }
+  c.restore();
   // settings
   c.save(); c.translate(L.gear.x, L.gear.y);
   c.beginPath(); c.arc(0, 0, 3.2, 0, TAU); c.stroke();
@@ -1648,12 +1743,13 @@ function drawStatus(c) {
   const tier = drag ? drag.tier : sel >= 0 ? S.board[sel] : 0;
   if (tier) {
     label = ITEMS[tier].name;
-    right = tier >= MAX_TIER ? 'the last bloom of all' : tier + 1 <= S.best ? `two make a ${ITEMS[tier + 1].name}` : 'two make something new';
+    right = tier >= MAX_TIER ? AREA.words.last : tier + 1 <= S.best ? `two make a ${ITEMS[tier + 1].name}` : 'two make something new';
   } else if (S.stats.seeds === 0 && S.stats.merges === 0) label = 'Tap the seed pouch below';
   else if (S.stats.merges === 0) label = 'Drag a seed onto another seed';
+  else if (S.area !== 'garden' && S.board.every((t, i) => t === freshBoard()[i])) label = `Welcome to ${AREA.name.toLowerCase()}. Pair things up.`;
   else if (S.decor < DECOR.length) {
     const a = decorAt(S.decor), b = decorAt(S.decor + 1);
-    label = `Next: ${DECOR[S.decor].name}`; right = `${fmt(Math.max(0, b - S.peak))} ✦ to go`;
+    label = `${S.area === 'garden' ? 'Next' : 'Garden next'}: ${DECOR[S.decor].name}`; right = `${fmt(Math.max(0, b - S.peak))} ✦ to go`;
     frac = clamp((S.peak - a) / (b - a), 0, 1);
   } else {
     const base = decorAt(DECOR.length), k = Math.floor((S.peak - base) / STAR_STEP), a = base + k * STAR_STEP;
@@ -1784,7 +1880,7 @@ function drawBar(c, ms) {
   c.fillStyle = rgba(COL.text, .5);
   c.fillText('Basket', B.x, B.y + B.r - 1);
   c.fillText('Undo', U.x, U.y + U.r - 1);
-  c.fillText('Seeds', P.x, P.y + P.r + 2);
+  c.fillText(AREA.words.pouch, P.x, P.y + P.r + 2);
 }
 
 function drawFlights(c, ms) {
@@ -1884,7 +1980,7 @@ function frame() {
   requestAnimationFrame(frame);
   const ms = now();
   const active = drag || anims.length || parts.length || floats.length || toasts.length
-    || ms - lastInput < 1500 || dispGlow !== S.glow || (hushA > 0 && hushA < 1);
+    || ms - lastInput < 1500 || dispGlow !== S.glow || (hushA > 0 && hushA < 1) || ms - arrivedAt < 700;
   if (!active && ms - lastDraw < 1000 / 20) return;
   const dt = Math.min(.05, (ms - lastDraw) / 1000); lastDraw = ms;
   update(dt, ms);
@@ -1901,6 +1997,7 @@ function frame() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
   drawBreath(ctx, ms);
+  if (ms - arrivedAt < 700) { ctx.fillStyle = `rgba(5,7,15,${1 - (ms - arrivedAt) / 700})`; ctx.fillRect(0, 0, W, H); }
   drawToast(ctx, ms);   // over the hush, so a morning or a moon is still told
 }
 /** Everything over the garden: the part that hush fades. */
@@ -1931,6 +2028,7 @@ function hitTest(x, y, dropping) {
   if (inC(L.basket, dropping ? 1.9 : 1.5)) return { kind: 'basket' };
   if (!dropping && inC(L.undo, 1.5)) return { kind: 'undo' };
   if (!dropping && inC(L.book, 1)) return { kind: 'book' };
+  if (!dropping && inC(L.map, 1)) return { kind: 'map' };
   if (!dropping && inC(L.gear, 1)) return { kind: 'gear' };
   return { kind: 'none' };
 }
@@ -1994,6 +2092,7 @@ function tap(h) {
       break;
     case 'undo': sel = -1; doUndo(); break;
     case 'book': openBook(); break;
+    case 'map': openMap(); break;
     case 'gear': openSettings(); break;
     default: sel = -1;
   }
@@ -2051,6 +2150,13 @@ document.getElementById('back').addEventListener('click', closeSheet);
 sheetEl.addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.hasAttribute('data-close')) { closeSheet(); return; }
+  if (b.dataset.area) {
+    const a = areaById(b.dataset.area);
+    if (a.id === S.area) { closeSheet(); return; }
+    if (S.opened.includes(a.id)) { closeSheet(); goToArea(a.id); return; }
+    document.getElementById('mapnote').innerHTML = `<b>${a.name}</b>: ${a.opens.need}`;
+    return;
+  }
   if (b.dataset.dim !== undefined) { S.set.dim = +b.dataset.dim; applySettings(); save(); openSettings(); return; }
   if (b.dataset.tog) {
     const k = b.dataset.tog; S.set[k] = !S.set[k]; applySettings(); save();
@@ -2096,9 +2202,9 @@ function openEnding() {
   if (wrap.classList.contains('open')) { later(1500, openEnding); return; }   // never on top of another sheet
   S.ended = true; save();
   openSheet(`
-    <h2 class="title">Goodnight, moon</h2>
+    <h2 class="title">${AREA.ending.title}</h2>
     <canvas class="endmoon" data-t="${MAX_TIER}"></canvas>
-    <p class="lede">You grew a moon, one seed at a time, in the small hours.<br>It has gone up into the stars as the Sleeping Moon, to keep watch over the garden.</p>
+    <p class="lede">${AREA.ending.lede}</p>
     <div class="stats">
       <span>Visits to the garden</span><span>${fmt(S.visits)}</span>
       <span>From the pouch</span><span>${fmt(S.stats.seeds)}</span>
@@ -2106,7 +2212,7 @@ function openEnding() {
       <span>Wishes granted</span><span>${fmt(S.stats.wishes)}</span>
       <span>Glow, all told</span><span>${fmt(S.peak)} ✦</span>
     </div>
-    <p><small>The garden isn't finished with you. Every moon you grow from now on rises to make a new constellation${S.decor < DECOR.length ? ', and the wonders keep coming' : ''}. The seed pouch gives ${ITEMS[pouchTier()].many.toLowerCase()} now. Rest well.</small></p>
+    <p><small>${AREA.ending.more}${S.decor < DECOR.length ? ' The garden\'s wonders keep coming, too.' : ''} The pouch gives ${ITEMS[pouchTier()].many.toLowerCase()} now. Rest well.</small></p>
     <button class="btn done" data-close>Keep growing</button>`);
 }
 
@@ -2146,9 +2252,9 @@ function openBook() {
     ? `Next: <b>${DECOR[S.decor].name}</b>, in ${fmt(decorAt(S.decor + 1) - S.peak)} ✦.`
     : `Every wonder has come. Each ${fmt(STAR_STEP)} ✦ now adds a constellation to the sky.`;
   const nextItem = S.best < MAX_TIER ? `<p><small>Merge two ${ITEMS[S.best].many} to find out what comes next.</small></p>`
-    : `<p><small>You grew a moon. There's nothing left to find, only more to grow: every moon rises into the sky as a new constellation.</small></p>`;
+    : `<p><small>${AREA.words.done}</small></p>`;
   openSheet(`
-    <h2>Garden book</h2>
+    <h2>${AREA.words.book}</h2>
     <div class="book">${items}</div>
     ${nextItem}
     <h3>Garden wonders · ${S.decor} of ${DECOR.length}</h3>
@@ -2168,6 +2274,410 @@ function openBook() {
 }
 
 /* ============================================================
+   The Farm
+   ============================================================ */
+// A sleepy farm under the stars. Its chain runs from an egg to a sky lantern,
+// which rises like the garden's moon. Opens when the garden grows its first
+// Moonflower.
+const FARM_ITEMS = [null,
+  { name: 'Egg',        many: 'Eggs',        blurb: 'Warm, and wobbling a little.' },
+  { name: 'Chick',      many: 'Chicks',      blurb: 'Fluff with feet.' },
+  { name: 'Hen',        many: 'Hens',        blurb: 'Settled on her roost for the night.' },
+  { name: 'Lamb',       many: 'Lambs',       blurb: 'Asleep in the straw.' },
+  { name: 'Sheep',      many: 'Sheep',       blurb: 'Counting people, probably.' },
+  { name: 'Calf',       many: 'Calves',      blurb: 'Wobbly legs, big eyes.' },
+  { name: 'Cow',        many: 'Cows',        blurb: 'Chewing slowly, thinking slowly.' },
+  { name: 'Pony',       many: 'Ponies',      blurb: 'Dreaming of apples.' },
+  { name: 'Hay cart',   many: 'Hay carts',   blurb: 'Stacked high and sweet-smelling.' },
+  { name: 'Red barn',   many: 'Red barns',   blurb: 'Everyone is tucked in.' },
+  { name: 'Windmill',   many: 'Windmills',   blurb: 'Turning slowly in the night breeze.' },
+  { name: 'Sky lantern', many: 'Sky lanterns', blurb: 'Lit in the barn, let go under the stars.' },
+];
+const FC = {
+  straw: '#b58e4a', strawL: '#d9b66c', egg: '#f4ead6', eggS: '#dcc7a2', chick: '#f6d36a', chickD: '#e2b244',
+  beak: '#eea04a', comb: '#d65a52', wool: '#f1ede4', woolS: '#d6cfc2', face: '#3b3540', tan: '#c99868', tanD: '#a4734a',
+  hoof: '#3a2c28', pink: '#e2a3a3', pony: '#8a5a3c', ponyD: '#5e3b27', mane: '#3b2a22', wood: '#7a5638', woodD: '#5a3d27',
+  hay: '#e4c06a', hayD: '#b8913f', barn: '#a8433a', barnD: '#7a2e28', roof: '#4a2a26', trim: '#efe2cf', stone: '#d9cbb0', stoneD: '#b3a385',
+  sail: '#efe4cf', paper: '#f2a65a', paperL: '#ffd889', light: '#ffd27a',
+};
+function straw(c, w = 24) {
+  c.fillStyle = FC.straw; c.beginPath(); c.ellipse(0, 38, w, 7, 0, 0, TAU); c.fill();
+  c.strokeStyle = FC.strawL; c.lineWidth = 1.1; c.lineCap = 'round';
+  for (let i = 0; i < 9; i++) { const x = -w + 4 + i * (2 * w - 8) / 8, a = (i % 3 - 1) * .5; c.beginPath(); c.moveTo(x - 4 * Math.cos(a), 37 - 2 * Math.sin(a)); c.lineTo(x + 4 * Math.cos(a), 37 + 2 * Math.sin(a)); c.stroke(); }
+}
+function fill(c, col) { c.fillStyle = col; c.fill(); }
+function oval(c, x, y, rx, ry, rot = 0) { c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, TAU); }
+/** A sleeping eye: a little downward arc. */
+function sleepyEye(c, x, y, r = 3, col = '#3a2c2a') { c.strokeStyle = col; c.lineWidth = 1.6; c.lineCap = 'round'; c.beginPath(); c.arc(x, y - r * .4, r, .25, Math.PI - .25); c.stroke(); }
+function legs(c, xs, top, col, w = 4) { c.fillStyle = col; for (const x of xs) { c.fillRect(x - w / 2, top, w, 37 - top); } }
+/** Fleece: a cloud of soft circles over an oval. */
+function fleece(c, cx, cy, rx, ry) {
+  const g = c.createLinearGradient(0, cy - ry, 0, cy + ry); g.addColorStop(0, FC.wool); g.addColorStop(1, FC.woolS);
+  c.fillStyle = g; oval(c, cx, cy, rx, ry); c.fill();
+  for (let i = 0; i < 10; i++) { const a = i / 10 * TAU; c.beginPath(); c.arc(cx + Math.cos(a) * rx * .92, cy + Math.sin(a) * ry * .85, ry * .42, 0, TAU); c.fill(); }
+}
+const FARM_ART = [null,
+  // 1 · Egg, in the straw
+  c => {
+    straw(c, 22); drawGlow(c, 0, 14, 32, '#fff1cf', .16);
+    const g = c.createLinearGradient(-12, -6, 12, 34); g.addColorStop(0, '#fffaf0'); g.addColorStop(1, FC.eggS);
+    c.fillStyle = g; c.beginPath(); c.moveTo(0, -4); c.bezierCurveTo(14, -4, 16, 22, 13, 28); c.bezierCurveTo(9, 36, -9, 36, -13, 28); c.bezierCurveTo(-16, 22, -14, -4, 0, -4); c.fill();
+    c.fillStyle = 'rgba(160,120,80,.45)'; for (const [x, y, r] of [[5, 8, 1.4], [-6, 14, 1.1], [7, 20, 1], [-2, 24, 1.3], [-8, 5, .9]]) { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
+    c.fillStyle = 'rgba(255,255,255,.6)'; oval(c, -6, 6, 2.6, 6, -.25); c.fill();
+    sparkle(c, 18, -8, 4, 'rgba(255,236,190,.7)');
+  },
+  // 2 · Chick
+  c => {
+    straw(c, 20);
+    const g = c.createRadialGradient(-4, 14, 2, 0, 20, 18); g.addColorStop(0, '#fff0a8'); g.addColorStop(1, FC.chick);
+    c.fillStyle = g; oval(c, -2, 22, 16, 14); c.fill(); oval(c, 6, 4, 11, 10); c.fill();
+    c.fillStyle = FC.chickD; oval(c, -6, 24, 8, 5, -.3); c.fill();
+    c.fillStyle = FC.chick; c.beginPath(); c.moveTo(4, -5); c.lineTo(6, -11); c.lineTo(9, -5); c.fill();
+    c.fillStyle = FC.beak; c.beginPath(); c.moveTo(16, 3); c.lineTo(22, 5); c.lineTo(16, 8); c.fill();
+    c.fillStyle = '#2a2420'; c.beginPath(); c.arc(10, 2, 1.8, 0, TAU); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.8)'; c.beginPath(); c.arc(10.6, 1.4, .6, 0, TAU); c.fill();
+    c.strokeStyle = FC.beak; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-6, 34); c.lineTo(-6, 38); c.moveTo(2, 34); c.lineTo(2, 38); c.stroke();
+  },
+  // 3 · Hen, roosting
+  c => {
+    straw(c, 28);
+    for (const [x, y, rx, ry, r] of [[-22, 6, 9, 4, -1.1], [-24, 12, 9, 4, -.7], [-22, 18, 8, 3.6, -.3]]) { c.fillStyle = FC.woolS; oval(c, x, y, rx, ry, r); c.fill(); }
+    const g = c.createLinearGradient(0, 0, 0, 36); g.addColorStop(0, '#fffaf0'); g.addColorStop(1, '#e3d6bd');
+    c.fillStyle = g; oval(c, -2, 20, 23, 16); c.fill(); oval(c, 13, -2, 10, 10); c.fill();
+    c.fillStyle = FC.comb; for (const [x, y, r] of [[9, -12, 3.4], [13, -14, 3.8], [17, -12, 3.2]]) { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
+    c.beginPath(); c.arc(20, 7, 2.8, 0, TAU); c.fill();
+    c.fillStyle = FC.beak; c.beginPath(); c.moveTo(22, -3); c.lineTo(28, 0); c.lineTo(22, 2); c.fill();
+    sleepyEye(c, 15, -1, 2.4);
+    c.strokeStyle = 'rgba(170,150,120,.6)'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(-14, 16); c.quadraticCurveTo(-2, 10, 8, 18); c.quadraticCurveTo(-2, 26, -14, 16); c.stroke();
+  },
+  // 4 · Lamb, asleep
+  c => {
+    straw(c, 26);
+    fleece(c, -2, 24, 20, 10);
+    c.fillStyle = FC.face; oval(c, 20, 18, 7.5, 6.2, .2); c.fill();
+    oval(c, 14, 13, 4.4, 2, -.6); c.fill();
+    sleepyEye(c, 21, 18, 2, '#cfc6bb');
+    c.fillStyle = FC.face; oval(c, -12, 34, 4, 2); c.fill(); oval(c, 8, 34, 4, 2); c.fill();
+    c.fillStyle = 'rgba(205,200,225,.7)'; c.font = '700 10px sans-serif'; c.fillText('z', 26, 4);
+  },
+  // 5 · Sheep
+  c => {
+    straw(c, 24);
+    legs(c, [-12, -4, 6, 13], 18, FC.face, 3.6);
+    fleece(c, -1, 6, 21, 13);
+    c.fillStyle = FC.face; oval(c, 23, 2, 7, 9, -.35); c.fill();
+    oval(c, 17, -6, 5, 2.2, -.5); c.fill();
+    c.fillStyle = '#e8e2d8'; c.beginPath(); c.arc(25, 0, 1.5, 0, TAU); c.fill();
+    c.fillStyle = FC.wool; for (const [x, y] of [[18, -5], [21, -7]]) { c.beginPath(); c.arc(x, y, 3, 0, TAU); c.fill(); }
+  },
+  // 6 · Calf
+  c => {
+    straw(c, 24);
+    legs(c, [-13, -6, 6, 12], 16, FC.tanD, 3.4);
+    c.fillStyle = FC.tan; oval(c, -2, 10, 19, 11); c.fill();
+    c.fillStyle = '#f3e7d6'; oval(c, -8, 6, 6, 4, .4); c.fill(); oval(c, 6, 14, 5, 3.4); c.fill();
+    c.fillStyle = FC.tan; oval(c, 20, -2, 8, 9, .2); c.fill();
+    c.fillStyle = '#f3e7d6'; oval(c, 23, -1, 2.6, 6, .2); c.fill();
+    c.fillStyle = FC.tanD; oval(c, 14, -9, 4.4, 2, -.6); c.fill(); oval(c, 27, -10, 4, 1.8, .6); c.fill();
+    c.fillStyle = FC.pink; oval(c, 26, 5, 4.2, 3); c.fill();
+    c.fillStyle = '#2a201c'; c.beginPath(); c.arc(19, -3, 2.4, 0, TAU); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.85)'; c.beginPath(); c.arc(19.8, -3.8, .8, 0, TAU); c.fill();
+    c.strokeStyle = FC.tanD; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-20, 6); c.quadraticCurveTo(-26, 14, -24, 22); c.stroke();
+  },
+  // 7 · Cow
+  c => {
+    straw(c, 30);
+    legs(c, [-18, -10, 8, 15], 18, '#2d2a30', 4.4);
+    c.fillStyle = '#f1ede6'; oval(c, -2, 8, 25, 14); c.fill();
+    c.fillStyle = '#2d2a30'; oval(c, -12, 2, 8, 6, .3); c.fill(); oval(c, 8, 12, 7, 4.6, -.2); c.fill(); oval(c, -4, 16, 4, 3); c.fill();
+    c.fillStyle = FC.pink; oval(c, 2, 22, 6, 3); c.fill();
+    c.fillStyle = '#f1ede6'; oval(c, 25, -2, 9, 10, .15); c.fill();
+    c.fillStyle = '#2d2a30'; oval(c, 23, -6, 5, 4); c.fill();
+    c.fillStyle = FC.pink; oval(c, 30, 6, 6, 4.4); c.fill();
+    c.fillStyle = FC.stone; c.beginPath(); c.moveTo(19, -10); c.quadraticCurveTo(15, -16, 17, -18); c.lineTo(21, -11); c.fill(); c.beginPath(); c.moveTo(29, -10); c.quadraticCurveTo(33, -16, 31, -18); c.lineTo(27, -11); c.fill();
+    sleepyEye(c, 25, -2, 2.2);
+    c.strokeStyle = '#2d2a30'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-26, 4); c.quadraticCurveTo(-32, 14, -29, 24); c.stroke();
+  },
+  // 8 · Pony, dozing
+  c => {
+    straw(c, 28);
+    legs(c, [-16, -9, 9, 15], 14, FC.pony, 3.6);
+    c.fillStyle = FC.hoof; for (const x of [-16, -9, 9, 15]) c.fillRect(x - 2.2, 34, 4.4, 3);
+    c.fillStyle = FC.pony; oval(c, -1, 8, 21, 11); c.fill();
+    c.beginPath(); c.moveTo(12, 4); c.lineTo(20, -18); c.lineTo(28, -15); c.lineTo(22, 8); c.fill();
+    oval(c, 28, -18, 5.6, 9, 1.05); c.fill();
+    c.fillStyle = FC.mane; c.beginPath(); c.moveTo(13, 0); c.quadraticCurveTo(14, -16, 22, -22); c.lineTo(23, -19); c.quadraticCurveTo(18, -12, 18, 2); c.fill();
+    c.strokeStyle = FC.mane; c.lineWidth = 4; c.lineCap = 'round'; c.beginPath(); c.moveTo(-21, 4); c.quadraticCurveTo(-28, 14, -25, 26); c.stroke();
+    c.fillStyle = FC.pony; c.beginPath(); c.moveTo(24, -24); c.lineTo(25, -30); c.lineTo(27.5, -24); c.fill();
+    sleepyEye(c, 27, -19, 1.8, '#2a1c16');
+    c.fillStyle = FC.ponyD; c.beginPath(); c.arc(33.5, -14, 1, 0, TAU); c.fill();
+  },
+  // 9 · Hay cart
+  c => {
+    c.fillStyle = 'rgba(0,0,0,.25)'; oval(c, 0, 38, 32, 4); c.fill();
+    const g = c.createLinearGradient(0, -14, 0, 14); g.addColorStop(0, '#f6d987'); g.addColorStop(1, FC.hayD);
+    c.fillStyle = g; c.beginPath(); c.moveTo(-28, 12); c.quadraticCurveTo(-26, -16, 0, -18); c.quadraticCurveTo(26, -16, 28, 12); c.fill();
+    c.strokeStyle = 'rgba(255,240,190,.55)'; c.lineWidth = 1; for (let i = 0; i < 9; i++) { const x = -22 + i * 5.5; c.beginPath(); c.moveTo(x, 10); c.lineTo(x + 3, -8 + Math.abs(i - 4) * 1.6); c.stroke(); }
+    c.fillStyle = FC.wood; c.fillRect(-32, 10, 64, 8); c.fillStyle = FC.woodD; c.fillRect(-32, 16, 64, 2);
+    c.strokeStyle = FC.woodD; c.lineWidth = 3; c.beginPath(); c.moveTo(30, 14); c.lineTo(44, 22); c.stroke();
+    for (const x of [-18, 18]) {
+      c.fillStyle = FC.woodD; c.beginPath(); c.arc(x, 28, 10, 0, TAU); c.fill();
+      c.fillStyle = FC.wood; c.beginPath(); c.arc(x, 28, 7.6, 0, TAU); c.fill();
+      c.strokeStyle = FC.woodD; c.lineWidth = 1.6; c.beginPath(); for (let k = 0; k < 6; k++) { const a = k * TAU / 6; c.moveTo(x, 28); c.lineTo(x + Math.cos(a) * 7.6, 28 + Math.sin(a) * 7.6); } c.stroke();
+      c.fillStyle = FC.woodD; c.beginPath(); c.arc(x, 28, 2, 0, TAU); c.fill();
+    }
+  },
+  // 10 · Red barn
+  c => {
+    c.fillStyle = 'rgba(0,0,0,.25)'; oval(c, 0, 38, 36, 4); c.fill();
+    const g = c.createLinearGradient(0, -16, 0, 38); g.addColorStop(0, FC.barn); g.addColorStop(1, FC.barnD);
+    c.fillStyle = g; c.fillRect(-30, -4, 60, 42);
+    c.fillStyle = FC.roof; c.beginPath(); c.moveTo(-34, -2); c.lineTo(-24, -22); c.lineTo(0, -32); c.lineTo(24, -22); c.lineTo(34, -2); c.closePath(); c.fill();
+    c.strokeStyle = FC.trim; c.lineWidth = 1.8; c.strokeRect(-11, 12, 22, 26);
+    c.beginPath(); c.moveTo(-11, 12); c.lineTo(11, 38); c.moveTo(11, 12); c.lineTo(-11, 38); c.stroke();
+    drawGlow(c, 0, -12, 18, FC.light, .55); c.fillStyle = FC.light; c.fillRect(-5, -17, 10, 9);
+    c.strokeStyle = FC.trim; c.lineWidth = 1.4; c.strokeRect(-5, -17, 10, 9); c.beginPath(); c.moveTo(0, -17); c.lineTo(0, -8); c.stroke();
+    c.strokeStyle = 'rgba(255,255,255,.12)'; c.lineWidth = 1; for (let x = -26; x <= 26; x += 6) { if (Math.abs(x) < 13) continue; c.beginPath(); c.moveTo(x, -2); c.lineTo(x, 37); c.stroke(); }
+  },
+  // 11 · Windmill
+  c => {
+    c.fillStyle = 'rgba(0,0,0,.25)'; oval(c, 0, 38, 22, 4); c.fill();
+    const g = c.createLinearGradient(-12, 0, 12, 0); g.addColorStop(0, FC.stone); g.addColorStop(1, FC.stoneD);
+    c.fillStyle = g; c.beginPath(); c.moveTo(-14, 38); c.lineTo(-8, -10); c.lineTo(8, -10); c.lineTo(14, 38); c.fill();
+    c.fillStyle = FC.roof; c.beginPath(); c.moveTo(-11, -9); c.quadraticCurveTo(0, -24, 11, -9); c.fill();
+    c.fillStyle = FC.woodD; c.beginPath(); c.moveTo(-4, 38); c.lineTo(-4, 28); c.quadraticCurveTo(0, 24, 4, 28); c.lineTo(4, 38); c.fill();
+    drawGlow(c, 0, 10, 12, FC.light, .5); c.fillStyle = FC.light; c.fillRect(-2.6, 7, 5.2, 6);
+    c.save(); c.translate(0, -12); c.rotate(.35);
+    for (let k = 0; k < 4; k++) {
+      c.save(); c.rotate(k * TAU / 4);
+      c.fillStyle = FC.sail; c.fillRect(2, -4.5, 30, 9);
+      c.strokeStyle = 'rgba(120,90,60,.55)'; c.lineWidth = 1; for (let x = 6; x < 32; x += 5) { c.beginPath(); c.moveTo(x, -4.5); c.lineTo(x, 4.5); c.stroke(); }
+      c.strokeStyle = FC.woodD; c.lineWidth = 1.6; c.beginPath(); c.moveTo(0, 0); c.lineTo(32, 0); c.stroke();
+      c.restore();
+    }
+    c.fillStyle = FC.woodD; c.beginPath(); c.arc(0, 0, 3, 0, TAU); c.fill();
+    c.restore();
+  },
+  // 12 · Sky lantern
+  c => {
+    drawGlow(c, 0, 0, 60, FC.paperL, .45);
+    const g = c.createLinearGradient(0, -30, 0, 26); g.addColorStop(0, FC.paperL); g.addColorStop(1, FC.paper);
+    c.fillStyle = g; c.beginPath(); c.moveTo(-22, -28); c.quadraticCurveTo(0, -34, 22, -28); c.lineTo(15, 22); c.quadraticCurveTo(0, 26, -15, 22); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(190,110,50,.45)'; c.lineWidth = 1.2; for (const x of [-11, 0, 11]) { c.beginPath(); c.moveTo(x * 1.6, -30); c.lineTo(x, 23); c.stroke(); }
+    c.strokeStyle = '#8a5a34'; c.lineWidth = 1.4; c.beginPath(); c.ellipse(0, 23, 15, 3, 0, 0, TAU); c.stroke();
+    drawGlow(c, 0, 28, 14, '#fff3c0', .9);
+    c.fillStyle = '#fff6d0'; c.beginPath(); c.moveTo(0, 22); c.quadraticCurveTo(4, 28, 0, 33); c.quadraticCurveTo(-4, 28, 0, 22); c.fill();
+    sparkle(c, 28, -20, 5, 'rgba(255,240,200,.9)'); sparkle(c, -30, 6, 3.5, 'rgba(255,240,200,.7)');
+  },
+];
+
+const FARM_VISITORS = ['Barn owl', 'Cat', 'Sheepdog', 'Goose', 'Mouse', 'Piglet', 'Goat', 'Duck', 'Donkey', 'Fox', 'Hedgehog', 'Bat'];
+// The farm's own visitors (the rest are the garden's): drawn like those, feet at
+// (0, 0), facing right, returning their eyes.
+Object.assign(VISITOR_ART, {
+  'Barn owl'(c) {
+    c.fillStyle = '#5d554a'; ell(c, 0, -6.5, 4.4, 6.5);
+    c.fillStyle = '#c9bca6'; ell(c, 0, -8.6, 3.4, 3); tri(c, -3.4, -10.6, 0, -8.6, 3.4, -10.6);
+    return [[-1.4, -8.8, .8], [1.4, -8.8, .8]];
+  },
+  Cat(c) {
+    c.fillStyle = '#2f2d38'; ell(c, 0, -4.2, 3.6, 4.6); ell(c, 1.4, -10.2, 2.8, 2.5);
+    tri(c, -.6, -11.6, -.2, -14.4, 1.2, -12.4); tri(c, 1.8, -12.4, 3.2, -14.4, 3.6, -11.4);
+    c.strokeStyle = '#2f2d38'; c.lineWidth = 1; c.beginPath(); c.moveTo(-3.2, -1); c.quadraticCurveTo(-7.5, -1, -6.5, -6); c.stroke();
+    return [[.5, -10.4, .5], [2.4, -10.4, .5]];
+  },
+  Sheepdog(c) {
+    c.fillStyle = '#2c2a30'; ell(c, 0, -5, 6, 3.6); ell(c, 6.2, -8.6, 3, 2.6);
+    c.fillRect(-4.6, -3, 1.6, 3); c.fillRect(3, -3, 1.6, 3);
+    c.fillStyle = '#d9d4cc'; ell(c, 5, -5.2, 2, 2.4); ell(c, 8.2, -8, 1.4, 1);
+    c.fillStyle = '#2c2a30'; ell(c, 5, -10.6, 1, 2, -.5);
+    c.strokeStyle = '#2c2a30'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-5.6, -6); c.quadraticCurveTo(-8.5, -8, -8, -11); c.stroke();
+    return [[7, -9.3, .5]];
+  },
+  Goose(c) {
+    c.fillStyle = '#d6d2ca'; ell(c, 0, -4, 5.6, 3.4, -.1);
+    c.strokeStyle = '#d6d2ca'; c.lineWidth = 1.8; c.beginPath(); c.moveTo(3.6, -5); c.quadraticCurveTo(6.5, -9, 5, -13); c.stroke();
+    ell(c, 5.6, -13.6, 1.9, 1.5); c.fillStyle = '#e09a3c'; tri(c, 7.2, -14.2, 9.6, -13.4, 7.2, -12.8);
+    c.fillRect(-1, -1, .8, 1); c.fillRect(1.4, -1, .8, 1);
+    return [[5.9, -14, .4]];
+  },
+  Piglet(c) {
+    c.fillStyle = '#c98f8f'; ell(c, 0, -3.6, 5, 3.4); ell(c, 4.4, -4.6, 2.7, 2.4);
+    c.fillStyle = '#dba2a2'; ell(c, 7, -4.2, 1.2, 1.1);
+    c.fillStyle = '#b07a7a'; tri(c, 3.2, -6.6, 3.8, -8.6, 5, -6.8);
+    c.fillRect(-3, -1, 1.2, 1); c.fillRect(2, -1, 1.2, 1);
+    c.strokeStyle = '#c98f8f'; c.lineWidth = .7; c.beginPath(); c.arc(-5.8, -4.6, 1, 0, 5); c.stroke();
+    return [[5.2, -5.4, .4]];
+  },
+  Goat(c) {
+    c.fillStyle = '#cbc3b5'; ell(c, 0, -7, 5.4, 3.2);
+    c.fillRect(-4, -5, 1.2, 5); c.fillRect(-2, -5, 1.2, 5); c.fillRect(2.2, -5, 1.2, 5); c.fillRect(4, -5, 1.2, 5);
+    tri(c, 3, -8.5, 5.4, -12.6, 7, -11, 5, -7);
+    ell(c, 6.8, -12, 2.2, 1.6, .5);
+    c.strokeStyle = '#8f8676'; c.lineWidth = .8; c.beginPath(); c.moveTo(5, -13); c.quadraticCurveTo(4, -16, 2, -15.4); c.stroke();
+    c.fillStyle = '#cbc3b5'; tri(c, 7.4, -11, 8, -8.6, 7, -9.4);
+    return [[6.6, -12.6, .45]];
+  },
+  Duck(c) {
+    c.fillStyle = '#5c4c3c'; ell(c, 0, -2.8, 4.6, 2.8);
+    c.fillStyle = '#2f5a3e'; ell(c, 3.6, -6, 2.2, 2);
+    c.fillStyle = '#e0b040'; tri(c, 5.4, -6.2, 7.8, -5.4, 5.4, -4.8);
+    c.fillStyle = '#d8d2c4'; ell(c, 3, -4.2, 1.4, .4);
+    return [[4.1, -6.5, .4]];
+  },
+  Donkey(c) {
+    c.fillStyle = '#4c4852'; c.strokeStyle = '#4c4852'; c.lineWidth = 1; c.beginPath();
+    for (const [x0, x1] of [[-4, -4], [-2, -2.2], [3, 3.2], [5, 5.2]]) { c.moveTo(x0, -7); c.lineTo(x1, 0); }
+    c.stroke(); ell(c, 0, -9, 6.4, 3.4); tri(c, 4, -11, 6.5, -15.5, 8.5, -14.6, 6.4, -9);
+    ell(c, 8.6, -15.4, 2.6, 1.6, .4); c.fillStyle = '#7b7682'; ell(c, 10.4, -14.4, 1, .9);
+    c.fillStyle = '#4c4852'; ell(c, 6.6, -19, .9, 2.8, -.2); ell(c, 8, -19.2, .9, 2.8, .2);
+    return [[8.8, -16, .5]];
+  },
+});
+
+const FARM_SHAPES = [
+  { name: 'The Sky Lantern', pts: [[-.6, -.9], [.6, -.9], [.4, .6], [-.4, .6], [0, .95]], lines: [[0, 1], [1, 2], [2, 3], [3, 0]] },
+  { name: 'The Hen', pts: [[-.9, .2], [-.4, -.3], [.3, -.4], [.55, -.85], [.85, -.6], [.7, -.2], [.6, .5], [-.2, .7]],
+    lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 0]] },
+  { name: 'The Sheep', pts: [[-.8, -.2], [.5, -.3], [.9, -.6], [.6, .2], [-.7, .3], [-.6, .9], [.4, .9]],
+    lines: [[0, 1], [1, 2], [1, 3], [3, 4], [4, 0], [4, 5], [3, 6]] },
+  { name: 'The Pony', pts: [[-.8, -.1], [.4, -.1], [.8, -.8], [.95, -.5], [-.8, .9], [.4, .9]], lines: [[0, 1], [1, 2], [2, 3], [0, 4], [1, 5]] },
+  { name: 'The Windmill', pts: [[0, -.2], [-.9, -.9], [.9, -.9], [-.9, .5], [.9, .5], [0, .95]], lines: [[0, 1], [0, 2], [0, 3], [0, 4], [0, 5]] },
+  { name: 'The Barn', pts: [[-.8, .9], [.8, .9], [-.8, -.1], [.8, -.1], [-.45, -.6], [.45, -.6], [0, -.9]],
+    lines: [[0, 1], [0, 2], [1, 3], [2, 4], [4, 6], [6, 5], [5, 3]] },
+  { name: 'The Cartwheel', pts: [[0, 0], [0, -.9], [.78, -.45], [.78, .45], [0, .9], [-.78, .45], [-.78, -.45]],
+    lines: [[0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6]] },
+  { name: 'The Scarecrow', pts: [[0, -.95], [0, .9], [-.9, -.3], [.9, -.3], [-.35, -.75], [.35, -.75]], lines: [[0, 1], [2, 3], [4, 5]] },
+];
+// Visitors wait by the fence, by the hay bales, and at the barn door.
+const FARM_SPOTS = [{ x: 98, dir: 1 }, { x: 200, dir: 1 }, { x: 250, dir: -1 }];
+
+/** The farm's land (cached): fields on the far hills, a windmill, the barn and silo, a fence, hay bales, an oak. */
+function landFarm(c, V) {
+  const G = V.G, rnd = mulberry32(11);
+  c.fillStyle = '#0c1127'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
+  for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, farY(V, x));
+  c.lineTo(V.xr + 4, V.vh + 2); c.fill();
+  c.strokeStyle = '#111a38'; c.lineWidth = 1;          // ploughed rows on the far fields
+  for (let k = 0; k < 5; k++) { c.beginPath(); for (let x = 90; x <= 250; x += 4) { const y = farY(V, x) + 5 + k * 3.4; x === 90 ? c.moveTo(x, y) : c.lineTo(x, y); } c.stroke(); }
+  { const x = 58, y = farY(V, 58) + 3;                 // the windmill's tower (its sails turn in liveFarm)
+    c.fillStyle = '#0a0e20'; c.beginPath(); c.moveTo(x - 6, y); c.lineTo(x - 3.4, y - 24); c.lineTo(x + 3.4, y - 24); c.lineTo(x + 6, y); c.fill();
+    c.beginPath(); c.arc(x, y - 24, 3.8, Math.PI, 0); c.fill(); }
+  c.fillStyle = '#090d1b'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
+  for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, nearY(V, x));
+  c.lineTo(V.xr + 4, V.vh + 2); c.fill();
+  { const x = 30, y = nearY(V, 30) + 1;                // an old oak
+    c.fillStyle = '#0d1517'; for (let i = 0; i < 40; i++) { const a = rnd() * TAU, d = Math.sqrt(rnd()) * 24; c.beginPath(); c.ellipse(x + Math.cos(a) * d * 1.2, y - 50 + Math.sin(a) * d * .7, 5 + rnd() * 3, 3 + rnd() * 2, rnd() * 3, 0, TAU); c.fill(); }
+    c.fillStyle = '#141114'; c.beginPath(); c.moveTo(x - 4, y); c.quadraticCurveTo(x - 2, y - 26, x - 1, y - 42); c.lineTo(x + 1, y - 42); c.quadraticCurveTo(x + 2, y - 26, x + 4, y); c.fill(); }
+  { const x = 282, y = nearY(V, 282) + 1;              // the barn
+    c.fillStyle = '#3a1618'; c.fillRect(x - 26, y - 30, 52, 31);
+    c.fillStyle = '#1d0f12'; c.beginPath(); c.moveTo(x - 29, y - 29); c.lineTo(x - 21, y - 42); c.lineTo(x, y - 50); c.lineTo(x + 21, y - 42); c.lineTo(x + 29, y - 29); c.closePath(); c.fill();
+    c.fillStyle = '#2a1012'; c.fillRect(x - 9, y - 18, 18, 19);
+    c.strokeStyle = '#5b4440'; c.lineWidth = .8; c.strokeRect(x - 9, y - 18, 18, 19);
+    c.beginPath(); c.moveTo(x - 9, y - 18); c.lineTo(x + 9, y + 1); c.moveTo(x + 9, y - 18); c.lineTo(x - 9, y + 1); c.stroke();
+    c.fillStyle = '#1a0c0e'; c.fillRect(x - 4.5, y - 41, 9, 7); }
+  { const x = 322, y = nearY(V, 322) + 1;              // the silo
+    c.fillStyle = '#1a2034'; c.fillRect(x - 9, y - 46, 18, 47);
+    c.beginPath(); c.arc(x, y - 46, 9, Math.PI, 0); c.fill();
+    c.strokeStyle = '#232a42'; c.lineWidth = .7; for (let k = 1; k < 5; k++) { c.beginPath(); c.moveTo(x - 9, y - 9 * k); c.lineTo(x + 9, y - 9 * k); c.stroke(); } }
+  c.strokeStyle = '#161b2a'; c.lineWidth = 1.6;          // the fence
+  c.beginPath(); c.moveTo(V.xl, nearY(V, 0) - 11); c.lineTo(132, nearY(V, 132) - 11);
+  c.moveTo(V.xl, nearY(V, 0) - 5); c.lineTo(132, nearY(V, 132) - 5); c.stroke();
+  c.lineWidth = 2.4; for (let x = Math.ceil((V.xl + 2) / 17) * 17 - 11; x <= 132; x += 17) { const y = nearY(V, x); c.beginPath(); c.moveTo(x, y + 1); c.lineTo(x, y - 15); c.stroke(); }
+  for (const [x, r] of [[156, 8], [174, 7.4], [165, 6.6]]) {   // round hay bales
+    const y = nearY(V, x) + 2 - r + (x === 165 ? -12 : 0);
+    c.fillStyle = '#3d301a'; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+    c.strokeStyle = '#54431f'; c.lineWidth = .8; c.beginPath(); c.arc(x, y, r * .6, 0, 5.4); c.stroke();
+  }
+  c.strokeStyle = '#142029'; c.lineWidth = .8;            // grass
+  for (let x = V.xl; x < V.xr; x += 3 + rnd() * 5) {
+    if (x > 254 && x < 334) continue;
+    const y = nearY(V, x) + 1;
+    for (let k = 0; k < 2; k++) { const h = 2 + rnd() * 5, lean = (rnd() - .5) * 4; c.beginPath(); c.moveTo(x + k, y); c.quadraticCurveTo(x + k, y - h * .6, x + k + lean, y - h); c.stroke(); }
+  }
+}
+/** The farm's live parts: the windmill's sails, the barn's loft light and door lantern, a few fireflies. */
+function liveFarm(c, V, t) {
+  { const x = 58, y = farY(V, 58) + 3 - 24;
+    c.strokeStyle = '#0a0e20'; c.lineWidth = 1.6;
+    for (let k = 0; k < 4; k++) { const a = t * .25 + k * TAU / 4; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * 15, y + Math.sin(a) * 15); c.stroke();
+      c.lineWidth = 3.2; c.beginPath(); c.moveTo(x + Math.cos(a) * 6, y + Math.sin(a) * 6); c.lineTo(x + Math.cos(a) * 15, y + Math.sin(a) * 15); c.stroke(); c.lineWidth = 1.6; } }
+  { const x = 282, y = nearY(V, 282) + 1, a = .82 + .1 * Math.sin(t * 1.7) + .05 * Math.sin(t * 4.3);
+    drawGlow(c, x, y - 37, 22, FC.light, .4 * a); c.fillStyle = FC.light; c.globalAlpha = a; c.fillRect(x - 4, y - 40.5, 8, 6); c.globalAlpha = 1;
+    c.fillStyle = '#1d0f12'; c.fillRect(x - .4, y - 40.5, .8, 6);
+    drawGlow(c, x + 13, y - 20, 18, '#ffcf87', .35 + .05 * Math.sin(t * 2.3)); c.fillStyle = '#ffd796'; c.fillRect(x + 11.6, y - 22, 2.8, 3.6); }
+  for (let i = 0; i < 4; i++) {
+    const x = 150 + 40 * Math.sin(t * (.2 + i * .03) + i * 2.1), y = V.G - 14 - 10 * (.5 + .5 * Math.sin(t * (.3 + i * .02) + i));
+    const a = Math.pow(Math.max(0, Math.sin(t * (.8 + i * .07) + i * 1.3)), 2); if (a < .02) continue;
+    drawGlow(c, x, y, 6, COL.fly, a * .7); c.globalAlpha = a; c.fillStyle = '#fff6c8'; c.fillRect(x - .5, y - .5, 1, 1); c.globalAlpha = 1;
+  }
+}
+
+/* ============================================================
+   The areas themselves (after everything they point at)
+   ============================================================ */
+const AREAS = [
+  {
+    id: 'garden', name: 'The Garden', items: GARDEN_ITEMS, art: GARDEN_ART, visitors: GARDEN_VISITORS,
+    shapes: GARDEN_SHAPES, spots: GARDEN_SPOTS, renderLand: landGarden, drawLive: liveGarden, pond: () => has('pond'),
+    map: { x: 22, y: 76, icon: 5 },
+    words: { pouch: 'Seeds', last: 'the last bloom of all', book: 'Garden book', welcome: 'Home again.',
+      done: 'You grew a moon. There\'s nothing left to find, only more to grow: every moon rises into the sky as a new constellation.' },
+    ending: { title: 'Goodnight, moon',
+      lede: 'You grew a moon, one seed at a time, in the small hours.<br>It has gone up into the stars as the Sleeping Moon, to keep watch over the garden.',
+      more: 'The garden isn\'t finished with you. Every moon you grow from now on rises to make a new constellation.' },
+  },
+  {
+    id: 'farm', name: 'The Farm', items: FARM_ITEMS, art: FARM_ART, visitors: FARM_VISITORS,
+    shapes: FARM_SHAPES, spots: FARM_SPOTS, renderLand: landFarm, drawLive: liveFarm, pond: null,
+    opens: { from: 'garden', tier: 5, need: 'Grow a Moonflower in the garden to open the lane.' },
+    map: { x: 72, y: 40, icon: 3 },
+    words: { pouch: 'Eggs', last: 'the last light of all', book: 'Farm book',
+      welcome: 'A sleepy farm under the stars. Pair things up, just like in the garden.',
+      done: 'You let a sky lantern go. There\'s nothing left to find, only more to raise: every lantern rises into the sky as a new constellation.' },
+    ending: { title: 'A light let go',
+      lede: 'You raised a whole farm, one egg at a time, while everyone slept.<br>Its lantern has gone up into the stars as the Sky Lantern, to keep the farm company.',
+      more: 'Every sky lantern you light from now on rises to make a new constellation over the farm.' },
+  },
+];
+const areaById = id => AREAS.find(a => a.id === id) || AREAS[0];
+let AREA = AREAS[0];
+
+/**
+ * The town at night: every area as a lit spot on a winding lane, the one
+ * you're in marked, closed ones dim with what opens them. Tap an open spot
+ * to walk there. The lane runs on into the dark past the last area, for the
+ * parts of the town that are still asleep.
+ */
+function openMap() {
+  const spots = AREAS.map(a => {
+    const open = S.opened.includes(a.id), here = a.id === S.area;
+    return `<button class="spot${here ? ' here' : ''}${open ? '' : ' shut'}" data-area="${a.id}" style="left:${a.map.x}%;top:${a.map.y}%">
+      <canvas data-icon="${a.id}"></canvas><b>${a.name}</b><small>${here ? 'You are here' : open ? 'Walk over' : 'Not yet'}</small></button>`;
+  }).join('');
+  const pts = AREAS.map(a => a.map), last = pts[pts.length - 1];
+  const lane = pts.map((p, i) => i ? ` Q ${(pts[i - 1].x + p.x) / 2 + 14} ${(pts[i - 1].y + p.y) / 2 + 10} ${p.x} ${p.y}` : `M ${p.x} ${p.y}`).join('');
+  const shut = AREAS.find(a => !S.opened.includes(a.id));
+  openSheet(`
+    <h2>The town at night</h2>
+    <div class="map">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 70 Q 20 60 40 66 T 80 58 T 100 62 L 100 100 L 0 100 Z" fill="#0c1127"/>
+        <path d="M0 84 Q 30 76 55 82 T 100 78 L 100 100 L 0 100 Z" fill="#0a0f22"/>
+        <path d="${lane}" fill="none" stroke="#e9cf98" stroke-opacity=".35" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="1 2.6" vector-effect="non-scaling-stroke"/>
+        <path d="M ${last.x} ${last.y} Q ${last.x + 18} ${last.y - 6} 100 ${last.y - 26}" fill="none" stroke="#e9cf98" stroke-opacity=".12" stroke-width="1.6" stroke-dasharray="1 2.6" vector-effect="non-scaling-stroke"/>
+      </svg>
+      ${spots}
+    </div>
+    <p class="mapnote" id="mapnote">${shut ? `<b>${shut.name}</b>: ${shut.opens.need}` : 'Further along, the rest of the town is still asleep.'}</p>
+    <button class="btn done" data-close>Back to ${AREA.name.toLowerCase()}</button>`);
+  for (const el of sheetEl.querySelectorAll('canvas[data-icon]')) {
+    const a = areaById(el.dataset.icon);
+    paintItem(el, a.map.icon, S.opened.includes(a.id), a.art);
+  }
+}
+
+/* ============================================================
    Start
    ============================================================ */
 window.addEventListener('resize', layout);
@@ -2179,12 +2689,14 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
 
+useArea(areaById(S.area));
 ensureWishes();
 retireUnreachableWishes();   // a save from before the pouch grew, or from 1.0
 applySettings();
 layout();
 if (document.fonts && document.fonts.load) document.fonts.load(font(16, 700)).then(() => { lastInput = now(); }).catch(() => {});
 onReturn();
+checkOpenings();   // a garden already past a Moonflower opens the farm (after onReturn: it saves, which resets S.last)
 if (!S.intro) openIntro();
 else {
   // A save from before 1.2 can hold moons on the board: send them up now,
