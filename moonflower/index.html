@@ -107,6 +107,12 @@
   .spot b { font-size: 13px; white-space: nowrap; } .spot small { font-size: 11px; opacity: .65; white-space: nowrap; }
   .spot.shut { opacity: .5; }
   .mapnote { text-align: center; min-height: 2.6em; opacity: .85; }
+  .satchel { display: flex; gap: 10px; }
+  .slot { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 14px; background: #121836; text-align: center; }
+  .slot canvas { width: 56px; height: 56px; } .slot b { font-size: 13px; } .slot small { opacity: .65; }
+  .slot button { margin-top: 4px; background: none; border: 1px solid rgba(239,217,168,.3); color: #efd9a8; border-radius: 999px; padding: 5px 14px; font: inherit; font-size: 12px; }
+  .slot.empty span { width: 56px; height: 56px; border-radius: 50%; border: 1px dashed rgba(239,217,168,.25); }
+  .errands { list-style: none; padding: 0; margin: 4px 0 0; line-height: 1.5; font-size: 14px; } .errands i { opacity: .7; }
   .book canvas { width: 64px; height: 64px; display: block; margin: 0 auto 4px; }
   .book .unk { opacity: .45; }
   .wonders { columns: 2; column-gap: 18px; padding: 0; list-style: none; font-size: 14px; margin: 0; }
@@ -130,7 +136,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '2.3';
+const VERSION = '2.4';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -529,8 +535,18 @@ const GARDEN_ART = [null,
 ];
 let ART = GARDEN_ART;
 
-let sprites = [];
-function sprite(t) {
+let sprites = [], foreignSprites = {};
+/** An item's cached picture; `area` for another area's item (an errand), else the current area's. */
+function sprite(t, area) {
+  if (area && area !== AREA.id) {
+    const key = area + ':' + t;
+    if (!foreignSprites[key]) {
+      const px = Math.max(24, Math.ceil(L.cell * dpr)), cv = document.createElement('canvas'); cv.width = cv.height = px;
+      const c = cv.getContext('2d'); c.translate(px / 2, px / 2); c.scale(px / 100 * .86, px / 100 * .86);
+      areaById(area).art[t](c); foreignSprites[key] = cv;
+    }
+    return foreignSprites[key];
+  }
   if (sprites[t]) return sprites[t];
   const px = Math.max(24, Math.ceil(L.cell * dpr));
   const cv = document.createElement('canvas'); cv.width = cv.height = px;
@@ -576,7 +592,8 @@ function freshState() {
     skyMoons: 0,      // Little moons grown and risen into the sky (the end of the chain)
     ended: false,     // the "Goodnight, moon" card has been shown
     visits: 1, last: Date.now(), intro: false,
-    stats: { seeds: 0, merges: 0, wishes: 0 },
+    stats: { seeds: 0, merges: 0, wishes: 0, errands: 0 },
+    satchel: [null, null],   // things carried between areas for errands: { area, tier } or null
     nightOf: '',      // the morning after the last night you played in (dayKey), for "You made it to morning"
     morningOf: '',    // the last morning that was said
     set: { dim: 1, warm: false, sound: false, buzz: false, hush: true, breathe: false, weather: true },
@@ -590,7 +607,8 @@ function load() {
       const s = Object.assign(base, d);
       s.set = Object.assign(freshState().set, d.set || {});
       s.stats = Object.assign(freshState().stats, d.stats || {});
-      s.wishes = (d.wishes || []).filter(Boolean).slice(0, 3).map(w => ({ tier: w.tier, who: w.who, reward: w.reward, born: 0 }));
+      s.wishes = (d.wishes || []).filter(Boolean).slice(0, 3).map(w => ({ tier: w.tier, who: w.who, reward: w.reward, from: w.from, born: 0 }));
+      if (!Array.isArray(s.satchel) || s.satchel.length !== 2) s.satchel = [null, null];
       return s;
     }
   } catch (e) { /* a broken save just means a fresh garden */ }
@@ -658,7 +676,7 @@ function layout() {
   L.book = { x: L.cx + L.cw - 62, y: hy, r: 22 };
   L.map = { x: L.cx + L.cw - 106, y: hy, r: 22 };
 
-  sprites = []; silhouettes = [];
+  sprites = []; silhouettes = []; foreignSprites = {};
   sceneDirty = true;
   makeStars();
 }
@@ -1275,10 +1293,28 @@ function wishTier(others) {
 }
 function newWish(slot, born) {
   const others = S.wishes.filter((w, i) => i !== slot && w);
+  if (!others.some(o => o.from) && Math.random() < ERRAND_CHANCE) { const e = newErrand(others, born); if (e) return e; }
   let t = 2, who = 'Owl';
   for (let k = 0; k < 8; k++) { t = wishTier(others); if (!others.some(o => o.tier === t)) break; }
   for (let k = 0; k < 16; k++) { who = VISITORS[Math.floor(Math.random() * VISITORS.length)]; if (!others.some(o => o.who === who) && who !== ITEMS[t].name) break; }
   return { tier: t, who, reward: 3 * value(t) + 2 * t, born };
+}
+/**
+ * Errands: now and then (ERRAND_CHANCE of new wishes, at most one per area at
+ * a time) a visitor wishes for something from another open area, one of the
+ * last four things grown there. You carry it over in the satchel (pack) and
+ * hand it in (deliverErrand) for more than a wish here pays.
+ */
+const ERRAND_CHANCE = .2;
+function newErrand(others, born) {
+  const areas = S.opened.filter(id => id !== S.area && areaState(id).best >= 2);
+  if (!areas.length) return null;
+  const from = areas[Math.floor(Math.random() * areas.length)], items = areaById(from).items;
+  const b = Math.min(areaState(from).best, MAX_TIER - 1), lo = Math.max(1, b - 3);
+  const t = lo + Math.floor(Math.random() * (b - lo + 1));
+  let who = 'Owl';
+  for (let k = 0; k < 16; k++) { who = VISITORS[Math.floor(Math.random() * VISITORS.length)]; if (!others.some(o => o.who === who) && who !== items[t].name) break; }
+  return { tier: t, who, from, reward: 5 * value(t) + 3 * t, born };
 }
 function ensureWishes() { for (let i = 0; i < 3; i++) if (!S.wishes[i]) S.wishes[i] = newWish(i, 0); }
 /**
@@ -1287,7 +1323,7 @@ function ensureWishes() { for (let i = 0; i < 3; i++) if (!S.wishes[i]) S.wishes
  * new wish. Runs when the pouch grows and when a save is loaded.
  */
 function retireUnreachableWishes() {
-  for (let i = 0; i < 3; i++) if (S.wishes[i] && S.wishes[i].tier < pouchTier()) S.wishes[i] = newWish(i, 0);
+  for (let i = 0; i < 3; i++) if (S.wishes[i] && !S.wishes[i].from && S.wishes[i].tier < pouchTier()) S.wishes[i] = newWish(i, 0);
 }
 
 /* ============================================================
@@ -1300,7 +1336,7 @@ let basketBump = -1e9, pouchShake = -1e9, lastFullHint = -1e9;
 let undoStack = [];
 
 function fly(tier, from, to, dur, o = {}) {
-  const a = { k: 'fly', tier, from, to, t0: now(), dur, s0: o.s0 ?? 1, s1: o.s1 ?? 1, arc: o.arc || 0, hide: o.hide ?? -1, alpha: o.alpha ?? 1 };
+  const a = { k: 'fly', tier, from, to, t0: now(), dur, s0: o.s0 ?? 1, s1: o.s1 ?? 1, arc: o.arc || 0, hide: o.hide ?? -1, alpha: o.alpha ?? 1, area: o.area || null };
   anims.push(a); return a;
 }
 function pop(cell, delay = 0, dur = 380) { anims.push({ k: 'pop', cell, t0: now() + delay, dur }); }
@@ -1383,14 +1419,14 @@ function buzz(ms) { if (S.set.buzz && navigator.vibrate) try { navigator.vibrate
    The rules
    ============================================================ */
 function pushUndo() {
-  undoStack.push(JSON.stringify({ b: S.board, g: S.glow, w: S.wishes.map(w => ({ tier: w.tier, who: w.who, reward: w.reward })), st: S.stats }));
+  undoStack.push(JSON.stringify({ b: S.board, g: S.glow, w: S.wishes.map(w => ({ tier: w.tier, who: w.who, reward: w.reward, from: w.from })), st: S.stats, sa: S.satchel }));
   if (undoStack.length > 40) undoStack.shift();
 }
 function doUndo() {
   const snap = undoStack.pop();
   if (!snap) { toast({ title: 'Nothing to undo' }); return; }
   const d = JSON.parse(snap);
-  S.board = d.b; S.glow = d.g; S.stats = d.st;
+  S.board = d.b; S.glow = d.g; S.stats = d.st; S.satchel = d.sa || S.satchel;
   S.wishes = d.w.map(w => Object.assign(w, { born: now() }));
   anims = []; sel = -1;
   sfx.undo(); save();
@@ -1484,6 +1520,64 @@ function deliver(wi, cell, from) {
   later(320, () => { burst(to.x, to.y, 12); sfx.wish(); buzz(12); });
   save();
 }
+/** Where an area is, as said in a sentence: "on the farm", "in the garden". */
+const WHERE = { garden: 'in the garden', farm: 'on the farm', park: 'in the park', lane: 'on the lane', harbour: 'at the harbour', chapel: 'at the chapel', nursery: 'in the nursery' };
+const where = id => WHERE[id] || `at ${areaById(id).name.toLowerCase()}`;
+/** The satchel slot holding `tier` from `area`, or -1. */
+function satchelSlot(area, tier) { return S.satchel.findIndex(x => x && x.area === area && x.tier === tier); }
+/** Every open errand in the town: [{ area, w }], the current area's first. */
+function townErrands() {
+  const out = [];
+  for (const id of S.opened) for (const w of areaState(id).wishes || []) if (w && w.from) out.push({ area: id, w });
+  return out.sort((a, b) => (b.area === S.area) - (a.area === S.area));
+}
+/** Tuck a board item into the satchel, to carry it to another area. */
+function pack(cell, from) {
+  const t = S.board[cell], k = S.satchel.indexOf(null);
+  if (k < 0) {
+    if (from) fly(t, from, cellCenter(cell), 180, { hide: cell });
+    toast({ title: 'Your satchel is full', sub: 'Hand something over, or take one out on the map.' });
+    return;
+  }
+  pushUndo();
+  S.board[cell] = 0; S.satchel[k] = { area: S.area, tier: t };
+  fly(t, from || cellCenter(cell), { x: L.map.x, y: L.map.y }, 320, { s1: .3, arc: 30 });
+  later(320, () => sfx.gather());
+  const want = townErrands().find(e => e.w.from === S.area && e.w.tier === t && e.area !== S.area);
+  toast({ title: `${ITEMS[t].name}, in your satchel`, sub: want ? `${want.w.who} is waiting for one ${where(want.area)}.` : 'Carry it anywhere in town.', tier: t });
+  save();
+}
+/** Hand an errand's item over from the satchel. */
+function deliverErrand(wi, k) {
+  const w = S.wishes[wi], r = L.wish[wi], item = S.satchel[k];
+  const to = { x: r.x + r.w * .3, y: r.y + r.h / 2 };
+  pushUndo();
+  S.satchel[k] = null; S.stats.wishes++; S.stats.errands = (S.stats.errands || 0) + 1;
+  fly(item.tier, { x: L.map.x, y: L.map.y }, to, 420, { s0: .3, s1: .45, arc: 30, area: item.area });
+  const nw = newWish(wi, now() + 1000);
+  nw.prev = { tier: w.tier, who: w.who, reward: w.reward, from: w.from, until: now() + 620, thanks: now() + 420 };
+  leaving[wi] = { who: w.who, t0: now() + 420 };
+  S.wishes[wi] = nw;
+  gain(w.reward, { x: r.x + r.w / 2, y: r.y + 10 }, 420);
+  later(420, () => { burst(to.x, to.y, 16); sfx.wish(); buzz(12); });
+  save();
+}
+/** Take something out of the satchel: it goes back to its own area's board. */
+function unpack(k) {
+  const item = S.satchel[k]; if (!item) return;
+  const a = areaById(item.area);
+  if (item.area === S.area) {
+    const i = pickSpawnCell();
+    if (i < 0) { toast({ title: `No room in ${a.name.toLowerCase()}`, sub: 'Merge or tuck something away first.' }); return; }
+    S.board[i] = item.tier; pop(i);
+  } else {
+    const st = areaState(item.area), i = st.board.lastIndexOf(0);
+    if (i < 0) { toast({ title: `No room back at ${a.name.toLowerCase()}`, sub: 'Its board is full.' }); return; }
+    st.board[i] = item.tier;
+  }
+  undoStack = []; S.satchel[k] = null; save();
+}
+
 function gather(cell, from) {
   const t = S.board[cell];
   pushUndo();
@@ -1495,6 +1589,11 @@ function gather(cell, from) {
 }
 function hintWish(wi) {
   const w = S.wishes[wi], it = ITEMS[w.tier];
+  if (w.from) {
+    const a = areaById(w.from);
+    toast({ title: `${w.who} would love ${an(a.items[w.tier].name)} from ${a.name.toLowerCase()}`, sub: 'Pack one in your satchel there (drag it onto the map), then bring it here.' });
+    return;
+  }
   if (w.tier > S.best) { toast({ title: `${w.who} is hoping for something new`, sub: `Merge two ${ITEMS[w.tier - 1].many} to find out what grows.` }); return; }
   toast({ title: `${w.who} would love ${an(it.name)}`, sub: w.tier > 1 ? `Merge two ${ITEMS[w.tier - 1].many} to grow one.` : '', tier: w.tier });
 }
@@ -1540,6 +1639,8 @@ function goToArea(id) {
   arrivedAt = now(); lastInput = now();
   save();
   toast({ title: AREA.name, sub: first ? AREA.words.welcome : 'Just as you left it.', tier: AREA.map.icon, dur: 3400 });
+  const ready = S.wishes.find(w => w.from && satchelSlot(w.from, w.tier) >= 0);
+  if (ready) toast({ title: `${ready.who} is waiting for your ${areaById(ready.from).items[ready.tier].name}`, sub: 'Tap their card to hand it over.', dur: 3600 });
 }
 let arrivedAt = -1e9;     // a moment's fade-in after walking to an area
 /**
@@ -1702,9 +1803,9 @@ function onReturn() {
 /* ============================================================
    Drawing the board, the bar and the bits on top
    ============================================================ */
-function drawItem(c, tier, x, y, size, ms, seed = 0, scale = 1) {
+function drawItem(c, tier, x, y, size, ms, seed = 0, scale = 1, area = null) {
   if (!tier || scale <= 0) return;
-  const sp = sprite(tier), t = ms / 1000;
+  const sp = sprite(tier, area), t = ms / 1000;
   c.save(); c.translate(x, y);
   if (tier === 9) c.scale(scale * (.86 + .14 * Math.cos(t * 2.1 + seed)), scale);
   else if (tier === 12) { c.translate(0, Math.sin(t * .9 + seed) * size * .02); c.scale(scale, scale); }
@@ -1734,7 +1835,10 @@ function drawHeader(c) {
   c.moveTo(-11, -6); c.lineTo(-4, -9); c.lineTo(4, -6); c.lineTo(11, -9); c.lineTo(11, 7); c.lineTo(4, 10); c.lineTo(-4, 7); c.lineTo(-11, 10); c.closePath();
   c.moveTo(-4, -9); c.lineTo(-4, 7); c.moveTo(4, -6); c.lineTo(4, 10); c.stroke();
   if (S.opened.some(id => !S.visited.includes(id))) { c.fillStyle = COL.gold; c.beginPath(); c.arc(11, -9, 3.2, 0, TAU); c.fill(); }
+  // what's in the satchel: a small dot for each thing carried
+  S.satchel.forEach((x, k) => { if (x) { c.fillStyle = COL.textHi; c.beginPath(); c.arc(-5 + k * 10, 15, 2.2, 0, TAU); c.fill(); } });
   c.restore();
+  if (drag && S.opened.length > 1) drawGlow(c, L.map.x, L.map.y, L.map.r * 1.8, COL.gold, .16 + .08 * Math.sin(now() / 250));
   // settings
   c.save(); c.translate(L.gear.x, L.gear.y);
   c.beginPath(); c.arc(0, 0, 3.2, 0, TAU); c.stroke();
@@ -1791,14 +1895,15 @@ function drawWishes(c, ms) {
       c.globalAlpha = 1;
     }
     if (!show) continue;
-    const ready = show === w && boardHas(w.tier);
+    const ready = show === w && (w.from ? satchelSlot(w.from, w.tier) >= 0 : boardHas(w.tier));
     c.save(); c.globalAlpha = a;
     rr(c, r.x + .5, r.y + .5, r.w - 1, r.h - 1, 14);
     if (ready) { c.strokeStyle = rgba(COL.gold, .4 + .25 * Math.sin(ms / 380)); c.lineWidth = 1.6; }
     else { c.strokeStyle = 'rgba(255,255,255,.06)'; c.lineWidth = 1; }
     c.stroke();
     const sp = Math.min(r.h * .86, r.w * .46), ix = r.x + 4 + sp / 2, iy = r.y + r.h / 2;
-    if (show.tier <= S.best) drawItem(c, show.tier, ix, iy, sp, ms, i * 3);
+    if (show.from) drawItem(c, show.tier, ix, iy, sp, ms, i * 3, 1, show.from);   // an errand: another area's item
+    else if (show.tier <= S.best) drawItem(c, show.tier, ix, iy, sp, ms, i * 3);
     else {   // something you haven't grown yet: its shape, and a question
       c.drawImage(silhouette(show.tier), ix - sp / 2, iy - sp / 2, sp, sp);
       c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(sp * .34, 700);
@@ -1806,8 +1911,9 @@ function drawWishes(c, ms) {
     }
     const tx = r.x + sp + 8, tw = r.w - sp - 14;
     c.textAlign = 'left'; c.textBaseline = 'middle';
-    fitFont(c, show.who, tw, 12.5, 600); c.fillStyle = rgba(COL.text, .66);
-    c.fillText(show.who, tx, r.y + r.h * .34);
+    const whoLine = show.from ? `${show.who} · ${areaById(show.from).name.slice(4)}` : show.who;
+    fitFont(c, whoLine, tw, 12.5, 600); c.fillStyle = rgba(COL.text, .66);
+    c.fillText(whoLine, tx, r.y + r.h * .34);
     fitFont(c, `✦ ${fmt(show.reward)}`, tw, 15, 700); c.fillStyle = rgba(COL.textHi, .92);
     c.fillText(`✦ ${fmt(show.reward)}`, tx, r.y + r.h * .66);
     c.restore();
@@ -1895,7 +2001,7 @@ function drawFlights(c, ms) {
     if (a.k !== 'fly') continue;
     const p = clamp((ms - a.t0) / a.dur, 0, 1), e = easeInOut(p);
     const x = lerp(a.from.x, a.to.x, e), y = lerp(a.from.y, a.to.y, e) - Math.sin(p * Math.PI) * a.arc;
-    drawItem(c, a.tier, x, y, L.cell, ms, 0, lerp(a.s0, a.s1, e));
+    drawItem(c, a.tier, x, y, L.cell, ms, 0, lerp(a.s0, a.s1, e), a.area);
   }
 }
 function drawParticles(c) {
@@ -2036,6 +2142,7 @@ function hitTest(x, y, dropping) {
   if (!dropping && inC(L.undo, 1.5)) return { kind: 'undo' };
   if (!dropping && inC(L.book, 1)) return { kind: 'book' };
   if (!dropping && inC(L.map, 1)) return { kind: 'map' };
+  if (dropping && inC(L.map, 1.8)) return { kind: 'satchel' };   // drop on the map icon: into the satchel
   if (!dropping && inC(L.gear, 1)) return { kind: 'gear' };
   return { kind: 'none' };
 }
@@ -2082,7 +2189,8 @@ function drop() {
     else doMove(src, h.i, from);
     return;
   }
-  if (h.kind === 'wish' && S.wishes[h.i].tier === tier && now() >= (S.wishes[h.i].born || 0)) { deliver(h.i, src, from); return; }
+  if (h.kind === 'wish' && !S.wishes[h.i].from && S.wishes[h.i].tier === tier && now() >= (S.wishes[h.i].born || 0)) { deliver(h.i, src, from); return; }
+  if (h.kind === 'satchel') { pack(src, from); return; }
   if (h.kind === 'basket') { gather(src, from); return; }
   if (h.kind === 'wish') hintWish(h.i);
   fly(tier, from, cellCenter(src), 180, { hide: src });
@@ -2099,7 +2207,7 @@ function tap(h) {
       break;
     case 'undo': sel = -1; doUndo(); break;
     case 'book': openBook(); break;
-    case 'map': openMap(); break;
+    case 'map': if (sel >= 0 && S.board[sel]) { pack(sel, null); sel = -1; } else openMap(); break;
     case 'gear': openSettings(); break;
     default: sel = -1;
   }
@@ -2118,6 +2226,7 @@ function tapCell(i) {
 function tapWish(wi) {
   const w = S.wishes[wi];
   if (now() < (w.born || 0)) return;
+  if (w.from) { const k = satchelSlot(w.from, w.tier); if (k >= 0) deliverErrand(wi, k); else hintWish(wi); return; }
   let cell = -1;
   if (sel >= 0 && S.board[sel] === w.tier) cell = sel;
   else for (let k = N - 1; k >= 0; k--) if (S.board[k] === w.tier && !busy(k)) { cell = k; break; }
@@ -2157,6 +2266,7 @@ document.getElementById('back').addEventListener('click', closeSheet);
 sheetEl.addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.hasAttribute('data-close')) { closeSheet(); return; }
+  if (b.dataset.unpack !== undefined) { unpack(+b.dataset.unpack); openMap(); return; }
   if (b.dataset.area) {
     const a = areaById(b.dataset.area);
     if (a.id === S.area) { closeSheet(); return; }
@@ -2273,6 +2383,7 @@ function openBook() {
       <span>From the pouch</span><span>${fmt(S.stats.seeds)}</span>
       <span>Things grown</span><span>${fmt(S.stats.merges)}</span>
       <span>Wishes granted</span><span>${fmt(S.stats.wishes)}</span>
+      ${S.stats.errands ? `<span>Errands run</span><span>${fmt(S.stats.errands)}</span>` : ''}
       ${S.skyMoons ? `<span>Moons grown</span><span>${fmt(S.skyMoons)}</span>` : ''}
       <span>Glow, all told</span><span>${fmt(S.peak)} ✦</span>
     </div>
@@ -5251,11 +5362,28 @@ function openMap() {
       ${spots}
     </div>
     <p class="mapnote" id="mapnote">${shut ? `<b>${shut.name}</b>: ${shut.opens.need}` : 'Every lane is open. Wander wherever you like.'}</p>
+    ${S.opened.length > 1 ? satchelHtml() : ''}
     <button class="btn done" data-close>Back to ${AREA.name.toLowerCase()}</button>`);
   for (const el of sheetEl.querySelectorAll('canvas[data-icon]')) {
     const a = areaById(el.dataset.icon);
     paintItem(el, a.map.icon, S.opened.includes(a.id), a.art);
   }
+  for (const el of sheetEl.querySelectorAll('canvas[data-carry]')) {
+    const [area, t] = el.dataset.carry.split(':'); paintItem(el, +t, true, areaById(area).art);
+  }
+}
+/** The map's satchel and errands: what you carry, and who in town is waiting for what. */
+function satchelHtml() {
+  const slots = S.satchel.map((x, k) => x
+    ? `<div class="slot"><canvas data-carry="${x.area}:${x.tier}"></canvas><b>${areaById(x.area).items[x.tier].name}</b><small>from ${areaById(x.area).name.toLowerCase()}</small><button data-unpack="${k}">Take out</button></div>`
+    : `<div class="slot empty"><span></span><small>empty</small></div>`).join('');
+  const errands = townErrands().map(({ area, w }) => {
+    const item = areaById(w.from).items[w.tier].name, have = satchelSlot(w.from, w.tier) >= 0;
+    return `<li>${have ? '✦' : '·'} <b>${w.who}</b> ${where(area)} would love ${an(item)} from ${areaById(w.from).name.toLowerCase()}${have ? ' <i>(in your satchel)</i>' : ''}</li>`;
+  }).join('');
+  return `<h3>Your satchel</h3><div class="satchel">${slots}</div>
+    <p><small>Drag anything onto the map at the top (or select it and tap the map) to carry it to another part of town.</small></p>
+    <h3>Errands</h3>${errands ? `<ul class="errands">${errands}</ul>` : '<p><small>None right now. Now and then a visitor asks for something from another part of town.</small></p>'}`;
 }
 
 /* ============================================================

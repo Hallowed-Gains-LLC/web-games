@@ -162,6 +162,18 @@ means a lane has opened that you haven't walked down yet.
   the Sheep, the Pony, the Windmill, the Barn, the Cartwheel, the Scarecrow),
   and the first one opens its own card ("A light let go").
 
+**Errands** tie the places together. About one new wish in five (never more
+than one per area at a time) is a visitor wishing for something from another
+open area, one of the last four things grown there; its card says where
+("Badger · Farm"). Carry it over in the **satchel**: drag an item onto the
+map icon (or select it and tap the map) and it goes in, two at most (a dot
+under the map icon for each). Walk over and tap the card to hand it in, for
+about 5× the item's seed value instead of 3×. Arriving somewhere, you're told
+if someone there is waiting for what you carry. The map lists the satchel
+(with "Take out", which sends an item home to its own board) and every
+errand in town. Undo covers packing. In the code: `newErrand`, `pack`,
+`deliverErrand`, `unpack`, `townErrands`, `S.satchel`, and a wish's `from`.
+
 In the code (`index.html`): `AREAS` lists the areas, each with its items, art,
 visitors, constellation shapes, visitor spots, scene (`renderLand` for the
 cached land, `drawLive` for the moving parts), map position, words and ending.
