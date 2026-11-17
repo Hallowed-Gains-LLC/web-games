@@ -165,7 +165,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '2.9.1';
+const VERSION = '2.9.2';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -3373,52 +3373,214 @@ function tapWish(wi) {
 // sent twice); the 6th brings a small gift, and at the 10th it's a friend.
 // They're read in the garden book, under Neighbours (openNeighbours).
 //
-// Each visitor has two lines of its own for the letters: `a`, said with the
-// first thank-you, and `b`, an aside in the third-wish letter.
-const VISITOR_NOTES = {
-  'Owl':      { a: 'I was up anyway. I am always up anyway.', b: 'I see your light on at all hours. I nod at it. You may not have noticed.' },
-  'Hedgehog': { a: 'I will treasure it, once I have had a little nap.', b: 'I have been asleep for most of this week. I hope you have managed some too.' },
-  'Fox':      { a: 'I buried it somewhere safe. I will remember where. Probably.', b: 'I walk past your window most nights. You always look like you are doing your best.' },
-  'Rabbit':   { a: 'My children all wanted a turn holding it. There are eleven of them.', b: 'Eleven children. I know what tired is. You are doing well.' },
-  'Toad':     { a: 'I have put it beside my favourite stone.', b: 'I am not one for fuss. But I thought you should know it was kind.' },
-  'Mouse':    { a: 'It is very nearly bigger than me, and I love it.', b: 'Small things are still things. I would know.' },
-  'Badger':   { a: 'Gruff thanks are still thanks.', b: 'I do not say much. I am saying this: well done, getting up again.' },
-  'Deer':     { a: 'I came to the edge of the woods to say so.', b: 'I am shy of most people. Not of you, any more.' },
-  'Mole':     { a: 'I cannot see it very well, but it smells wonderful.', b: 'Most of my life is spent in the dark. It is not so bad with company.' },
-  'Bat':      { a: 'Hanging it up beside me, upside down, where all good things go.', b: 'The night is my day. You are welcome in it whenever you need to be.' },
-  'Vole':     { a: 'I have shown it to everyone in the hedgerow.', b: 'The hedgerow says hello. All of it. At once. They mean well.' },
-  'Nightjar': { a: 'I sang about it all night. You may have heard me churring.', b: 'If you hear a long low churr out there, that is me, keeping you company.' },
-  'Barn owl': { a: 'I flew a whole lap of the farm with it before I put it down.', b: 'I glide past the barn at midnight and two and four. Look out for a pale shape. That is me, saying hello.' },
-  'Cat':      { a: 'I knocked it off a shelf only once, which is a sign of great respect.', b: 'I sat on your windowsill for a while last night. I hope you did not mind.' },
-  'Sheepdog': { a: 'I would have brought you a stick in return, but I could not choose which one.', b: 'I keep an eye on everyone. I keep one on you too, now.' },
-  'Goose':    { a: 'I have honked about it to the whole pond.', b: 'I am loud. I know. I am loud because I care.' },
-  'Piglet':   { a: 'I rolled about in happiness. Then in mud. Then in happiness again.', b: 'Mum says I should let you rest. So this letter is short.' },
-  'Goat':     { a: 'I did try to eat it, just a little. That is how you know it is good.', b: 'I climb on things when I cannot sleep. What do you do?' },
-  'Duck':     { a: 'It floats beautifully. I checked.', b: 'Nothing bothers me much. Water off a duck. Try it.' },
-  'Donkey':   { a: 'It has made my whole week, and I have had a long week.', b: 'Some nights are long. We carry on, you and I.' },
-  'Squirrel': { a: 'I have hidden it with my nuts, which is the highest honour I can give.', b: 'I have planted an acorn for you. In a hundred years it will be an oak.' },
-  'Pigeon':   { a: 'I strutted all the way home with it.', b: 'I have spread the word round town that you are good for a favour. Sorry.' },
-  'Robin':    { a: 'I sang about it at dawn, so you can thank me for the singing too.', b: 'I am the first to sing in the morning. When you hear me, you have nearly made it.' },
-  'Moth':     { a: 'I flew round your lamp three times to say thank you.', b: 'Every light at night is a little bit for me. Yours most of all.' },
-  'Dormouse': { a: 'I am going to sleep curled round it until spring.', b: 'I am mostly asleep, but in my dreams you are doing marvellously.' },
-  'Seagull':  { a: 'I have not stolen a single chip since. Well. Hardly any.', b: 'I know the tides, and here is what they say: everything comes back round.' },
-  'Seal':     { a: 'I balanced it on my nose for a whole hour.', b: 'When the sea is rough I float and wait. It usually passes.' },
-  'Crab':     { a: 'I scuttled sideways with joy, which is the only way I scuttle.', b: 'A hard shell and a soft heart. That is the trick.' },
-  'Otter':    { a: 'I held it while I slept, so it would not float away.', b: 'Otters hold hands in their sleep. I am holding this letter, which is nearly the same.' },
-  'Puffin':   { a: 'It is the most colourful thing I own, apart from my beak.', b: 'I came a long way over the sea to live here. It was worth it.' },
-  'Heron':    { a: 'I stood very still and admired it for an hour.', b: 'Patience is mostly standing in cold water. You are better at it than you think.' },
-  'Dove':     { a: 'Peace to you, and to the little one.', b: 'I sit in the chapel tower and pray for this house. I thought you would like to know.' },
+// Each visitor writes its own four letters, in its own voice (the first,
+// third, sixth and tenth wish): no two alike, and "{item}" in the first is
+// what it was given. `dear` is its greeting for the first three when it isn't
+// "Dear neighbour," (the tenth is always "Dear friend,"), and `sign` how it
+// signs off when it isn't plain "The fox".
+const VISITOR_LETTERS = {
+  "Owl": { letters: [
+    ["The {item} arrived safely. I was up anyway. I am always up anyway. Thank you."],
+    ["I have started looking for your window on my rounds. It is nearly always lit. So is my tree.", "We are a matching pair, you and I."],
+    ["Owls do not usually give presents. We are more for watching.", "But I found this on my rounds, and I thought: that is for the one at the window."],
+    ["I have watched this town sleep for longer than I can remember, and I have never had a friend who kept my hours.", "Rest when you can. I will keep watch while you do."],
+  ], sign: "The owl (wide awake)" },
+  "Hedgehog": { letters: [
+    ["I will treasure the {item}, once I have had a little nap. Thank you."],
+    ["I meant to write sooner, but I fell asleep in a pile of leaves.", "I hope you have managed a little sleep too. It helps. I would know."],
+    ["I rolled this all the way over to you. It has a few prickle marks on it.", "That means it was carried with care."],
+    ["I stayed awake for this whole letter, which for me is a very big deal.", "You are my favourite person to stay awake for."],
+  ], sign: "The hedgehog (zzz)" },
+  "Fox": { letters: [
+    ["I buried the {item} somewhere safe. I will remember where. Probably. Thank you."],
+    ["I walk past your window most nights. You always look like you are doing your best.", "For what it is worth, from a fox: you are."],
+    ["I dug this up, and I think it is yours now. I did not steal it.", "Foxes have a bad name, but I am trying."],
+    ["Foxes do not really do friends. We do \"someone I don’t run from\".", "You are a great deal more than that. Look for me under the hedge: I will be the one with my tail over my nose."],
+  ] },
+  "Rabbit": { letters: [
+    ["My children all wanted a turn holding the {item}. There are eleven of them. It took a while. Thank you."],
+    ["Eleven children. Some nights I count them twice to be sure they are all asleep.", "I know what tired is. You are doing well."],
+    ["The little ones picked this out for you. They argued about it for an hour.", "I have no energy left, but they wanted you to have it."],
+    ["The children have made you an honorary rabbit.", "It comes with no duties at all, except being loved by a great many small people with long ears."],
+  ], sign: "The rabbit (and all eleven)" },
+  "Toad": { letters: [
+    ["Thank you for the {item}. I have put it beside my favourite stone."],
+    ["I am not one for fuss.", "But I thought you should know it was kind, and I noticed."],
+    ["This was under my stone. It is better under your roof.", "Do not make a fuss about it."],
+    ["I have sat on the same stone for nine years and moved for almost nothing.", "I have moved for you ten times. Draw your own conclusions."],
+  ] },
+  "Mouse": { letters: [
+    ["The {item} is very nearly bigger than me, and I love it."],
+    ["I have told every mouse in the walls about you.", "Small things are still things, and you never forget the small ones. I would know."],
+    ["It took me all night to carry this to you, a bit at a time.", "Please do not look at how tiny my footprints are in the frost."],
+    ["I am very small and you are very kind, and I think that makes us even.", "Goodnight, and a crumb of cheese for the morning."],
+  ], sign: "The mouse (very small)" },
+  "Badger": { letters: [
+    ["Got the {item}. Gruff thanks are still thanks."],
+    ["I do not say much. I am saying this:", "well done, getting up again. And again."],
+    ["Found this while I was digging. It is not dirt.", "That is the best I can say about most things, and the least I can say about this."],
+    ["I have dug a spare room in my sett. It is for you, if ever you need somewhere very dark and quiet to sleep.", "I mean it."],
+  ] },
+  "Deer": { letters: [
+    ["I came to the edge of the woods to thank you for the {item}. Then I lost my nerve and ran.", "So here is a letter instead."],
+    ["I am shy of most people. Not of you, any more.", "You have been gentle with me every time."],
+    ["I left this where the woods meet your garden. I stood a long while deciding.", "Then I was brave."],
+    ["The woods are full of quiet things that wait to see if you are safe. I have decided you are.", "I will come right up to the gate now."],
+  ] },
+  "Mole": { letters: [
+    ["I cannot see the {item} very well, but it smells wonderful. Thank you."],
+    ["Most of my life is spent in the dark.", "It is not so bad with company."],
+    ["I tunnelled all the way to you to bring this.", "You may find a small hill in the lawn. Sorry about that."],
+    ["I cannot see your face, but I know the sound of your step now.", "I would know it anywhere."],
+  ] },
+  "Bat": { letters: [
+    ["I have hung the {item} up beside me, upside down, where all good things go."],
+    ["The night is my day. It feels as if you have moved into my hours, and I like it.", "You are welcome here whenever you need to be."],
+    ["I caught this in mid-air. I thought it was going to be a moth.", "It turned out to be a present for you."],
+    ["The whole roost knows your name now.", "We squeak it as we fly past your window, very quietly, so as not to wake anyone."],
+  ] },
+  "Vole": { letters: [
+    ["I have shown the {item} to everyone in the hedgerow. Everyone. Thank you."],
+    ["The hedgerow says hello. All of it. At once.", "They mean well. You are the talk of the ditch."],
+    ["The hedgerow took a vote, and this was chosen for you.", "It was very close. The beetles abstained."],
+    ["There is a party in the hedgerow in your honour.", "It is extremely quiet and over by four. That is the best kind."],
+  ] },
+  "Nightjar": { letters: [
+    ["I sang about the {item} all night. You may have heard me churring. That was thank you."],
+    ["If you hear a long, low churr out there, that is me, keeping you company."],
+    ["I hide in plain sight, the colour of old bark.", "This present is not hiding. It is for you."],
+    ["A nightjar only sings for the ones who are listening in the dark.", "You always were."],
+  ] },
+  "Barn owl": { letters: [
+    ["I flew a whole lap of the farm with the {item} before I put it down."],
+    ["I glide past the barn at midnight, and two, and four.", "Look out for a pale shape. That is me, saying hello."],
+    ["I brought this down from the rafters.", "It has been waiting up there for someone who deserved it."],
+    ["When I fly past your window now, I tip a wing.", "You will not hear me; I make no sound. But I will be there."],
+  ] },
+  "Cat": { letters: [
+    ["The {item} is acceptable. I knocked it off a shelf only once, which is a sign of great respect."],
+    ["I sat on your windowsill for a while last night. I hope you did not mind.", "I am not usually impressed. I am a little impressed."],
+    ["I have brought you something. It is not a mouse.", "Do not look so relieved. I can still change my mind."],
+    ["I have decided that you belong to me. It is the highest honour a cat can give.", "You may continue to feed me."],
+  ], dear: "Human,", sign: "The cat" },
+  "Sheepdog": { letters: [
+    ["The {item}! For me! I would have brought you a stick back, but I could not choose which one."],
+    ["I keep an eye on everyone. I keep one on you too, now.", "You are part of the flock."],
+    ["I rounded this up for you. It tried to wander off twice.", "I am very good at my job."],
+    ["I have lain down across your doorstep, nose on my paws.", "Nothing is getting past me tonight. Get some rest."],
+  ] },
+  "Goose": { letters: [
+    ["HONK. That means thank you for the {item}. I have honked about it to the whole pond."],
+    ["I am loud. I know. I am loud because I care.", "HONK. That one was just for you."],
+    ["I am giving you this, and I will not hiss about it.", "That is how much I mean it."],
+    ["Geese are friends for life. I am afraid you are stuck with me now.", "HONK. (Fondly.)"],
+  ], dear: "NEIGHBOUR,", sign: "The goose (loudly)" },
+  "Piglet": { letters: [
+    ["THANK YOU for the {item}!! I rolled about in happiness. Then in mud. Then in happiness again."],
+    ["Mum says I should let you rest, so this letter is short.", "You are the best. Sorry. Short."],
+    ["I found this in the trough. I washed it. Mostly.", "It’s for you!!"],
+    ["You are my best friend who isn’t a pig.", "Mum says that is a very big thing for a piglet to say. It is."],
+  ], dear: "Dear neighbour!!", sign: "Piglet (Mum helped with the spelling)" },
+  "Goat": { letters: [
+    ["I did try to eat the {item}, just a little. That is how you know it is good."],
+    ["I climb on things when I cannot sleep.", "What do you do? Apart from this, I mean."],
+    ["I did not eat this. I want that on the record.", "It was very difficult."],
+    ["I have climbed to the very top of the barn roof to write this, where I can see your window.", "Still lit. Of course it is."],
+  ] },
+  "Duck": { letters: [
+    ["The {item} floats beautifully. I checked. Thank you."],
+    ["Nothing bothers me much. Water off a duck.", "I recommend it. Let tonight roll off your back."],
+    ["This came down the stream, and I fished it out for you.", "Quack."],
+    ["On the pond, ducks sleep with one eye open, keeping watch for each other.", "I will keep one open for you."],
+  ] },
+  "Donkey": { letters: [
+    ["The {item} has made my whole week, and I have had a long week."],
+    ["Some nights are long.", "We carry on, you and I."],
+    ["I carried this for you. Carrying is what I am for,", "but this is the nicest load I have had in years."],
+    ["Donkeys never forget a kindness, and I remember all of yours.", "Lean on me whenever you need to."],
+  ] },
+  "Squirrel": { letters: [
+    ["I have hidden the {item} with my nuts, which is the highest honour I can give."],
+    ["I have planted an acorn for you.", "In a hundred years it will be an oak."],
+    ["This was in my best hiding place. I remembered where it was, which never happens,", "so it must be meant for you."],
+    ["I would share my winter store with you. All of it.", "Well. Most. Fine, half. That is a very great deal, for a squirrel."],
+  ] },
+  "Pigeon": { letters: [
+    ["Strutted all the way home with the {item}. Cheers."],
+    ["I have told everyone in town you are good for a favour.", "Sorry if that makes you busier."],
+    ["Flew this over special. Bit of a detour.", "Worth it."],
+    ["Pigeons always find their way home.", "I have decided your windowsill is one of my homes now. Coo."],
+  ], sign: "Pigeon" },
+  "Robin": { letters: [
+    ["I sang about the {item} at dawn, so you can thank me for the singing too."],
+    ["I am the first to sing in the morning.", "When you hear me, you have nearly made it."],
+    ["I found this in the frost and thought of you.", "Robins guard their patch fiercely, but I am giving this away."],
+    ["I will sing first tomorrow, and the next day, and every day you are up to hear it.", "That is a promise."],
+  ] },
+  "Moth": { letters: [
+    ["I flew round your lamp three times to say thank you for the {item}."],
+    ["Every light at night is a little bit for me.", "Yours most of all."],
+    ["I brought this to the light for you.", "Moths know what it is to be drawn to the one warm thing in a dark place."],
+    ["You are my lamp, the one I always come back to.", "Please keep it on, just a little."],
+  ] },
+  "Dormouse": { letters: [
+    ["I am going to sleep curled round the {item} until spring. Thank you. Yawn."],
+    ["I am mostly asleep, but in my dreams you are doing marvellously."],
+    ["I woke up specially to give you this.", "Now I am going back to sleep. You should too."],
+    ["All through the winter I will dream of how kind you have been.", "Goodnight. Goodnight. Goodnight."],
+  ], sign: "The dormouse (yawning)" },
+  "Seagull": { letters: [
+    ["Thanks for the {item}. I have not stolen a single chip since. Well. Hardly any."],
+    ["I know the tides, and here is what they say: everything comes back round.", "Even sleep."],
+    ["Look, I found this on the beach, and I could have kept it. I did not.", "Growth."],
+    ["I have told all the gulls you are off limits. No one steals from you.", "Not even me. Especially not me."],
+  ] },
+  "Seal": { letters: [
+    ["I balanced the {item} on my nose for a whole hour. Thank you!"],
+    ["When the sea is rough, I float and wait. It usually passes.", "You know how to wait, too."],
+    ["This washed up by my rock.", "I nosed it all the way to shore for you."],
+    ["When I bark from the rocks tonight, that is for you.", "It means: you are doing beautifully, and the tide is turning."],
+  ] },
+  "Crab": { letters: [
+    ["I scuttled sideways with joy about the {item}, which is the only way I scuttle."],
+    ["A hard shell and a soft heart. That is the trick.", "I think you have it, too."],
+    ["I held this very carefully in my claw.", "Do not worry, I did not pinch it."],
+    ["I am growing a new shell soon.", "When I do, I am keeping a little space in it for you."],
+  ] },
+  "Otter": { letters: [
+    ["I held the {item} while I slept, so it would not float away. Thank you."],
+    ["Otters hold hands in their sleep so they do not drift apart.", "I am holding this letter, which is nearly the same."],
+    ["I found this on the river bed. I keep a favourite stone in my pocket.", "This is for yours."],
+    ["If you feel yourself drifting tonight, I have got you.", "That is what otters are for."],
+  ] },
+  "Puffin": { letters: [
+    ["The {item} is the most colourful thing I own, apart from my beak."],
+    ["I came a long way over the sea to live here.", "It was worth it. You are part of why."],
+    ["I carried this in my beak, along with nine fish.", "The fish were for me. This is for you."],
+    ["I have only one burrow, but there is a spot by the door with your name on it.", "Bring your own fish."],
+  ] },
+  "Heron": { letters: [
+    ["I stood very still and admired the {item} for an hour. Thank you."],
+    ["Patience is mostly standing in cold water.", "You are better at it than you think."],
+    ["I waited a very long time for exactly the right gift.", "This is it."],
+    ["I have stood in this river through a great many night feeds of other folk’s babies.", "They all grow up. Yours will too, and remember being held."],
+  ] },
+  "Dove": { letters: [
+    ["Thank you for the {item}. Peace to you, and to the little one."],
+    ["I sit in the chapel tower and pray for this house.", "I thought you would like to know."],
+    ["An olive leaf would have been traditional, but I found this instead.", "It is for you, with peace."],
+    ["“The LORD bless thee, and keep thee.” I say it over your house every night now, from the tower.", "You are never as alone as it feels at this hour."],
+  ] },
 };
 const LETTER_AT = [1, 3, 6, 10];   // wishes granted to one visitor when each of its four letters comes
-/** The body of letter `k` from `who` (its item: what it was given). */
-function letterText(who, k, item) {
-  const n = VISITOR_NOTES[who] || { a: 'It was very kind of you.', b: 'You are a good neighbour.' };
-  return [
-    [`Thank you for the ${item.toLowerCase()}.`, n.a],
-    ['That is three now. I have started looking out for your light.', n.b],
-    ['I found this and thought of you. It is not much, but it is yours.'],
-    ['Ten wishes. I do not think anyone has ever been so kind to me at this hour.', 'Whatever you are up for, I hope it goes gently. I will keep coming by.'],
-  ][k];
+/** Letter `k` from `who` (its item: what it was first given): { dear, paras, sign }. */
+function letter(who, k, item) {
+  const v = VISITOR_LETTERS[who] || { letters: [['Thank you for the {item}.'], ['You are a good neighbour.'], ['I found this and thought of you.'], ['I will keep coming by.']] };
+  return {
+    dear: k === 3 ? 'Dear friend,' : v.dear || 'Dear neighbour,',
+    paras: v.letters[k].map(t => t.replace('{item}', item.toLowerCase())),
+    sign: v.sign || `The ${who.toLowerCase()}`,
+  };
 }
 /** A wish for `who` was granted (with an item called `item`): count it, and send a letter at the right number. */
 function befriend(who, item, at) {
@@ -3446,8 +3608,8 @@ function openNeighbours() {
   const rows = met.map(([who, n]) => {
     const hearts = LETTER_AT.map(at => n >= at ? '♥' : '♡').join('');
     const letters = S.letters.filter(l => l.who === who).sort((a, b) => a.k - b.k);
-    const body = letters.map(l => `<div class="letter${l.read ? '' : ' new'}"><p>${l.k === 3 ? 'Dear friend,' : 'Dear neighbour,'}</p>
-      ${letterText(who, l.k, l.item).map(t => `<p>${t}</p>`).join('')}<p class="sig">The ${who.toLowerCase()}</p></div>`).join('');
+    const body = letters.map(l => { const t = letter(who, l.k, l.item); return `<div class="letter${l.read ? '' : ' new'}"><p>${t.dear}</p>
+      ${t.paras.map(x => `<p>${x}</p>`).join('')}<p class="sig">${t.sign}</p></div>`; }).join('');
     const fresh = letters.some(l => !l.read);
     return `<details${fresh ? ' open' : ''}><summary><canvas data-v="${who}"></canvas><span><b>The ${who.toLowerCase()}</b>
       <small>${n >= 10 ? 'A friend · ' : ''}${n} ${n === 1 ? 'wish' : 'wishes'} granted${fresh ? ' · <i>new letter</i>' : ''}</small></span>
