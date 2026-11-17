@@ -155,7 +155,7 @@ window.PASTOR = {
       { text: "The website says Vespers at 7. The sign says 6:30. The bulletin says 7:00 (soup at 6). You fix all three and feel like a minor prophet." },
       { text: "Erin Bauer, who teaches Sunday school, is applying to the deaconess program and asks for your letter. Three drafts. It goes out with a prayer and a stamp.", fx: { harmony: 2 } },
       { text: "The insurance form asks whether the church owns a trampoline. You check, to be thorough. Biscuit owns a cardboard box. You tick “No.”" },
-      { text: "The register of official acts goes back to 1911. You enter a baptism in your best handwriting, and it looks like every pastor’s before you, which is the point." },
+      { text: "The register of official acts goes back to 1876. You enter a baptism in your best handwriting, and it looks like every pastor’s before you, which is the point." },
       { text: "A covered dish appears in the office fridge with a note: “PASTOR.” No name. You don’t know what it is. You eat it. It’s wonderful. You will never be able to say thank you." },
       { text: "Hymn numbers for {sunday}: Hannah’s spreadsheet, the bulletin, the hymn board. Three chances to get it wrong. This week you get all three right, and tell nobody, and glow." },
       { text: "You restock the narthex rack with the new Portals of Prayer, regular and large print. The large print go first. They always do." }
@@ -1772,7 +1772,7 @@ window.PASTOR = {
         { label: "Drive to Fort Wayne", away: true, fx: { strength: 8, sermon: 10, family: -6 },
           reply: "Two papers on John, Matins sung by three hundred men in parts, and a hallway full of classmates. Bea phones to ask if you’ve met the Pope yet. You explain, again, gently." },
         { label: "Stay home this year", fx: { family: 4, harmony: 2 },
-          reply: "You’ll read the papers when they’re published. Bea brings cocoa to the office and asks what a symposium is. “A lot of pastors talking,” you say. “So, church,” she says." }
+          reply: "You’ll read the papers when they’re published. After school Bea brings cocoa to the office and asks what a symposium is. “A lot of pastors talking,” you say. “So, church,” she says." }
       ] },
 
     { id: "districtConference", when: { minWeek: 15, maxWeek: 15, day: 0, chance: 1 }, from: "District office", kind: "email", title: "Pastors’ Conference",
@@ -1876,7 +1876,7 @@ window.PASTOR = {
       ] },
 
     { id: "confessor", when: { minWeek: 8, maxWeek: 10, chance: 0.35 }, from: "Pastor Dietz", kind: "call", title: "Your Confessor Calls",
-      text: "Pastor Dietz from Elm Grove, your father confessor: “It’s been since Advent, my friend. Lent is a good time for it. I have an hour Thursday, and the coffee is terrible.”",
+      text: "Pastor Dietz from Elm Grove, your father confessor: “It’s been since Advent, my friend. Lent is a good time for it. I have an hour this week, and the coffee is terrible.”",
       choices: [
         { label: "Make the appointment", fx: { strength: 10, sermon: 3 },
           reply: "You kneel in his chancel and say what you would tell no one else. He absolves you in Christ’s stead. You drive home with the radio off, forgiven, and you know it." },
@@ -1941,6 +1941,54 @@ window.PASTOR = {
           reply: "Gus rolls a 210 with the lucky ball. The Feed Mill Strikers buy the winners a round. You have a root beer and lead the table prayer over the pretzels." },
         { label: "Bring Sam and Bea to cheer", fx: { family: 6, harmony: 3 },
           reply: "Bea makes a sign: GO UNALTERED PINS (AND DAD). You bowl better than ever for an audience of two. The team loses by eleven, and nobody minds at all." }
+      ] },
+
+    // Congregational life the owner asked for: the voters, the LWML, missions, Memorial Day.
+    { id: "votersAnnual", when: { minWeek: 5, maxWeek: 5, day: 2, chance: 1 }, from: "Pete", kind: "call", title: "The Annual Voters’ Meeting",
+      text: "Pete: “Annual voters’ meeting after church Sunday. I present the budget, we elect officers, and under new business, the thermostat. It’s always under new business. It is never new.”",
+      choices: [
+        { label: "Help Pete prepare", fx: { pete: -10, building: 4, strength: -3 },
+          reply: "You go through his slides with him. He cuts nine down to four. The voters adopt the budget, elect Erv again, and refer the thermostat to a committee of Gus and Marge. Brave." },
+        { label: "Open it with a devotion", fx: { harmony: 5, sermon: 2 },
+          reply: "Psalm 133, a prayer, then Pete’s budget. It passes 41 to 3. The thermostat debate lasts twenty minutes and ends, as ever, tabled. Coffee and kuchen after." },
+        { label: "Keep to your advisory role", fx: { harmony: 2, strength: 2 },
+          reply: "You answer two questions and otherwise let the voters do their work. They do it well. Arne moves to adjourn before the thermostat. The motion fails. Some things are eternal." }
+      ] },
+
+    { id: "lwmlSunday", when: { minWeek: 16, maxWeek: 16, day: 2, chance: 1 }, from: "Marge", kind: "call", title: "LWML Sunday",
+      text: "Marge: “LWML Sunday shares Reformation this year. The mite boxes come back this week. Over and above, Pastor, not out of the offering. I’ve counted the boxes we sent out. I will be counting the boxes that come back.”",
+      choices: [
+        { label: "Preach on the widow’s mite", fx: { marge: -10, sermon: 4, harmony: 2 },
+          reply: "“a certain poor widow casting in thither two mites” (Luke 21:2). The boxes come back heavy, rattling with coins. Marge counts them twice and is, for her, radiant." },
+        { label: "Have Bea bring hers up", fx: { family: 4, marge: -6, harmony: 2 },
+          reply: "Bea has filled her mite box with dimes all year and carries it up the aisle with both hands. The LWML ladies applaud. Marge pretends there is something in her eye." }
+      ] },
+
+    { id: "missionFestival", when: { minWeek: 17, maxWeek: 17, day: 0, chance: 1 }, from: "Mission committee", kind: "email", title: "Mission Festival Sunday",
+      text: "Mission Festival this Sunday: a missionary home from Kenya will preach and show slides, and the potluck after already has twenty-two dishes signed up, most of them kuchen.",
+      choices: [
+        { label: "Host him at the parsonage", fx: { family: -2, harmony: 4, sermon: 4 },
+          reply: "He stays Saturday night. Bea asks forty questions about lions. On Sunday he preaches Christ crucified to a full church, and you get to sit in a pew for once and listen." },
+        { label: "Plan the potluck with the ladies", fx: { harmony: 5, strength: -3 },
+          reply: "Brats, sauerkraut, six kuchen and a sheet cake shaped like Africa. The missionary says it’s the best potluck since his last furlough. The offering for missions is the largest in years." }
+      ] },
+
+    { id: "memorialDay", when: { minWeek: 15, maxWeek: 15, day: 3, chance: 1 }, from: "The Legion post", kind: "call", title: "Memorial Day",
+      text: "The Legion commander: “Flags go on the veterans’ graves in Zion’s cemetery Saturday, Pastor, and Monday the honor guard comes at ten. Would you say a few words and the prayer, like always?”",
+      choices: [
+        { label: "Place the flags with them", fx: { harmony: 5, strength: -3 },
+          reply: "Thirty-one small flags behind the church, one per grave, Gus reading the names off his list. A Korea veteran salutes every one. Monday the bugle plays Taps over the cornfield." },
+        { label: "Write a short, careful prayer", fx: { harmony: 3, sermon: 3 },
+          reply: "You pray for the fallen and for those who mourn them, and thank God for the Synod’s chaplains serving in the Ministry to the Armed Forces. The honor guard fires; Bea covers her ears." }
+      ] },
+
+    { id: "anniversary", when: { minWeek: 3, maxWeek: 16, chance: 0.2 }, from: "Anniversary committee", kind: "email", title: "Zion Turns 151",
+      text: "Zion turns 151 this month. The committee wants red paraments, the district president to preach, a photo of everyone on the front steps, and a cake in the shape of the church. The steeple will be a sugar cone.",
+      choices: [
+        { label: "Dig out the old records", fx: { harmony: 4, strength: -2 },
+          reply: "You read from the 1876 minutes at coffee hour: twelve German families, one borrowed barn, and a resolution to call a pastor “as soon as God provides.” He did. He kept doing so." },
+        { label: "Let the committee run it", fx: { harmony: 3, strength: 2 },
+          reply: "They run it beautifully. The district president preaches on Psalm 90, the photo needs four tries because of Biscuit, and the sugar-cone steeple leans like the real one." }
       ] }
   ],
 
@@ -2217,7 +2265,7 @@ window.PASTOR = {
     { text: "Reformation: red paraments, “A Mighty Fortress” with a trumpet, and Bible class on the Augsburg Confession. Brats are already on the grill outside.", when: { minWeek: 16, maxWeek: 16 } },
     { text: "The Last Sunday: “Wake, Awake, for Night Is Flying” with the organ open full, and gold on the altar. The year ends where it began, waiting for Christ.", when: { minWeek: 17, maxWeek: 17 } },
     { text: "Arne pulls in with The Lutheran Hour still playing in his truck, as his father listened to it on the way to church. He arrives quoting the sermon. Then Bible class at 9:15, and yours." },
-    { text: "Potluck after the Divine Service: brats, sauerkraut, three kinds of kuchen, seven kinds of bars and one green Jell-O salad nobody claims. Everybody eats it anyway." }
+    { text: "Potluck after the Divine Service: brats, sauerkraut, three kinds of kuchen, seven kinds of bars and a Jell-O salad with something suspended in it. Everybody tries it, out of love." }
   ],
 
   // ───────────────────────── 6. The year in review ─────────────────────────
