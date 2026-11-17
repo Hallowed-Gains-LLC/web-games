@@ -218,6 +218,8 @@ change. Scripture is never in the library: each app keeps its own.
 | Two alike | Drag one onto the other, or tap one and then the other. They become the next item and earn glow. |
 | Wish cards | Three visitors, each wanting one item. A gold border means you have it: tap the card (or drag the item onto it). Pays 3× the item's seed value. Wishes lead you on: about one in four (never more than one at a time) is for the next thing you've never grown, shown as a silhouette with a "?" until you grow it; about a third ask for your best so far; the rest for something a step to three below it (`wishTier`). |
 | Basket | Drag anything here (or select it and tap the basket) to tuck it away for its seed value in glow. |
+| Sort | Tidies the board: everything in order, the biggest first from the top left, so pairs sit side by side and the empty places end up at the bottom by the pouch. Each thing glides to its place, and Undo puts it back (`sortBoard`). |
+| Merge | Merges the two lowest things on the board that make a pair (the closest two of them), as if you'd dragged one onto the other: one merge a tap, into the one nearer the top. Says so when nothing pairs yet (`autoMerge`). The bar is five evenly spaced, the pouch in the middle: Basket, Sort, Seeds, Merge, Undo. |
 | Glow | Never spent. Crossing each threshold brings a new garden wonder to the scene. |
 
 **The chain:** Seed → Sprout → Seedling → Bud → Moonflower → Posy → Glow-lily →
@@ -326,10 +328,12 @@ means a lane has opened that you haven't walked down yet.
   one. The garden's wonders still come with glow (`has`); everywhere else it's
   `seen`, from the area's `scenery` list and its best item. Until 2.10 the
   other places opened fully built.
-- **Each area has its own goal** on the line under the scene, with a bar. The garden's is its next wonder (then, once all 24 have come, the next star lit with glow). Elsewhere, in turn:
-  - the way to the next place, until it opens ("Next: the way to the park", "6 of 10 found");
-  - then the area's last item ("Next: the last light of all", "11 of 12 found");
-  - once that's grown, another one for the sky ("Next: another sky lantern"). The bar here shows how much of the next one is already on the board, by its worth in seeds (`areaProgress`).
+- **Every place shows its own goal**, the garden included, on the line under the scene, with a bar. In turn:
+  - the way to the next place, until it opens ("Next: the way to the farm", "6 of 10 found");
+  - then that place's last thing ("Next: the last bloom of all", "11 of 12 found");
+  - once that's grown, another one for the sky ("Next: another little moon", "3 in the sky"). The bar here shows how much of the next one is already on the board, by its worth in seeds (`areaProgress`).
+
+  The garden's wonders and the stars lit with glow arrive with their own toasts, and the garden book says which is next. Until 2.11 the garden's line counted glow to its next wonder instead.
 - **Each area has its own ending.** Its last item rises like the moon and
   becomes that area's constellations (the farm's: the Sky Lantern, the Hen,
   the Sheep, the Pony, the Windmill, the Barn, the Cartwheel, the Scarecrow),

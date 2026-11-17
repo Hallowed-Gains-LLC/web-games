@@ -165,7 +165,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '2.10.2';
+const VERSION = '2.11.0';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -712,8 +712,12 @@ function layout() {
 
   const by = L.barTop + barH / 2 - 7;
   L.pouch = { x: W / 2, y: by, r: Math.min(barH * .36, 40) };
-  L.basket = { x: W / 2 - Math.min(L.cw * .34, 150), y: by, r: 27 };
-  L.undo = { x: W / 2 + Math.min(L.cw * .34, 150), y: by, r: 27 };
+  // The bar: five evenly spaced, the pouch in the middle. Basket, Sort | Seeds | Merge, Undo.
+  const slot = Math.min(L.cw * .2, 86);
+  L.basket = { x: W / 2 - slot * 2, y: by, r: 27 };
+  L.sort = { x: W / 2 - slot, y: by, r: 20 };
+  L.merge = { x: W / 2 + slot, y: by, r: 20 };
+  L.undo = { x: W / 2 + slot * 2, y: by, r: 27 };
   const hy = st + L.headerH / 2;
   L.gear = { x: L.cx + L.cw - 18, y: hy, r: 22 };
   L.book = { x: L.cx + L.cw - 62, y: hy, r: 22 };
@@ -2476,6 +2480,43 @@ function unpack(k) {
   undoStack = []; S.satchel[k] = null; save();
 }
 
+/**
+ * Tidy the board: everything in order, the biggest first from the top left,
+ * so each pair sits side by side, and the empty places end up at the bottom,
+ * by the pouch. Each thing glides to its new place, and it can be undone.
+ * Not while something is moving, or while the last thing is about to rise.
+ */
+function sortBoard() {
+  if (anims.some(a => a.k === 'fly' || a.k === 'pop') || risingMoons || S.board.includes(MAX_TIER)) return;
+  const items = S.board.map((t, i) => ({ t, i })).filter(x => x.t).sort((a, b) => b.t - a.t || a.i - b.i);
+  if (items.every((x, k) => x.i === k)) { toast({ title: 'All tidy already' }); return; }
+  pushUndo();
+  const next = Array(N).fill(0);
+  items.forEach((x, k) => { next[k] = x.t; if (x.i !== k) fly(x.t, cellCenter(x.i), cellCenter(k), 300 + k * 6, { hide: k }); });
+  S.board = next; sel = -1;
+  sfx.tick(); later(150, () => sfx.tick()); buzz(6);
+  save();
+}
+/**
+ * Merge the two lowest things on the board that make a pair (the closest
+ * two of them), as if you'd dragged one onto the other: one merge a tap,
+ * into the one nearer the top. Saves the fiddly little drags of seeds and
+ * sprouts; the bigger choices are still yours.
+ */
+function autoMerge() {
+  for (let t = 1; t < MAX_TIER; t++) {
+    const cells = S.board.map((v, i) => v === t && !busy(i) ? i : -1).filter(i => i >= 0);
+    if (cells.length < 2) continue;
+    let pair = null, d = 1e9;
+    for (let a = 0; a < cells.length; a++) for (let b = a + 1; b < cells.length; b++) {
+      const i = cells[a], j = cells[b], dd = Math.hypot(i % COLS - j % COLS, Math.floor(i / COLS) - Math.floor(j / COLS));
+      if (dd < d) { d = dd; pair = [j, i]; }   // the later one flies into the earlier (nearer the top)
+    }
+    sel = -1; doMerge(pair[0], pair[1], null);
+    return;
+  }
+  toast({ title: 'Nothing to pair yet', sub: 'Tap the seed pouch for more.' });
+}
 function gather(cell, from) {
   const t = S.board[cell];
   if (t === MAX_TIER) return;   // it's on its way into the sky
@@ -2806,12 +2847,13 @@ function expandGlyph(c, x, y, dir) {
 }
 
 /**
- * What the line under the scene says away from the garden: this place's own
- * goal, not the garden's (its wonders and the glow stars are the
- * garden's, and glow is the whole town's). In turn: the way on to the next
- * place, until it opens; then this place's last thing; then, once it's
- * grown, another of them for the sky, the bar showing how much of the next
- * one is already on the board (its worth in seeds, out of the 2,048 it takes).
+ * What the line under the scene says: this place's own goal, the same in
+ * every place, the garden too. In turn: the way on to the next place, until
+ * it opens; then this place's last thing; then, once it's grown, another of
+ * them for the sky, the bar showing how much of the next one is already on
+ * the board (its worth in seeds, out of the 2,048 it takes). The garden's
+ * wonders and the stars lit with glow arrive with their own toasts, and the
+ * garden book says which is next.
  */
 function areaProgress() {
   const next = AREAS.find(a => a.opens && a.opens.from === AREA.id && !S.opened.includes(a.id));
@@ -2832,16 +2874,7 @@ function drawStatus(c) {
   } else if (S.stats.seeds === 0 && S.stats.merges === 0) label = 'Tap the seed pouch below';
   else if (S.stats.merges === 0) label = 'Drag a seed onto another seed';
   else if (S.area !== 'garden' && S.board.every((t, i) => t === freshBoard()[i])) label = `Welcome to ${AREA.name.toLowerCase()}. Pair things up.`;
-  else if (S.area !== 'garden') ({ label, right, frac } = areaProgress());
-  else if (S.decor < DECOR.length) {
-    const a = decorAt(S.decor), b = decorAt(S.decor + 1);
-    label = `Next: ${DECOR[S.decor].name}`; right = `${fmt(Math.max(0, b - S.peak))} ✦ to go`;
-    frac = clamp((S.peak - a) / (b - a), 0, 1);
-  } else {
-    const base = decorAt(DECOR.length), k = Math.floor((S.peak - base) / STAR_STEP), a = base + k * STAR_STEP;
-    label = 'Next: a new star'; right = `${fmt(a + STAR_STEP - S.peak)} ✦ to go`;
-    frac = clamp((S.peak - a) / STAR_STEP, 0, 1);
-  }
+  else ({ label, right, frac } = areaProgress());
   c.textBaseline = 'alphabetic';
   c.textAlign = 'right'; c.font = font(12, 600); c.fillStyle = rgba(COL.text, .55);
   const rw = right ? c.measureText(right).width : 0;
@@ -2998,6 +3031,19 @@ function drawBar(c, ms) {
   c.fillStyle = rgba(COL.text, .5);
   c.fillText('Basket', B.x, B.y + B.r - 1);
   c.fillText('Undo', U.x, U.y + U.r - 1);
+  // sort: three bars, longest at the top, like the board after it
+  const So = L.sort;
+  c.save(); c.translate(So.x, So.y); c.strokeStyle = rgba(COL.text, .8); c.lineWidth = 2.6; c.lineCap = 'round';
+  for (const [k, w] of [[0, 9], [1, 6], [2, 3]]) { c.beginPath(); c.moveTo(-9, -6 + k * 6); c.lineTo(-9 + w * 2, -6 + k * 6); c.stroke(); }
+  c.restore();
+  c.textBaseline = 'top'; c.fillStyle = rgba(COL.text, .5); c.fillText('Sort', So.x, B.y + B.r - 1);
+  // merge: two chevrons meeting at a small spark
+  const Me = L.merge;
+  c.save(); c.translate(Me.x, Me.y); c.strokeStyle = rgba(COL.text, .8); c.lineWidth = 2.4; c.lineCap = 'round'; c.lineJoin = 'round';
+  c.beginPath(); c.moveTo(-11, -6); c.lineTo(-5, 0); c.lineTo(-11, 6); c.moveTo(11, -6); c.lineTo(5, 0); c.lineTo(11, 6); c.stroke();
+  c.fillStyle = rgba(COL.gold, .85); sparkle(c, 0, 0, 3, rgba(COL.gold, .85));
+  c.restore();
+  c.textBaseline = 'top'; c.fillStyle = rgba(COL.text, .5); c.fillText('Merge', Me.x, B.y + B.r - 1);
   c.fillText(AREA.words.pouch, P.x, P.y + P.r + 2);
 }
 
@@ -3367,6 +3413,8 @@ function hitTest(x, y, dropping) {
   if (i >= 0) return { kind: 'cell', i };
   if (inC(L.pouch, 1.25)) return { kind: 'pouch' };
   if (inC(L.basket, dropping ? 1.9 : 1.5)) return { kind: 'basket' };
+  if (!dropping && inC(L.sort, 1.15)) return { kind: 'sort' };
+  if (!dropping && inC(L.merge, 1.15)) return { kind: 'merge' };
   if (!dropping && inC(L.undo, 1.5)) return { kind: 'undo' };
   if (!dropping && inC(L.book, 1)) return { kind: 'book' };
   if (!dropping && inC(L.map, 1)) return { kind: 'map' };
@@ -3438,6 +3486,8 @@ function tap(h) {
       else toast({ title: 'The basket', sub: 'Drag anything here to tuck it away for ✦.' });
       break;
     case 'undo': sel = -1; doUndo(); break;
+    case 'sort': sortBoard(); break;
+    case 'merge': autoMerge(); break;
     case 'book': openBook(); break;
     case 'map': if (sel >= 0 && S.board[sel] && S.opened.length > 1) { pack(sel, null); sel = -1; } else { sel = -1; openMap(); } break;
     case 'gear': openSettings(); break;
@@ -3925,7 +3975,7 @@ function openBook() {
     + (S.decor < DECOR.length ? `<li class="no">· · · and ${DECOR.length - S.decor} more to find</li>` : '');
   const next = S.decor < DECOR.length
     ? `Next: <b>${DECOR[S.decor].name}</b>, in ${fmt(decorAt(S.decor + 1) - S.peak)} ✦.`
-    : `Every wonder has come. Each ${fmt(STAR_STEP)} ✦ now lights a new star in the sky${glowStars() ? ` (${fmt(glowStars())} so far)` : ''}. The constellations come from the moons you grow.`;
+    : `Every wonder has come. Each ${fmt(STAR_STEP)} ✦ now lights a new star in the sky (the next in ${fmt(STAR_STEP - (S.peak - decorAt(DECOR.length)) % STAR_STEP)} ✦)${glowStars() ? ` (${fmt(glowStars())} so far)` : ''}. The constellations come from the moons you grow.`;
   const nextItem = S.best < MAX_TIER ? `<p><small>Merge two ${ITEMS[S.best].many} to find out what comes next.</small></p>`
     : `<p><small>${AREA.words.done}</small></p>`;
   openSheet(`
