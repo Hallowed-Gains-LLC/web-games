@@ -12,6 +12,7 @@ anyone with the link can play.
 | [`first-trinity/`](first-trinity/) | First Trinity Oktoberfest, a pixel-art stroll around the church's Oktoberfest | [/games/first-trinity/](https://hallowedgains.com/games/first-trinity/) |
 | [`lily/`](lily/) | Lily's games: Unicorn Quest and Walk Me Home | [/games/lily/](https://hallowedgains.com/games/lily/) |
 | [`moonflower/`](moonflower/) | Moonflower, a quiet merge garden for night feeds: one thumb, dim and warm, no timers | [/games/moonflower/](https://hallowedgains.com/games/moonflower/) |
+| [`pastor/`](pastor/) | A Pastor's Year, a cozy pixel-art church year (about half an hour) as the pastor of a small-town Lutheran church | [/games/pastor/](https://hallowedgains.com/games/pastor/) |
 
 Both were imported from their old repos (`brandonadamprice/first_trinity` and
 `brandonadamprice/lily`) with their full commit history.
