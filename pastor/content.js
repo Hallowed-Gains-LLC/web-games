@@ -122,7 +122,8 @@ window.PASTOR = {
       { text: "You pray for the people who left Zion, and for why they left. Some names make you sad, some make you wince. You hand them all over. They were always His, not yours." },
       { text: "You read the names on the old memorial plaque in the narthex, slowly, one by one, and pray for their great-grandchildren, wherever they are tonight." },
       { text: "You catch yourself praying for the budget more fervently than for Pete. You go back and pray for Pete again, properly. The budget can wait its turn.", fx: { harmony: 1 } },
-      { text: "Holy Week. You kneel with Isaiah 53: “All we like sheep have gone astray” (Isaiah 53:6). You count yourself among the sheep and stay down a while.", when: { minWeek: 11, maxWeek: 11 } }
+      { text: "Holy Week. You kneel with Isaiah 53: “All we like sheep have gone astray” (Isaiah 53:6). You count yourself among the sheep and stay down a while.", when: { minWeek: 11, maxWeek: 11 } },
+      { text: "You pray with today’s Portals of Prayer, the same little booklet half of Zion read over breakfast. It’s good to know you’re all on the same page, literally." }
     ],
 
     office: [
@@ -156,7 +157,8 @@ window.PASTOR = {
       { text: "The insurance form asks whether the church owns a trampoline. You check, to be thorough. Biscuit owns a cardboard box. You tick “No.”" },
       { text: "The register of official acts goes back to 1911. You enter a baptism in your best handwriting, and it looks like every pastor’s before you, which is the point." },
       { text: "A covered dish appears in the office fridge with a note: “PASTOR.” No name. You don’t know what it is. You eat it. It’s wonderful. You will never be able to say thank you." },
-      { text: "Hymn numbers for {sunday}: Hannah’s spreadsheet, the bulletin, the hymn board. Three chances to get it wrong. This week you get all three right, and tell nobody, and glow." }
+      { text: "Hymn numbers for {sunday}: Hannah’s spreadsheet, the bulletin, the hymn board. Three chances to get it wrong. This week you get all three right, and tell nobody, and glow." },
+      { text: "You restock the narthex rack with the new Portals of Prayer, regular and large print. The large print go first. They always do." }
     ],
 
     property: [
@@ -267,7 +269,8 @@ window.PASTOR = {
       { text: "You split firewood behind the parsonage. Every log does exactly what you expect it to. After a week of people, it’s a holiday.", when: { minWeek: 0, maxWeek: 8 } },
       { text: "Snow all afternoon. You watch it with a mug of cocoa and don’t shovel. Later Gus texts you a photo of the church walk, cleared, with no comment.", when: { minWeek: 0, maxWeek: 7 } },
       { text: "The first warm afternoon. You sit on the porch steps in shirtsleeves with your eyes closed and let the sun do its pastoral work on you.", when: { minWeek: 11, maxWeek: 15 } },
-      { text: "Leaves to rake, and you lie down in the pile instead. Bea finds you and jumps in. The leaves are now everywhere. Worth it.", when: { minWeek: 16, maxWeek: 17 }, fx: { family: 2 } }
+      { text: "Leaves to rake, and you lie down in the pile instead. Bea finds you and jumps in. The leaves are now everywhere. Worth it.", when: { minWeek: 16, maxWeek: 17 }, fx: { family: 2 } },
+      { text: "The Lutheran Hour on the old kitchen radio, the Lutheran Laymen’s League broadcast that has been on the air since 1930. Somebody else preaches to you for once. Sam hums the closing hymn." }
     ],
 
     family: [
@@ -405,7 +408,7 @@ window.PASTOR = {
       { text: "Arne lifts his glass and announces that the Bible is pro-beer. You look it up for him: “wine that maketh glad the heart of man” (Psalm 104:15). Close enough, says Arne, delighted." },
       { text: "Euchre: you and Gus against Arne and Hank. Gus goes alone on a hand he shouldn’t. He takes all five tricks and talks about it until closing.", fx: { gus: -6 } },
       { text: "A young farmer, quietly, over one beer: his dad is drinking too much and he doesn’t know who to tell. You listen. You give him your number, and a counselor’s in the county seat.", fx: { harmony: 2, strength: -2 } },
-      { text: "Friday fish fry in Lent: Hank’s beer-battered perch. Half of Zion is here; the other half is at St. Bridget’s fish fry and will hear about this.", when: { season: "lent" } },
+      { text: "Hank shows you the Tap’s old guest book, signed by the Zion choir after a concert in 1958. Ruth Peterson signed it twice, once upside down. You take a picture for Walt." },
       { text: "Somebody asks why a pastor drinks beer at all. Arne answers for you: Jesus made wine at a wedding, and the good stuff, too. He sits back, pleased. You let him have the point." },
       { text: "The Wildcats win on a last-second field goal and the Tap erupts. Hank rings the bell behind the bar. You find yourself hugging a dairy farmer. It’s fine." },
       { text: "Hank asks, drying a glass, if you ever get tired of people telling you their troubles. You say no. He says he doesn’t either. Two men in the listening trade nod at each other." },
@@ -458,6 +461,44 @@ window.PASTOR = {
       { text: "A kid’s birthday party on lane two, and you’re drafted to sing. You do it at full liturgical volume. The kid is thrilled. The parents look alarmed." },
       { text: "League runs late. Sam texts: “Did you win?” You text back: “We bowled.” She sends a heart. She knows what that means." },
       { text: "Walt bowls his first frame in a year: an eight, then the spare. He turns around and the whole Tap is clapping. He doesn’t know what to do with his hands. Then he grins.", when: { flag: "waltBowls" }, fx: { walt: -10 } }
+    ],
+
+    // The Friday fish fry at Krause’s Tap, Fridays in Lent.
+    fishFry: [
+      { text: "Friday fish fry at Krause’s Tap, the line out the door by 4:45: cod, rye bread, coleslaw, potato pancakes. Lutherans are free to eat meat in Lent. They come for the fish, and for each other." },
+      { text: "Sam, Bea and you at a long table with the Schroeders. Bea discovers tartar sauce and becomes, for one evening, its evangelist.", fx: { family: 4 } },
+      { text: "Father Mike from St. Bridget’s is three places ahead in line and saves you a seat. You compare Lenten preaching plans over walleye. Neighbours, and glad of it." },
+      { text: "Hank’s walleye is the real thing, caught by his cousin up north. Gus says it beats the cod. Arne disagrees. The two camps eat at separate tables, amiably.", fx: { gus: -6 } },
+      { text: "Walt comes alone and sits at the end of a table. Inside five minutes a family of six has adopted him, and he is cutting a little boy’s fish.", fx: { walt: -8 } },
+      { text: "Potato pancakes: applesauce or sour cream? The town divides on it every Lent. You take both, and Arne accuses you of being very Lutheran about it." },
+      { text: "Mrs. Dahl arrives on the Pine Haven van with six friends. They order what they’ve ordered since 1971 and are delighted all over again." },
+      { text: "Bea asks why there’s fish every Friday in Lent. You tell her about the old fast, kept freely and never to earn anything. She decides to keep it with extra coleslaw.", fx: { family: 2 } },
+      { text: "Josh is at the next table with his family. He pretends not to know you, then comes over and steals a potato pancake. This is respect.", fx: { josh: -6 } },
+      { text: "Pete works out the cost per fillet on a napkin and declares the fish fry the best value in the county. Hank asks if he can put that on the sign.", fx: { pete: -5 } },
+      { text: "A family from St. Bridget’s at your table asks what you’re giving up for Lent. “Second helpings,” you say. They watch you go back for coleslaw and are kind enough to say nothing." },
+      { text: "The rye is from the bakery on Main, sliced thick, and Hank’s mother butters it in the kitchen as she has since 1974. You thank her. She tells you to eat more." },
+      { text: "Marge brings her own tartar sauce from home in a jar. She doesn’t trust Hank’s. Hank, wisely, says nothing at all.", fx: { marge: -6 } },
+      { text: "The line out the door becomes a town meeting: the school levy, the weather, a new baby on Elm Street, and two people in the hospital nobody had told you about.", fx: { harmony: 2 } },
+      { text: "Bea falls asleep against Sam with a hush puppy in her hand. You carry her home through the cold under a sky full of stars. A good Lenten Friday.", fx: { family: 3 } },
+      { text: "The tip jar by the register is for the food pantry. By eight it’s full. Hank puts in a twenty and says not to tell anybody. You tell nobody but God." }
+    ],
+
+    // Coffee with the quilters in the fellowship hall, Wednesday mornings.
+    quilters: [
+      { text: "Coffee with the quilters: eight women, two frames, one percolator. Marge is unpicking a seam she says Leonard would have noticed. You hold the spool.", fx: { marge: -6 } },
+      { text: "Mrs. Dahl, brought over from Pine Haven by her granddaughter, still stitches faster than anyone in the room. The needle, she says, is the one thing that hasn’t slowed down." },
+      { text: "This month’s quilts go to the hospital’s newborn nursery: tiny ones, in pastels. The women pray over the stack before it goes, and ask you to say the amen.", fx: { harmony: 2 } },
+      { text: "Kuchen on the table: peach, from Erna Vogel’s mother’s recipe. You are asked to rank it against last week’s apple. You decline, wisely, and have two pieces." },
+      { text: "Prayer requests over coffee: a grandson’s surgery, a daughter’s divorce, a cow that won’t calve. You write them all down. The cow is prayed for by supper." },
+      { text: "The quilt for the women’s shelter is nearly done. Marge stitches a small cross into one corner, where only the woman who sleeps under it will find it.", fx: { marge: -6 } },
+      { text: "Gossip, gently: who’s moving, who’s expecting, who isn’t speaking to whom. You listen for the people who need a visit, and find two." },
+      { text: "Disaster relief: forty quilts boxed for flood victims down south. The women debate the packing order with great love. Gus is summoned to tape the boxes.", fx: { gus: -4 } },
+      { text: "The quilters ask what you’re preaching on. You tell them {gospel}. By the second cup they have a better illustration than yours. You take it.", fx: { sermon: 2 } },
+      { text: "Marge and a newer quilter disagree about a pattern, and you find yourself mediating between Flying Geese and Bear Paw. Both come out beautiful.", fx: { marge: -4, harmony: 2 } },
+      { text: "The women are piecing a quilt from Ruth Peterson’s fabric, for Walt. They make you promise not to tell. You don’t. You pray for him all the way home." },
+      { text: "Mrs. Dahl teaches you a running stitch. Yours wanders like a sermon without notes. She says the Lord sees the intention. Then she unpicks it." },
+      { text: "Half the quilters read Portals of Prayer at breakfast and compare notes on today’s devotion. One disagrees with it, respectfully and at length." },
+      { text: "Sauerkraut recipes are traded across the frame, along with strong views on caraway. You stay out of it. There are hills a pastor does not die on." }
     ]
   },
 
@@ -1931,6 +1972,7 @@ window.PASTOR = {
         "Three services tonight: four o’clock with the children’s pageant (one shepherd in tears), seven, and eleven by candlelight.",
         "Every pew is full: the regulars, the college kids home for break, and the once-a-year folks, who are every bit as welcome.",
         "“Fear not: for, behold, I bring you good tidings of great joy, which shall be to all people” (Luke 2:10).",
+        "At eleven, as Zion always has, the old-timers sing the first verse in German from the old hymnal: “Stille Nacht! Heilige Nacht!” Everyone else hums, and nobody minds.",
         "The lights go down. Flame passes candle to candle down every row, and the whole church sings “Silent Night.”"
       ] },
     ashWednesday: { title: "Ash Wednesday", fx: { strength: -3 },
@@ -2146,34 +2188,36 @@ window.PASTOR = {
 
   // Sunday morning around the sermon: Bible class, the Divine Service, the Supper, coffee.
   sundayMornings: [
-      "Bible class at 9:15 on the Book of Acts: eleven people, two Bibles with tabs, one with sticky notes in five colours. Then the Divine Service at 10:30.",
-      "Bible class reads Ruth this morning. Arne admits he never knew she was a foreigner. Then the bell, the processional hymn and the Divine Service.",
-      "The acolyte lights the altar candles on the second try. The congregation exhales together, and the Divine Service begins.",
-      "Usher report: seventy-four present, two new faces, and one dog in the parking lot who would very much like to come in.",
-      "At the rail you place the host in hands old and young: Marge’s, Daniel’s, a farmer’s cracked ones. Given for you, again and again.",
-      "Bible class on the Augsburg Confession: Article IV takes the whole hour. Nobody minds. It’s the one about being forgiven.",
-      "The hymn of the day is “Now Thank We All Our God.” The third stanza comes out stronger than the first. It usually does.",
-      "Coffee hour: the big urn, three kinds of bars, and a lemon one that’s gone in four minutes. A good deal of theology happens near the lemon bars.",
-      "Confession and absolution open the service. You speak the forgiveness in Christ’s stead, and something in the room unclenches.",
-      "Before the service a visitor asks about Communion. You talk with her kindly at the door; she comes forward with arms crossed for a blessing.",
-      "The sound system squeals during the Gospel. Gus is up the stairs before the end of the verse. Silence. He sits down to grateful, scattered smiles.",
-      "Bible class runs over because someone asked about Melchizedek. You stop at 10:20 with the question open and the coffee still hot.",
-      "In the offering plate, a check with a sticky note: “for the boiler, don’t tell my wife.” Two pews back, his wife has written the same note.",
-      "The children come up for the children’s message. One brings her stuffed rabbit, who is also very interested in the parable.",
-      { text: "The Advent wreath, one more candle lit than last week. The acolyte reaches with the long taper, and the whole congregation leans with him.", when: { season: "advent" } },
-      { text: "Gaudete: the rose candle. Marge has polished the wreath stand until it reflects the windows. Bible class discusses joy, stiffly, then less stiffly.", when: { minWeek: 2, maxWeek: 2 } },
-      { text: "The Sunday after Christmas: half the regulars are visiting relatives, and the other half have brought theirs. Every carol, every stanza.", when: { minWeek: 4, maxWeek: 4 } },
-      { text: "The Wise Men in the Sunday school display finally reach the manger, having crossed the windowsill one inch a week since Advent.", when: { minWeek: 5, maxWeek: 5 } },
-      { text: "The last Alleluias until Easter. The congregation sings them loud, like people waving goodbye at a train station.", when: { minWeek: 7, maxWeek: 7 } },
-      { text: "Violet on the altar, no Alleluia, and the Litany sung slowly. The quiet of Lent feels like a held breath.", when: { minWeek: 8, maxWeek: 9 } },
-      { text: "Palm Sunday. The ushers hand out palms, and the procession winds round the outside of the church singing “All Glory, Laud and Honor.” One palm becomes a sword by the second stanza.", when: { minWeek: 10, maxWeek: 10 } },
-      { text: "Easter Day: sunrise at 6:30, the youth breakfast at 8 (ham, eggs, a dispute over the syrup), then the Festival Divine Service at 10:30, packed to the narthex.", when: { minWeek: 11, maxWeek: 11 } },
-      { text: "Easter lilies still crowd the altar steps, a bit tired now. The Alleluias are back, and the congregation won’t stop singing them.", when: { season: "easter" } },
-      { text: "Good Shepherd Sunday. Bible class reads Psalm 23 and Ezekiel 34, and a farmer explains, at length, what sheep are really like. It helps.", when: { minWeek: 13, maxWeek: 13 } },
-      { text: "Pentecost: everybody wears red, more or less. Pete’s red tie still has the price tag on. Bible class is cancelled for confirmation photos.", when: { minWeek: 14, maxWeek: 14 } },
-      { text: "The Holy Trinity, and the Athanasian Creed, all of it, read aloud standing. Nobody sits down early. Gus calls it a workout.", when: { minWeek: 15, maxWeek: 15 } },
-      { text: "Reformation: red paraments, “A Mighty Fortress” with a trumpet, and Bible class on the Augsburg Confession. Brats are already on the grill outside.", when: { minWeek: 16, maxWeek: 16 } },
-      { text: "The Last Sunday: “Wake, Awake, for Night Is Flying” with the organ open full, and gold on the altar. The year ends where it began, waiting for Christ.", when: { minWeek: 17, maxWeek: 17 } }
+    "Bible class at 9:15 on the Book of Acts: eleven people, two Bibles with tabs, one with sticky notes in five colours. Then the Divine Service at 10:30.",
+    "Bible class reads Ruth this morning. Arne admits he never knew she was a foreigner. Then the bell, the processional hymn and the Divine Service.",
+    "The acolyte lights the altar candles on the second try. The congregation exhales together, and the Divine Service begins.",
+    "Usher report: seventy-four present, two new faces, and one dog in the parking lot who would very much like to come in.",
+    "At the rail you place the host in hands old and young: Marge’s, Daniel’s, a farmer’s cracked ones. Given for you, again and again.",
+    "Bible class on the Augsburg Confession: Article IV takes the whole hour. Nobody minds. It’s the one about being forgiven.",
+    "The hymn of the day is “Now Thank We All Our God.” The third stanza comes out stronger than the first. It usually does.",
+    "Coffee hour: the big urn, three kinds of bars, and a lemon one that’s gone in four minutes. A good deal of theology happens near the lemon bars.",
+    "Confession and absolution open the service. You speak the forgiveness in Christ’s stead, and something in the room unclenches.",
+    "Before the service a visitor asks about Communion. You talk with her kindly at the door; she comes forward with arms crossed for a blessing.",
+    "The sound system squeals during the Gospel. Gus is up the stairs before the end of the verse. Silence. He sits down to grateful, scattered smiles.",
+    "Bible class runs over because someone asked about Melchizedek. You stop at 10:20 with the question open and the coffee still hot.",
+    "In the offering plate, a check with a sticky note: “for the boiler, don’t tell my wife.” Two pews back, his wife has written the same note.",
+    "The children come up for the children’s message. One brings her stuffed rabbit, who is also very interested in the parable.",
+    { text: "The Advent wreath, one more candle lit than last week. The acolyte reaches with the long taper, and the whole congregation leans with him.", when: { season: "advent" } },
+    { text: "Gaudete: the rose candle. Marge has polished the wreath stand until it reflects the windows. Bible class discusses joy, stiffly, then less stiffly.", when: { minWeek: 2, maxWeek: 2 } },
+    { text: "The Sunday after Christmas: half the regulars are visiting relatives, and the other half have brought theirs. Every carol, every stanza.", when: { minWeek: 4, maxWeek: 4 } },
+    { text: "The Wise Men in the Sunday school display finally reach the manger, having crossed the windowsill one inch a week since Advent.", when: { minWeek: 5, maxWeek: 5 } },
+    { text: "The last Alleluias until Easter. The congregation sings them loud, like people waving goodbye at a train station.", when: { minWeek: 7, maxWeek: 7 } },
+    { text: "Violet on the altar, no Alleluia, and the Litany sung slowly. The quiet of Lent feels like a held breath.", when: { minWeek: 8, maxWeek: 9 } },
+    { text: "Palm Sunday. The ushers hand out palms, and the procession winds round the outside of the church singing “All Glory, Laud and Honor.” One palm becomes a sword by the second stanza.", when: { minWeek: 10, maxWeek: 10 } },
+    { text: "Easter Day: sunrise at 6:30, the youth breakfast at 8 (ham, eggs, a dispute over the syrup), then the Festival Divine Service at 10:30, packed to the narthex.", when: { minWeek: 11, maxWeek: 11 } },
+    { text: "Easter lilies still crowd the altar steps, a bit tired now. The Alleluias are back, and the congregation won’t stop singing them.", when: { season: "easter" } },
+    { text: "Good Shepherd Sunday. Bible class reads Psalm 23 and Ezekiel 34, and a farmer explains, at length, what sheep are really like. It helps.", when: { minWeek: 13, maxWeek: 13 } },
+    { text: "Pentecost: everybody wears red, more or less. Pete’s red tie still has the price tag on. Bible class is cancelled for confirmation photos.", when: { minWeek: 14, maxWeek: 14 } },
+    { text: "The Holy Trinity, and the Athanasian Creed, all of it, read aloud standing. Nobody sits down early. Gus calls it a workout.", when: { minWeek: 15, maxWeek: 15 } },
+    { text: "Reformation: red paraments, “A Mighty Fortress” with a trumpet, and Bible class on the Augsburg Confession. Brats are already on the grill outside.", when: { minWeek: 16, maxWeek: 16 } },
+    { text: "The Last Sunday: “Wake, Awake, for Night Is Flying” with the organ open full, and gold on the altar. The year ends where it began, waiting for Christ.", when: { minWeek: 17, maxWeek: 17 } },
+    { text: "Arne pulls in with The Lutheran Hour still playing in his truck, as his father listened to it on the way to church. He arrives quoting the sermon. Then Bible class at 9:15, and yours." },
+    { text: "Potluck after the Divine Service: brats, sauerkraut, three kinds of kuchen, seven kinds of bars and one green Jell-O salad nobody claims. Everybody eats it anyway." }
   ],
 
   // ───────────────────────── 6. The year in review ─────────────────────────
