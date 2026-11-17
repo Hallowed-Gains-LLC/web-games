@@ -304,6 +304,20 @@ means a lane has opened that you haven't walked down yet.
   tiny clothes swaying; no new visitors, just gentle ones from everywhere.
   Nothing in the nursery is a baby, and nothing suggests one going up into
   the sky: what rises there is a Sweet dream (keep it that way).
+- **Each area builds up as you go**, like the garden. Each place opens with
+  its hills, ground and main building, and every new thing found there brings
+  the next of its ten pieces of scenery, from the 3rd item to the 12th, with a
+  toast ("The fountain has come to the park"). Some arrive with what they're
+  named for: the farm's barn with the Red barn and its windmill with the
+  Windmill; the park's bench, lamps, fountain and bandstand with theirs; the
+  chapel's stained glass and bell tower with the Stained-glass window and the
+  Bell tower; the harbour's rowing boat, lobster pots, fishing boat, footbridge
+  (the Pier) and lighthouse; the lane's thatched cottage with the Little house
+  and its chimney smoke with the Fireplace; and the nursery's lit window, with
+  its mobile, with the Mobile. Each place's book lists its wonders and the next
+  one. The garden's wonders still come with glow (`has`); everywhere else it's
+  `seen`, from the area's `scenery` list and its best item. Until 2.10 the
+  other places opened fully built.
 - **Each area has its own goal** on the line under the scene, with a bar. The garden's is its next wonder (then, once all 24 have come, the next star lit with glow). Elsewhere, in turn:
   - the way to the next place, until it opens ("Next: the way to the park", "6 of 10 found");
   - then the area's last item ("Next: the last light of all", "11 of 12 found");
