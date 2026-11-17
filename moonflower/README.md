@@ -350,7 +350,7 @@ others' in `S.away` (`goToArea` swaps them). `S.opened` and `S.visited` list
 the areas opened and walked to; `checkOpenings` opens an area once its
 `opens.from` area has grown its `opens.tier`-th item. A save from before the
 town is a garden that starts where it was (and opens the farm at once if it
-already has a Moonflower).
+already has a Firefly jar).
 
 **Adding an area:** its `ITEMS`/`ART` (12 each, drawn in the 100×100 box), a
 visitor list (new visitor drawings go in `VISITOR_ART`), constellation shapes,

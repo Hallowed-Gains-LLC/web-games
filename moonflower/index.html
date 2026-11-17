@@ -165,7 +165,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '2.10.0';
+const VERSION = '2.10.1';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -876,7 +876,7 @@ function updateWishStar(ms) {
   if (wishStar && ms > wishStar.t0 + WISH_STAR_MS) wishStar = null;
   if (wishStar || ms < nextWishStar) return;
   nextWishStar = ms + 150000 + Math.random() * 150000;
-  if (!S.intro || hushA < 1 || wrap.classList.contains('open') || L.rotate) return;
+  if (!S.intro || hushA < 1 || expanded || wrap.classList.contains('open') || L.rotate) return;
   const V = sceneView(), m = moonPos(V), left = Math.random() < .5;
   const x0 = left ? lerp(V.xl + 30, 160, Math.random()) : lerp(200, m.x - 40, Math.random()), y0 = V.top + 8 + Math.random() * Math.max(6, (V.G - 70 - V.top) * .4);
   wishStar = { t0: ms, x0, y0, dx: (left ? 1 : -1) * (90 + Math.random() * 40), dy: 34 + Math.random() * 16 };
@@ -1544,6 +1544,7 @@ function drawVerse(c, ms) {
     verseNow = { ...v, t0: ms, dur: clamp(3500 + v.text.length * 60, 8000, 16000) }; verseQ = null;
   }
   const v = verseNow, p = ms - v.t0;
+  if (toasts.length && !wrap.classList.contains('open') && v.dur > p + 500) v.dur = p + 500;   // something to tell: the verse fades out of its way
   if (p > v.dur) { verseNow = null; return; }
   const a = Math.min(1, p / VERSE_IN, (v.dur - p) / VERSE_OUT);
   // Wrap the words to the open sky, centred and clear of the moon on the
@@ -1947,7 +1948,15 @@ function ensureWishes() { for (let i = 0; i < 3; i++) if (!S.wishes[i]) S.wishes
  * new wish. Runs when the pouch grows and when a save is loaded.
  */
 function retireUnreachableWishes() {
-  for (let i = 0; i < 3; i++) if (S.wishes[i] && !S.wishes[i].from && S.wishes[i].tier < pouchTier()) S.wishes[i] = newWish(i, 0);
+  for (let i = 0; i < 3; i++) {
+    const w = S.wishes[i]; if (!w) continue;
+    if (!w.from) { if (w.tier < pouchTier()) S.wishes[i] = newWish(i, 0); continue; }
+    // An errand for something its own place can't make any more (its pouch
+    // has grown past it) is retired too, unless one is still there on that
+    // board or in the satchel: otherwise it would wait on its card for ever.
+    const st = areaState(w.from);
+    if (w.tier < Math.max(1, st.best - POUCH_LAG) && !st.board.includes(w.tier) && satchelSlot(w.from, w.tier) < 0) S.wishes[i] = newWish(i, 0);
+  }
 }
 
 /* ============================================================
@@ -2071,7 +2080,7 @@ function buzz(ms) { if (S.set.buzz && navigator.vibrate) try { navigator.vibrate
 // timer); nothing starts by itself when the game opens.
 const SND_VOL = [.35, .6, 1];   // Soft, Medium, Louder
 const SND_FADE_MS = 30000;
-let snd = { kind: 'off', mbox: false, stopAt: 0, out: null, noise: null, box: null, wake: null, fading: false };
+let snd = { kind: 'off', mbox: false, stopAt: 0, out: null, noise: null, box: null, wake: null, timer: 0 };
 
 /** The shared AudioContext, made on first use (from a tap, as browsers require) whatever the Sound setting. */
 function audioCtx() {
@@ -2205,21 +2214,26 @@ function applySounds() {
   const want = S.set.shush || 'off';
   if (want !== snd.kind || (want !== 'off' && !snd.noise)) { if (want === 'off') stopNoise(); else startNoise(want); snd.kind = want; }
   if (S.set.mbox && !snd.box) startBox(); else if (!S.set.mbox && snd.box) stopBox();
-  const out = sndOut(ac);
-  out.gain.cancelScheduledValues(ac.currentTime); out.gain.setTargetAtTime(SND_VOL[S.set.vol ?? 1], ac.currentTime, .3);
-  snd.fading = false;
+  const out = sndOut(ac), vol = SND_VOL[S.set.vol ?? 1], t0 = ac.currentTime;
+  out.gain.cancelScheduledValues(t0); out.gain.setValueAtTime(out.gain.value, t0); out.gain.linearRampToValueAtTime(vol, t0 + .4);
   snd.stopAt = sndPlaying() && S.set.timer ? Date.now() + S.set.timer * 60000 : 0;
+  clearTimeout(snd.timer);
+  if (snd.stopAt) {
+    // The fade is scheduled on the audio clock, and the stop on a timeout, so
+    // both happen even with the screen locked (when frames stop being drawn).
+    const end = t0 + S.set.timer * 60;
+    out.gain.setValueAtTime(vol, end - SND_FADE_MS / 1000); out.gain.linearRampToValueAtTime(0, end);
+    snd.timer = setTimeout(() => { stopAllSounds(); toast({ title: 'The sounds have faded out', sub: 'Sweet dreams.' }); }, S.set.timer * 60000 + 300);
+  }
   keepAwake(sndPlaying());
 }
-/** Every frame: fade out over the last 30 s of the timer, then stop. */
+/** Every frame: a backstop in case the timeout was held up (a throttled background tab). */
 function updateSounds() {
-  if (!snd.stopAt || !sndPlaying()) return;
-  const left = snd.stopAt - Date.now();
-  if (left <= SND_FADE_MS && !snd.fading && AC) { snd.fading = true; snd.out.gain.setTargetAtTime(0, AC.currentTime, SND_FADE_MS / 4000); }
-  if (left <= 0) { stopAllSounds(); toast({ title: 'The sounds have faded out', sub: 'Sweet dreams.' }); }
+  if (snd.stopAt && sndPlaying() && Date.now() > snd.stopAt + 5000) { stopAllSounds(); toast({ title: 'The sounds have faded out', sub: 'Sweet dreams.' }); }
 }
 function stopAllSounds() {
-  stopNoise(); stopBox(); snd.kind = 'off'; snd.stopAt = 0; snd.fading = false;
+  clearTimeout(snd.timer);
+  stopNoise(); stopBox(); snd.kind = 'off'; snd.stopAt = 0;
   S.set.shush = 'off'; S.set.mbox = false; save();
   keepAwake(false);
   if (wrap.classList.contains('open') && document.getElementById('sndnote')) openSounds();
@@ -2267,6 +2281,7 @@ function doUndo() {
   const d = JSON.parse(snap);
   S.board = d.b; S.glow = d.g; S.stats = d.st; S.satchel = d.sa || S.satchel; S.friends = d.fr || S.friends;
   S.wishes = d.w.map(w => Object.assign(w, { born: now() }));
+  retireUnreachableWishes();
   anims = []; sel = -1;
   sfx.undo(); save();
 }
@@ -2278,7 +2293,7 @@ function gain(n, at, delay = 0) {
   if (at) later(delay, () => floatText(`+${fmt(n)} ✦`, at.x, at.y - L.cell * .3));
   while (S.decor < DECOR.length && S.peak >= decorAt(S.decor + 1)) {
     S.decor++; sceneDirty = true;
-    toast({ title: DECOR[S.decor - 1].name, sub: S.decor === DECOR.length ? 'Your garden is complete. The stars will keep coming.' : 'has come to your garden', wonder: true, dur: 3600 });
+    toast({ title: DECOR[S.decor - 1].name, sub: S.decor === DECOR.length ? 'Your garden is complete. The stars will keep coming.' : 'New in the garden.', wonder: true, dur: 3600 });
     later(250, sfx.wonder);
   }
 }
@@ -2297,7 +2312,7 @@ function discover(t, at) {
   const piece = AREA.scenery && AREA.scenery[t - 3];   // and a new piece of this place's scenery
   if (piece) {
     sceneDirty = true;
-    toast({ title: piece[1], sub: `has come to ${AREA.name.toLowerCase()}`, wonder: true, dur: 3400 });
+    toast({ title: piece[1], sub: `New ${where(AREA.id)}.`, wonder: true, dur: 3400 });
     later(400, sfx.wonder);
   }
   const pouch = pouchTier();
@@ -2322,7 +2337,7 @@ function plantSeed() {
   const i = pickSpawnCell();
   if (i < 0) {
     pouchShake = now();
-    if (now() - lastFullHint > 6000) { lastFullHint = now(); toast({ title: `${AREA.name} is full`, sub: 'Merge two alike, or tuck one into the basket.' }); }
+    if (now() - lastFullHint > 6000) { lastFullHint = now(); toast({ title: `${sentenceName(AREA)} is full`, sub: 'Merge two alike, or tuck one into the basket.' }); }
     return;
   }
   pushUndo();
@@ -2358,7 +2373,7 @@ function doMerge(src, dst, from) {
   gain(t + 1, c, delay);
   discover(t + 1, c);
   later(delay, () => { burst(c.x, c.y, 6 + t); sfx.merge(t + 1); buzz(8); });
-  if (t + 1 === MAX_TIER) later(delay + MOON_PAUSE_MS, () => riseMoon(dst));
+  if (t + 1 === MAX_TIER) { const id = S.area, age = townAge; later(delay + MOON_PAUSE_MS, () => { if (S.area === id && age === townAge) riseMoon(dst); }); }
   save();
 }
 function deliver(wi, cell, from) {
@@ -2373,14 +2388,15 @@ function deliver(wi, cell, from) {
   S.wishes[wi] = nw;
   gain(w.reward, { x: r.x + r.w / 2, y: r.y + 10 }, 320);
   later(320, () => { burst(to.x, to.y, 12); sfx.wish(); buzz(12); });
-  const age = townAge, name = ITEMS[t].name;
-  later(700, () => { if (age === townAge) befriend(w.who, name, to); });
+  befriend(w.who, ITEMS[t].name, to);
   homeMotes({ x: r.x + r.w / 2, y: r.y + r.h / 2 }, 5, 380);
   save();
 }
 /** Where an area is, as said in a sentence: "on the farm", "in the garden". */
 const WHERE = { garden: 'in the garden', farm: 'on the farm', park: 'in the park', lane: 'on the lane', harbour: 'at the harbour', chapel: 'at the chapel', nursery: 'in the nursery' };
 const where = id => WHERE[id] || `at ${areaById(id).name.toLowerCase()}`;
+/** An area's name to start a sentence: "The farm". */
+const sentenceName = a => a.name[0] + a.name.slice(1).toLowerCase();
 /** The satchel slot holding `tier` from `area`, or -1. */
 function satchelSlot(area, tier) { return S.satchel.findIndex(x => x && x.area === area && x.tier === tier); }
 /** Every open errand in the town: [{ area, w }], the current area's first. */
@@ -2392,6 +2408,7 @@ function townErrands() {
 /** Tuck a board item into the satchel, to carry it to another area. */
 function pack(cell, from) {
   const t = S.board[cell], k = S.satchel.indexOf(null);
+  if (t === MAX_TIER) return;   // it's on its way into the sky
   if (k < 0) {
     if (from) fly(t, from, cellCenter(cell), 180, { hide: cell });
     toast({ title: 'Your satchel is full', sub: 'Hand something over, or take one out on the map.' });
@@ -2418,21 +2435,25 @@ function deliverErrand(wi, k) {
   S.wishes[wi] = nw;
   gain(w.reward, { x: r.x + r.w / 2, y: r.y + 10 }, 420);
   later(420, () => { burst(to.x, to.y, 16); sfx.wish(); buzz(12); });
-  const age = townAge, name = areaById(item.area).items[item.tier].name;
-  later(800, () => { if (age === townAge) befriend(w.who, name, to); });
+  befriend(w.who, areaById(item.area).items[item.tier].name, to);
   save();
 }
 /** Take something out of the satchel: it goes back to its own area's board. */
+/** A line under the map (where the satchel's "Take out" buttons are), or a toast if the map isn't open. */
+function mapNote(text) {
+  const el = document.getElementById('mapnote');
+  if (el && wrap.classList.contains('open')) el.innerHTML = text; else toast({ title: text });
+}
 function unpack(k) {
   const item = S.satchel[k]; if (!item) return;
   const a = areaById(item.area);
   if (item.area === S.area) {
     const i = pickSpawnCell();
-    if (i < 0) { toast({ title: `No room in ${a.name.toLowerCase()}`, sub: 'Merge or tuck something away first.' }); return; }
+    if (i < 0) { mapNote(`No room ${where(a.id)}: merge or tuck something away first.`); return false; }
     S.board[i] = item.tier; pop(i);
   } else {
     const st = areaState(item.area), i = st.board.lastIndexOf(0);
-    if (i < 0) { toast({ title: `No room back at ${a.name.toLowerCase()}`, sub: 'Its board is full.' }); return; }
+    if (i < 0) { mapNote(`No room back ${where(a.id)}: its board is full.`); return false; }
     st.board[i] = item.tier;
   }
   undoStack = []; S.satchel[k] = null; save();
@@ -2440,6 +2461,7 @@ function unpack(k) {
 
 function gather(cell, from) {
   const t = S.board[cell];
+  if (t === MAX_TIER) return;   // it's on its way into the sky
   pushUndo();
   S.board[cell] = 0;
   fly(t, from || cellCenter(cell), { x: L.basket.x, y: L.basket.y - 4 }, 280, { s1: .3, arc: 30 });
@@ -2515,6 +2537,11 @@ function goToArea(id) {
   arrivedAt = now(); lastInput = now();
   save();
   toast({ title: AREA.name, sub: first ? AREA.words.welcome : 'Just as you left it.', tier: AREA.map.icon, dur: 3400 });
+  // Anything grown to the end here and left on the board rises now, and an
+  // ending not yet seen (the first one rose as you walked away) is shown.
+  const age = townAge;
+  S.board.forEach((t, i) => { if (t === MAX_TIER) later(1200 + 900 * S.board.slice(0, i).filter(x => x === MAX_TIER).length, () => { if (S.area === id && age === townAge) riseMoon(i); }); });
+  if (S.skyMoons && !S.ended) later(1500, () => openEnding(id, age));
   const ready = S.wishes.find(w => w.from && satchelSlot(w.from, w.tier) >= 0);
   if (ready) toast({ title: `${ready.who} is waiting for your ${areaById(ready.from).items[ready.tier].name}`, sub: 'Tap their card to hand it over.', dur: 3600 });
 }
@@ -2591,7 +2618,7 @@ function riseMoon(cell) {
   // A risen moon can't be undone (undo would hand back the two Wishing trees
   // and keep the moon), so the undo history ends here, as it does on a visit.
   undoStack = [];
-  const V = sceneView(), k = S.skyMoons, slot = skySlots[k];
+  const V = sceneView(), k = S.skyMoons, slot = skySlots[k], areaHere = S.area;
   // With the sky full, it rises toward the big moon instead.
   const at = slot || moonPos(V), to = { x: V.ox + at.x * V.s, y: at.y * V.s };
   S.board[cell] = 0; S.skyMoons++; risingMoons++;
@@ -2601,13 +2628,15 @@ function riseMoon(cell) {
   later(MOON_RISE_MS, () => {
     if (age !== townAge) return;   // the town was started over meanwhile
     risingMoons--;
-    newest = { k, t0: now() };
-    burst(to.x, to.y, 10, .6);
+    undoStack = [];   // a move made while it rose mustn't undo the glow it pays
     // What the basket would have paid. Given on landing, not before, so the
     // wonders it brings don't cover the sky while the moon is on its way.
     gain(value(MAX_TIER), to);
-    if (!S.ended) later(1600, openEnding);   // after its stars have come out
-    else if (slot) toast({ title: moonShape(k).name, sub: 'A new constellation, from the moon you grew', tier: MAX_TIER, dur: 3600 });
+    if (S.area !== areaHere) return;   // walked on (the map waits while one rises, so only just): its card comes on the way back (goToArea)
+    newest = { k, t0: now() };
+    burst(to.x, to.y, 10, .6);
+    if (!S.ended) later(1600, () => openEnding(areaHere, age));   // after its stars have come out
+    else if (slot) toast({ title: moonShape(k).name, sub: `A new constellation, from the ${ITEMS[MAX_TIER].name.toLowerCase()} you grew`, tier: MAX_TIER, dur: 3600 });
     else toast({ title: `Another ${ITEMS[MAX_TIER].name.toLowerCase()} for the sky`, sub: `${fmt(S.skyMoons)} up there now, and the sky is full of them.`, tier: MAX_TIER, dur: 3600 });
   });
   save();
@@ -2658,14 +2687,17 @@ function onReturn() {
     const tier = Math.max(S.best >= 8 ? 3 : S.best >= 5 ? 2 : 1, pouchTier() + 1);
     const n = Math.min(3, emptyCount());
     undoStack = [];
+    if (expanded) toggleExpand();   // the gifts land on the board, so show it
+    const id = S.area, age = townAge;
     for (let k = 0; k < n; k++) later(500 + k * 220, () => {
+      if (S.area !== id || townAge !== age) return;   // walked on or started over before it landed
       const i = pickSpawnCell(); if (i < 0) return;
       S.board[i] = tier;
       fly(tier, { x: L.pouch.x, y: L.pouch.y - 12 }, cellCenter(i), 320, { s0: .35, arc: 30, hide: i });
       sfx.seed(); save();
     });
     const what = n === 1 ? `one ${ITEMS[tier].name.toLowerCase()}` : `${['', '', 'two', 'three'][n]} ${ITEMS[tier].many.toLowerCase()}`;
-    toast({ title: 'Welcome back', sub: n ? GIFT_LINES[Math.floor(Math.random() * GIFT_LINES.length)](what) : 'Your garden waited for you.', dur: 3600 });
+    toast({ title: 'Welcome back', sub: n ? GIFT_LINES[Math.floor(Math.random() * GIFT_LINES.length)](what) : `${sentenceName(AREA)} waited for you.`, dur: 3600 });
     queueVerse('night');
   }
   checkMorning();   // before save(), which would count this visit as the night's; a morning verse replaces the night's
@@ -2999,6 +3031,7 @@ function drawDrag(c, ms) {
 }
 function drawToast(c, ms) {
   const t = toasts[0]; if (!t) return;
+  if (wrap.classList.contains('open')) { t.t0 = 0; return; }   // a sheet is up: it waits, rather than running out unseen
   if (!t.t0) t.t0 = ms;
   const p = ms - t.t0;
   if (p > t.dur) { toasts.shift(); return; }
@@ -3009,17 +3042,25 @@ function drawToast(c, ms) {
   c.font = font(15, 700); const tw1 = c.measureText(t.title).width;
   c.font = font(12.5, 500); const tw2 = t.sub ? c.measureText(t.sub).width : 0;
   const maxW = L.cw - 10;
-  const w = Math.min(maxW, Math.max(tw1, tw2) + icon + 34), h = t.sub ? 58 : 40;
+  const w = Math.min(maxW, Math.max(tw1, tw2) + icon + 34), avail = w - 30 - icon;
+  // The second line wraps onto two when it's too long for one (a place's welcome, an errand's hint).
+  let subLines = t.sub ? [t.sub] : [];
+  if (t.sub && tw2 > avail) {
+    const words = t.sub.split(' '); let a = '';
+    for (const wd of words) { const tryA = a ? `${a} ${wd}` : wd; if (c.measureText(tryA).width <= avail || !a) a = tryA; else break; }
+    subLines = [a, t.sub.slice(a.length + 1)];
+  }
+  const h = t.sub ? 40 + 17 * subLines.length + 1 : 40;
   const x = W / 2 - w / 2, y = cy - h / 2 + (1 - a) * 8;
   c.save(); c.globalAlpha = a;
   rr(c, x, y, w, h, 18); c.fillStyle = 'rgba(10,13,30,.92)'; c.fill();
   c.strokeStyle = rgba(COL.gold, t.wonder ? .45 : .2); c.lineWidth = 1; c.stroke();
   if (t.tier) drawItem(c, t.tier, x + 12 + icon / 2, y + h / 2, icon * 1.1, ms, 0, 1);
-  const tx = x + 17 + icon, avail = w - 30 - icon;
+  const tx = x + 17 + icon;
   c.textAlign = 'left'; c.textBaseline = 'middle';
   const title = fitText(c, t.title, avail, 15, 700, 11); c.fillStyle = COL.textHi;
   c.fillText(title, tx, t.sub ? y + 21 : y + h / 2);
-  if (t.sub) { const sub = fitText(c, t.sub, avail, 12.5, 500, 9.5); c.fillStyle = rgba(COL.text, .78); c.fillText(sub, tx, y + 40); }
+  subLines.forEach((ln, i) => { const sub = fitText(c, ln, avail, 12.5, 500, 9.5); c.fillStyle = rgba(COL.text, .78); c.fillText(sub, tx, y + 40 + i * 17); });
   c.restore();
 }
 
@@ -3127,7 +3168,7 @@ function drawUI(c, ms) {
  * nothing lands on a board that isn't there.
  */
 function toggleExpand() {
-  if (!expanded && (anims.length || risingMoons || drag)) return;
+  if (!expanded && (anims.length || risingMoons || drag || wishStar)) return;
   expanded = !expanded; expandedAt = now(); sel = -1; starStory = null;
   layout();
   arrivedAt = now(); lastInput = now();   // the same short fade-in as walking somewhere
@@ -3146,7 +3187,7 @@ function drawExpanded(c, ms) {
   for (let k = 0; k < moons; k++) {
     if (newest && newest.k === k) continue;   // still coming out
     const { x, y: sy } = skySlots[k];
-    c.fillText(moonShape(k).name, V.ox + x * V.s, (sy + SHAPE_R + 7) * V.s);
+    c.fillText(fitText(c, moonShape(k).name, (V.xr - V.xl - 48) / 4 * V.s - 6, 10.5, 500, 8.5), V.ox + x * V.s, (sy + SHAPE_R + 7) * V.s);
   }
   c.restore();
   c.strokeStyle = rgba(COL.text, .55); c.lineWidth = 1.6; expandGlyph(c, L.gear.x, y, -1);
@@ -3304,7 +3345,7 @@ function hitTest(x, y, dropping) {
   if (!dropping && inC(L.book, 1)) return { kind: 'book' };
   if (!dropping && inC(L.map, 1)) return { kind: 'map' };
   if (!dropping && inC(L.sounds, 1)) return { kind: 'sounds' };
-  if (dropping && inC(L.map, 1.8)) return { kind: 'satchel' };   // drop on the map icon: into the satchel
+  if (dropping && S.opened.length > 1 && inC(L.map, 1.8)) return { kind: 'satchel' };   // drop on the map icon: into the satchel (once there's somewhere else to go)
   if (!dropping && inC(L.gear, 1)) return { kind: 'gear' };
   // The open sky and land (not the header, not the line under the scene): expand the scene.
   if (!dropping && (inC(L.expand, 1) || (y > L.st + L.headerH && y < L.scene.h - 30))) return { kind: 'expand' };
@@ -3327,7 +3368,7 @@ cv.addEventListener('pointermove', e => {
   if (!ptr.moved && !ptr.wake && Math.hypot(ptr.x - ptr.x0, ptr.y - ptr.y0) > 9) {
     ptr.moved = true;
     const h = ptr.hit;
-    if (h.kind === 'cell' && S.board[h.i] && !busy(h.i)) { drag = { src: h.i, tier: S.board[h.i] }; sel = -1; }
+    if (h.kind === 'cell' && S.board[h.i] && S.board[h.i] < MAX_TIER && !busy(h.i)) { drag = { src: h.i, tier: S.board[h.i] }; sel = -1; }   // the last thing is about to rise: it stays put
   }
 });
 cv.addEventListener('pointerup', e => {
@@ -3372,7 +3413,7 @@ function tap(h) {
       break;
     case 'undo': sel = -1; doUndo(); break;
     case 'book': openBook(); break;
-    case 'map': if (sel >= 0 && S.board[sel]) { pack(sel, null); sel = -1; } else openMap(); break;
+    case 'map': if (sel >= 0 && S.board[sel] && S.opened.length > 1) { pack(sel, null); sel = -1; } else { sel = -1; openMap(); } break;
     case 'gear': openSettings(); break;
     case 'sounds': openSounds(); break;
     case 'expand': toggleExpand(); break;
@@ -3382,7 +3423,7 @@ function tap(h) {
   }
 }
 function tapCell(i) {
-  if (busy(i)) return;
+  if (busy(i) || S.board[i] === MAX_TIER) return;   // the last thing is about to rise: not for selecting
   const t = S.board[i];
   if (sel < 0) { if (t) { sel = i; sfx.tick(); } return; }
   if (i === sel) { sel = -1; return; }
@@ -3622,23 +3663,30 @@ function letter(who, k, item) {
     sign: v.sign || `The ${who.toLowerCase()}`,
   };
 }
-/** A wish for `who` was granted (with an item called `item`): count it, and send a letter at the right number. */
+/**
+ * A wish for `who` was granted (with an item called `item`): count it at
+ * once, inside the move, so an undo takes the count (and the sixth wish's
+ * gift) back with it, and send a letter at the right number. A letter is
+ * never sent twice; the gift comes each time the count reaches six, which
+ * only happens again after an undo took the first one away.
+ */
 function befriend(who, item, at) {
   const n = S.friends[who] = (S.friends[who] || 0) + 1;
   const k = LETTER_AT.indexOf(n);
-  if (k < 0 || S.letters.some(l => l.who === who && l.k === k)) return;
-  S.letters.push({ who, k, item, day: dayKey(new Date()), read: false });
+  if (k < 0) return;
+  const fresh = !S.letters.some(l => l.who === who && l.k === k);
+  if (fresh) S.letters.push({ who, k, item, day: dayKey(new Date()), read: false });
+  let note = null;
   if (k === 2) {   // the sixth wish: a small gift, a couple of steps better than the pouch
     const tier = Math.min(Math.max(2, pouchTier() + 2), S.best), i = pickSpawnCell();
     if (i >= 0) {
       S.board[i] = tier;
-      fly(tier, at, cellCenter(i), 520, { s0: .3, arc: 50, hide: i });
-      later(520, () => pop(i));
+      fly(tier, at, cellCenter(i), 700, { s0: .3, arc: 50, hide: i });
+      later(700, () => pop(i));
     } else gain(value(tier) * 2, at);
-    toast({ title: `A gift from the ${who.toLowerCase()}`, sub: i >= 0 ? `${an(ITEMS[tier].name).replace(/^a/, 'A')}, and a letter in the book.` : 'Some glow, and a letter in the book.', dur: 3800 });
-  } else toast({ title: k === 3 ? `The ${who.toLowerCase()} is your friend now` : `A letter from the ${who.toLowerCase()}`, sub: 'It\'s in the book, under Neighbours.', dur: 3600 });
-  later(200, () => sfx.wish());
-  save();
+    note = { title: `A gift from the ${who.toLowerCase()}`, sub: i >= 0 ? `${an(ITEMS[tier].name).replace(/^a/, 'A')}${fresh ? ', and a letter in the book' : ''}.` : `Some glow${fresh ? ', and a letter in the book' : ''}.`, dur: 3800 };
+  } else if (fresh) note = { title: k === 3 ? `The ${who.toLowerCase()} is your friend now` : `A letter from the ${who.toLowerCase()}`, sub: 'It\'s in the book, under Neighbours.', dur: 3600 };
+  if (note) { const age = townAge; later(700, () => { if (age === townAge) { toast(note); sfx.wish(); } }); }
 }
 const unreadLetters = () => S.letters.filter(l => !l.read).length;
 
@@ -3728,10 +3776,13 @@ sheetEl.addEventListener('click', e => {
   }
   if (b.hasAttribute('data-sndstop')) { stopAllSounds(); openSounds(); return; }
   if (b.hasAttribute('data-book')) { openBook(); return; }
-  if (b.dataset.unpack !== undefined) { unpack(+b.dataset.unpack); openMap(); return; }
+  if (b.dataset.unpack !== undefined) { if (unpack(+b.dataset.unpack) !== false) openMap(); return; }
   if (b.dataset.area) {
     const a = areaById(b.dataset.area);
     if (a.id === S.area) { closeSheet(); return; }
+    if (S.opened.includes(a.id) && (risingMoons || S.board.includes(MAX_TIER))) {   // let it reach the sky first
+      document.getElementById('mapnote').innerHTML = `Wait a moment: your ${ITEMS[MAX_TIER].name.toLowerCase()} is rising.`; return;
+    }
     if (S.opened.includes(a.id)) { closeSheet(); goToArea(a.id); return; }
     document.getElementById('mapnote').innerHTML = `<b>${a.name}</b>: ${a.opens.need}`;
     return;
@@ -3790,9 +3841,10 @@ function openIntro() {
  * what it took, and an invitation to keep going. Shown once (S.ended); a
  * save with a moon in the sky but no ending yet gets it at start-up.
  */
-function openEnding() {
-  if (S.ended) return;
-  if (wrap.classList.contains('open')) { later(1500, openEnding); return; }   // never on top of another sheet
+function openEnding(id = S.area, age = townAge) {
+  if (S.area !== id || townAge !== age) return;   // walked on, or started over: it waits for the way back (goToArea)
+  if (S.ended || !S.skyMoons) return;
+  if (wrap.classList.contains('open')) { later(1500, () => openEnding(id, age)); return; }   // never on top of another sheet
   S.ended = true; save();
   openSheet(`
     <h2 class="title">${AREA.ending.title}</h2>
@@ -3860,7 +3912,7 @@ function openBook() {
     ${nextItem}
     ${AREA.scenery ? `<h3>${AREA.name.replace(/^The /, '')} wonders · ${sceneryCount()} of ${AREA.scenery.length}</h3>
     <ul class="wonders">${AREA.scenery.slice(0, sceneryCount()).map(p => `<li>✦ ${p[1]}</li>`).join('')}${sceneryCount() < AREA.scenery.length ? `<li class="no">· · · and ${AREA.scenery.length - sceneryCount()} more to find</li>` : ''}</ul>
-    <p><small>${sceneryCount() < AREA.scenery.length ? `Each new thing you find here brings another. Next: <b>${AREA.scenery[sceneryCount()][1]}</b>.` : `Every wonder has come to ${AREA.name.toLowerCase()}.`}</small></p>`
+    <p><small>${sceneryCount() < AREA.scenery.length ? `Each new thing you find here brings another. Next: <b>${AREA.scenery[sceneryCount()][1]}</b>.` : `Every wonder is here to ${AREA.name.toLowerCase()}.`}</small></p>`
     : `<h3>Garden wonders · ${S.decor} of ${DECOR.length}</h3>
     <ul class="wonders">${wonders}</ul>
     <p><small>${next}</small></p>`}
@@ -3871,12 +3923,12 @@ function openBook() {
       <span>Things grown</span><span>${fmt(S.stats.merges)}</span>
       <span>Wishes granted</span><span>${fmt(S.stats.wishes)}</span>
       ${S.stats.errands ? `<span>Errands run</span><span>${fmt(S.stats.errands)}</span>` : ''}
-      ${S.skyMoons ? `<span>Moons grown</span><span>${fmt(S.skyMoons)}</span>` : ''}
+      ${S.skyMoons ? `<span>${ITEMS[MAX_TIER].many} grown</span><span>${fmt(S.skyMoons)}</span>` : ''}
       ${glowStars() ? `<span>Stars lit with glow</span><span>${fmt(glowStars())}</span>` : ''}
       <span>Glow, all told</span><span>${fmt(S.peak)} ✦</span>
     </div>
     ${S.skyMoons ? `<h3>Constellations</h3><ul class="wonders">${MOON_SHAPES.slice(0, Math.min(S.skyMoons, MOON_SHAPES.length)).map(m => `<li>✦ ${m.name}</li>`).join('')}</ul>` : ''}
-    <button class="btn done" data-close>Back to the garden</button>`);
+    <button class="btn done" data-close>Back to ${AREA.name.toLowerCase()}</button>`);
 }
 
 /* ============================================================
