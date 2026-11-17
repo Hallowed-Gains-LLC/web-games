@@ -90,14 +90,16 @@ Live at [hallowedgains.com/games/moonflower/](https://hallowedgains.com/games/mo
 - **Neighbours and letters.** A visitor is the same animal all over town
   (the Owl in the garden is the Owl at the chapel), and it remembers every
   wish you grant it. A letter comes "under the door" after the 1st, 3rd,
-  6th and 10th wish. The first two letters are in the animal's own voice
-  (two lines each, `VISITOR_NOTES`). The sixth brings a small gift, a
-  couple of steps better than the pouch, onto the board. After the tenth
-  it's a friend. The garden book has a Neighbours page listing everyone
-  you've met, with their hearts (♥ for each letter) and their letters, and
-  a gold dot on the book icon means a letter is waiting. Wish counts are
-  part of the undo snapshot; letters are kept and never sent twice
-  (`befriend`, `openNeighbours`, `S.friends`, `S.letters`).
+  6th (with a small gift onto the board) and 10th wish, when it's a friend.
+  Every visitor writes its own four letters in its own voice: 128 in all, no
+  two alike. The first names what you gave it. Some animals have their own
+  greeting and sign-off: the cat writes "Human,", the goose "NEIGHBOUR,", and
+  the rabbit signs for "all eleven". The garden book's Neighbours page shows
+  everyone you've met, with their hearts (♥ for each letter) and their
+  letters, and a gold dot on the book icon means a letter is waiting. Wish
+  counts are part of the undo snapshot; letters are kept and never sent twice
+  (`VISITOR_LETTERS`, `letter`, `befriend`, `openNeighbours`, `S.friends`,
+  `S.letters`).
 - **The real moon.** The big moon follows tonight's phase, worked out from
   a known new moon and the mean synodic month. The dark part shows faintly
   (earthshine), and the sky's glow follows how much is lit. The expanded
