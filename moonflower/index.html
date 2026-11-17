@@ -165,7 +165,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '2.10.1';
+const VERSION = '2.10.2';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -795,13 +795,26 @@ function makeStars() {
 const GLOW_STARS_MAX = 120;
 let glowStarAt = [];
 const glowStars = () => S.decor >= DECOR.length ? Math.max(0, Math.floor((S.peak - decorAt(DECOR.length)) / STAR_STEP)) : 0;
+const GLOW_STARS_CALM = 18;   // how many show in the small sky above the board (the expanded sky shows them all)
+/**
+ * The stars lit with glow. Above the board the sky is kept calm: only the
+ * first GLOW_STARS_CALM, quiet, plus the newest with its glint. Expanded,
+ * every one of them glints.
+ */
 function drawGlowStars(c, t, mul) {
   const n = Math.min(glowStars(), glowStarAt.length);
   for (let i = 0; i < n; i++) {
+    const loud = expanded || i === n - 1;
+    if (!loud && i >= GLOW_STARS_CALM) continue;
     const g = glowStarAt[i], tw = .75 + .25 * Math.sin(t * .9 + g.ph);
-    drawGlow(c, g.x, g.y, 7, '#ffe3a8', .6 * tw * mul);
-    sparkle(c, g.x, g.y, 2.8 * tw, `rgba(255,244,214,${.85 * mul})`);   // a small four-pointed glint: these are stars you lit
-    c.globalAlpha = mul; c.fillStyle = '#fffaf0'; c.fillRect(g.x - .8, g.y - .8, 1.6, 1.6); c.globalAlpha = 1;
+    if (loud) {
+      drawGlow(c, g.x, g.y, 7, '#ffe3a8', .6 * tw * mul);
+      sparkle(c, g.x, g.y, 2.8 * tw, `rgba(255,244,214,${.85 * mul})`);   // a small four-pointed glint: these are stars you lit
+      c.globalAlpha = mul; c.fillStyle = '#fffaf0'; c.fillRect(g.x - .8, g.y - .8, 1.6, 1.6); c.globalAlpha = 1;
+    } else {
+      drawGlow(c, g.x, g.y, 4, '#ffe3a8', .3 * tw * mul);
+      c.globalAlpha = .8 * mul; c.fillStyle = '#fff4dc'; c.fillRect(g.x - .6, g.y - .6, 1.2, 1.2); c.globalAlpha = 1;
+    }
   }
 }
 
@@ -1284,13 +1297,17 @@ function season() {
  * "reduce motion" on, only what lies on the ground.
  */
 function drawSeason(c, V, t, sn) {
-  const span = V.xr - V.xl, top = V.top - 10, fall = V.vh - top, still = calm();
+  const span = V.xr - V.xl, still = calm();
+  // Petals and leaves come down from the trees, not out of the stars: they
+  // drift through the lower part of the scene only, fading in as they enter it.
+  const low = V.G - 64, lowFall = V.vh - low, enter = y => clamp((y - low) / 14, 0, 1);
   if (sn === 'spring' && !still) {
-    for (let i = 0; i < 18; i++) {   // petals, fluttering down on a breeze
-      const y = top + ((i * 53.1 + t * 11) % fall), x = V.xl + ((i * 71.3 + t * 7) % span) + Math.sin(t * 1.3 + i) * 5;
+    for (let i = 0; i < 9; i++) {   // petals, fluttering down on a breeze
+      const y = low + ((i * 53.1 + t * 8) % lowFall), x = V.xl + ((i * 71.3 + t * 7) % span) + Math.sin(t * 1.3 + i) * 5;
+      c.globalAlpha = enter(y);
       c.save(); c.translate(x, y); c.rotate(t * (.8 + (i % 3) * .3) + i); c.scale(1, .45 + .45 * Math.sin(t * 2 + i));
       c.fillStyle = i % 3 ? 'rgba(240,190,206,.8)' : 'rgba(250,226,234,.75)'; c.beginPath(); c.ellipse(0, 0, 3, 1.9, 0, 0, TAU); c.fill();
-      c.restore();
+      c.restore(); c.globalAlpha = 1;
     }
   } else if (sn === 'summer' && !still) {
     for (let i = 0; i < 14; i++) {   // fireflies, low over the ground and up into the dark
@@ -1306,11 +1323,11 @@ function drawSeason(c, V, t, sn) {
       const x = V.xl + ((i * 37.9) % span), y = nearY(V, x) + 1.5 + (i % 3) * .8;
       c.fillStyle = rgba(cols[i % 4], .7); c.beginPath(); c.ellipse(x, y, 2.8, 1.1, (i % 5) * .6 - 1.2, 0, TAU); c.fill();
     }
-    if (!still) for (let i = 0; i < 12; i++) {   // and a few still falling, tumbling as they go
-      const y = top + ((i * 61.7 + t * 9) % fall), x = V.xl + ((i * 83.1) % span) + Math.sin(t * .9 + i * 1.7) * 9;
-      c.save(); c.translate(x, y); c.rotate(Math.sin(t * 1.6 + i) * 1.2); c.scale(1, .5 + .5 * Math.abs(Math.sin(t * 1.2 + i)));
+    if (!still) for (let i = 0; i < 7; i++) {   // and a few still falling, tumbling as they go
+      const y = low + ((i * 61.7 + t * 7) % lowFall), x = V.xl + ((i * 83.1) % span) + Math.sin(t * .9 + i * 1.7) * 9;
+      c.globalAlpha = enter(y); c.save(); c.translate(x, y); c.rotate(Math.sin(t * 1.6 + i) * 1.2); c.scale(1, .5 + .5 * Math.abs(Math.sin(t * 1.2 + i)));
       c.fillStyle = rgba(cols[i % 4], .9); c.beginPath(); c.moveTo(-3.6, 0); c.quadraticCurveTo(0, -2.6, 3.6, 0); c.quadraticCurveTo(0, 2.6, -3.6, 0); c.fill();
-      c.restore();
+      c.restore(); c.globalAlpha = 1;
     }
   } else if (sn === 'winter') {
     c.fillStyle = 'rgba(214,224,250,.13)';   // a rime of frost along the ground
@@ -2647,11 +2664,20 @@ function riseMoon(cell) {
  * shapes, in skySlots, from the middle out). A new one's stars come out one
  * by one, then its lines. (The glow stars are drawGlowStars.)
  */
+const BRIGHT_CONSTELLATIONS = 4;   // above the board, the newest few are bright; the rest rest faint (all bright when expanded)
 function drawConstellations(c, t, ms) {
   const n = skySlots.length;
   const moons = Math.min(S.skyMoons - risingMoons, n);
   for (let k = 0; k < moons; k++) {
     const { x, y } = skySlots[k], shape = moonShape(k);
+    if (!expanded && k < moons - BRIGHT_CONSTELLATIONS && !(newest && newest.k === k)) {   // an older one: a faint outline
+      const P = shape.pts.map(([a, b]) => [x + a * SHAPE_R, y + b * SHAPE_R]);
+      c.strokeStyle = 'rgba(232,222,255,.15)'; c.lineWidth = .5; c.beginPath();
+      for (const [a, b] of shape.lines) { c.moveTo(P[a][0], P[a][1]); c.lineTo(P[b][0], P[b][1]); }
+      c.stroke();
+      c.fillStyle = 'rgba(255,247,222,.6)'; for (const [px, py] of P) c.fillRect(px - .6, py - .6, 1.2, 1.2);
+      continue;
+    }
     const since = newest && newest.k === k ? ms - newest.t0 : 1e9;
     const shown = i => clamp((since - i * STAR_STEP_MS) / 400, 0, 1);
     const linesIn = clamp((since - shape.pts.length * STAR_STEP_MS) / 900, 0, 1);

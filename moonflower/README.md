@@ -72,6 +72,14 @@ Live at [hallowedgains.com/games/moonflower/](https://hallowedgains.com/games/mo
   five otherwise (more in spring) with clouds, dimmer stars and rings on the
   pond. The same all day for everyone on a date (`weather`). Settings →
   Weather turns it off.
+- **A calm sky above the board.** A long-played garden fills its sky:
+  dozens of glow stars and up to 16 grown constellations. So above the
+  board only the newest 4 constellations are bright, with older ones resting
+  as faint outlines (`BRIGHT_CONSTELLATIONS`). Only 18 glow stars show there,
+  quietly, plus the newest with its glint (`GLOW_STARS_CALM`). The expanded
+  scene shows every one of them, bright. Falling petals and leaves drift
+  through the lower part of the scene only, near the trees, never among the
+  stars.
 - **Expand the scene.** Tap the open sky or land, or the corners icon under
   the gear, and the board slides away: the scene fills the screen, under the
   place's name, with a taller sky that holds up to 32 of the constellations
