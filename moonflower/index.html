@@ -165,7 +165,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '2.9.3';
+const VERSION = '2.10.0';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -2294,6 +2294,12 @@ function discover(t, at) {
     later(120, sfx.discover);
     if (at) { later(150, () => burst(at.x, at.y, 26, 1.5)); beam(at.x, at.y, 150); }
   }
+  const piece = AREA.scenery && AREA.scenery[t - 3];   // and a new piece of this place's scenery
+  if (piece) {
+    sceneDirty = true;
+    toast({ title: piece[1], sub: `has come to ${AREA.name.toLowerCase()}`, wonder: true, dur: 3400 });
+    later(400, sfx.wonder);
+  }
   const pouch = pouchTier();
   if (pouch > pouchBefore && t < MAX_TIER) toast({ title: 'The pouch has grown', sub: `It gives ${ITEMS[pouch].many.toLowerCase()} now.`, tier: pouch, dur: 3400 });
 }
@@ -2473,6 +2479,21 @@ function useArea(a) {
   AREA = a; ITEMS = a.items; ART = a.art; VISITORS = a.visitors; MOON_SHAPES = a.shapes; VISIT_SPOTS = a.spots;
   sprites = []; silhouettes = []; sceneDirty = true;
 }
+/**
+ * Is this place's scenery piece `id` there yet? Away from the garden (whose
+ * wonders come with glow, `has`), each place starts with its hills, ground
+ * and main building, and every new thing found there brings the next piece
+ * of AREA.scenery: the first with the 3rd thing, the last with the 12th.
+ * Some arrive with what they're named for (the barn with the Red barn, the
+ * lighthouse with the Lighthouse). A piece that isn't listed is always there.
+ */
+function seen(id) {
+  const list = AREA.scenery; if (!list) return true;
+  const i = list.findIndex(p => p[0] === id);
+  return i < 0 || i < S.best - 2;
+}
+/** The scenery that has come to this place so far, and what's left. */
+const sceneryCount = () => AREA.scenery ? clamp(S.best - 2, 0, AREA.scenery.length) : 0;
 /** One area's saved state (its board and progress); the current area's lives on S itself. */
 function areaState(id) {
   if (id === S.area) return S;
@@ -3837,9 +3858,12 @@ function openBook() {
     </div>
     <div class="book">${items}</div>
     ${nextItem}
-    <h3>Garden wonders · ${S.decor} of ${DECOR.length}</h3>
+    ${AREA.scenery ? `<h3>${AREA.name.replace(/^The /, '')} wonders · ${sceneryCount()} of ${AREA.scenery.length}</h3>
+    <ul class="wonders">${AREA.scenery.slice(0, sceneryCount()).map(p => `<li>✦ ${p[1]}</li>`).join('')}${sceneryCount() < AREA.scenery.length ? `<li class="no">· · · and ${AREA.scenery.length - sceneryCount()} more to find</li>` : ''}</ul>
+    <p><small>${sceneryCount() < AREA.scenery.length ? `Each new thing you find here brings another. Next: <b>${AREA.scenery[sceneryCount()][1]}</b>.` : `Every wonder has come to ${AREA.name.toLowerCase()}.`}</small></p>`
+    : `<h3>Garden wonders · ${S.decor} of ${DECOR.length}</h3>
     <ul class="wonders">${wonders}</ul>
-    <p><small>${next}</small></p>
+    <p><small>${next}</small></p>`}
     <h3>So far</h3>
     <div class="stats">
       <span>Visits to the town</span><span>${fmt(S.visits)}</span>
@@ -4140,17 +4164,24 @@ function landFarm(c, V) {
   c.fillStyle = '#0c1127'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
   for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, farY(V, x));
   c.lineTo(V.xr + 4, V.vh + 2); c.fill();
+  if (seen('fields')) {
   c.strokeStyle = '#111a38'; c.lineWidth = 1;          // ploughed rows on the far fields
   for (let k = 0; k < 5; k++) { c.beginPath(); for (let x = 90; x <= 250; x += 4) { const y = farY(V, x) + 5 + k * 3.4; x === 90 ? c.moveTo(x, y) : c.lineTo(x, y); } c.stroke(); }
+  }
+  if (seen('windmill')) {
   { const x = 58, y = farY(V, 58) + 3;                 // the windmill's tower (its sails turn in liveFarm)
     c.fillStyle = '#0a0e20'; c.beginPath(); c.moveTo(x - 6, y); c.lineTo(x - 3.4, y - 24); c.lineTo(x + 3.4, y - 24); c.lineTo(x + 6, y); c.fill();
     c.beginPath(); c.arc(x, y - 24, 3.8, Math.PI, 0); c.fill(); }
+  }
   c.fillStyle = '#090d1b'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
   for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, nearY(V, x));
   c.lineTo(V.xr + 4, V.vh + 2); c.fill();
+  if (seen('oak')) {
   { const x = 30, y = nearY(V, 30) + 1;                // an old oak
     c.fillStyle = '#0d1517'; for (let i = 0; i < 40; i++) { const a = rnd() * TAU, d = Math.sqrt(rnd()) * 24; c.beginPath(); c.ellipse(x + Math.cos(a) * d * 1.2, y - 50 + Math.sin(a) * d * .7, 5 + rnd() * 3, 3 + rnd() * 2, rnd() * 3, 0, TAU); c.fill(); }
     c.fillStyle = '#141114'; c.beginPath(); c.moveTo(x - 4, y); c.quadraticCurveTo(x - 2, y - 26, x - 1, y - 42); c.lineTo(x + 1, y - 42); c.quadraticCurveTo(x + 2, y - 26, x + 4, y); c.fill(); }
+  }
+  if (seen('barn')) {
   { const x = 282, y = nearY(V, 282) + 1;              // the barn
     c.fillStyle = '#3a1618'; c.fillRect(x - 26, y - 30, 52, 31);
     c.fillStyle = '#1d0f12'; c.beginPath(); c.moveTo(x - 29, y - 29); c.lineTo(x - 21, y - 42); c.lineTo(x, y - 50); c.lineTo(x + 21, y - 42); c.lineTo(x + 29, y - 29); c.closePath(); c.fill();
@@ -4158,40 +4189,55 @@ function landFarm(c, V) {
     c.strokeStyle = '#5b4440'; c.lineWidth = .8; c.strokeRect(x - 9, y - 18, 18, 19);
     c.beginPath(); c.moveTo(x - 9, y - 18); c.lineTo(x + 9, y + 1); c.moveTo(x + 9, y - 18); c.lineTo(x - 9, y + 1); c.stroke();
     c.fillStyle = '#1a0c0e'; c.fillRect(x - 4.5, y - 41, 9, 7); }
+  }
+  if (seen('silo')) {
   { const x = 322, y = nearY(V, 322) + 1;              // the silo
     c.fillStyle = '#1a2034'; c.fillRect(x - 9, y - 46, 18, 47);
     c.beginPath(); c.arc(x, y - 46, 9, Math.PI, 0); c.fill();
     c.strokeStyle = '#232a42'; c.lineWidth = .7; for (let k = 1; k < 5; k++) { c.beginPath(); c.moveTo(x - 9, y - 9 * k); c.lineTo(x + 9, y - 9 * k); c.stroke(); } }
+  }
+  if (seen('fence')) {
   c.strokeStyle = '#161b2a'; c.lineWidth = 1.6;          // the fence
   c.beginPath(); c.moveTo(V.xl, nearY(V, 0) - 11); c.lineTo(132, nearY(V, 132) - 11);
   c.moveTo(V.xl, nearY(V, 0) - 5); c.lineTo(132, nearY(V, 132) - 5); c.stroke();
   c.lineWidth = 2.4; for (let x = Math.ceil((V.xl + 2) / 17) * 17 - 11; x <= 132; x += 17) { const y = nearY(V, x); c.beginPath(); c.moveTo(x, y + 1); c.lineTo(x, y - 15); c.stroke(); }
+  }
+  if (seen('bales')) {
   for (const [x, r] of [[156, 8], [174, 7.4], [165, 6.6]]) {   // round hay bales
     const y = nearY(V, x) + 2 - r + (x === 165 ? -12 : 0);
     c.fillStyle = '#3d301a'; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
     c.strokeStyle = '#54431f'; c.lineWidth = .8; c.beginPath(); c.arc(x, y, r * .6, 0, 5.4); c.stroke();
   }
+  }
+  if (seen('grass')) {
   c.strokeStyle = '#142029'; c.lineWidth = .8;            // grass
   for (let x = V.xl; x < V.xr; x += 3 + rnd() * 5) {
     if (x > 254 && x < 334) continue;
     const y = nearY(V, x) + 1;
     for (let k = 0; k < 2; k++) { const h = 2 + rnd() * 5, lean = (rnd() - .5) * 4; c.beginPath(); c.moveTo(x + k, y); c.quadraticCurveTo(x + k, y - h * .6, x + k + lean, y - h); c.stroke(); }
   }
+  }
 }
 /** The farm's live parts: the windmill's sails, the barn's loft light and door lantern, a few fireflies. */
 function liveFarm(c, V, t) {
+  if (seen('windmill')) {
   { const x = 58, y = farY(V, 58) + 3 - 24;
     c.strokeStyle = '#0a0e20'; c.lineWidth = 1.6;
     for (let k = 0; k < 4; k++) { const a = t * .25 + k * TAU / 4; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * 15, y + Math.sin(a) * 15); c.stroke();
       c.lineWidth = 3.2; c.beginPath(); c.moveTo(x + Math.cos(a) * 6, y + Math.sin(a) * 6); c.lineTo(x + Math.cos(a) * 15, y + Math.sin(a) * 15); c.stroke(); c.lineWidth = 1.6; } }
+  }
+  if (seen('loft')) {
   { const x = 282, y = nearY(V, 282) + 1, a = .82 + .1 * Math.sin(t * 1.7) + .05 * Math.sin(t * 4.3);
     drawGlow(c, x, y - 37, 22, FC.light, .4 * a); c.fillStyle = FC.light; c.globalAlpha = a; c.fillRect(x - 4, y - 40.5, 8, 6); c.globalAlpha = 1;
     c.fillStyle = '#1d0f12'; c.fillRect(x - .4, y - 40.5, .8, 6);
     drawGlow(c, x + 13, y - 20, 18, '#ffcf87', .35 + .05 * Math.sin(t * 2.3)); c.fillStyle = '#ffd796'; c.fillRect(x + 11.6, y - 22, 2.8, 3.6); }
+  }
+  if (seen('fireflies')) {
   for (let i = 0; i < 4; i++) {
     const x = 150 + 40 * Math.sin(t * (.2 + i * .03) + i * 2.1), y = V.G - 14 - 10 * (.5 + .5 * Math.sin(t * (.3 + i * .02) + i));
     const a = Math.pow(Math.max(0, Math.sin(t * (.8 + i * .07) + i * 1.3)), 2); if (a < .02) continue;
     drawGlow(c, x, y, 6, COL.fly, a * .7); c.globalAlpha = a; c.fillStyle = '#fff6c8'; c.fillRect(x - .5, y - .5, 1, 1); c.globalAlpha = 1;
+  }
   }
 }
 
@@ -4524,10 +4570,13 @@ function landPark(c, V) {
   c.fillStyle = '#0c1127'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
   for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, farY(V, x));
   c.lineTo(V.xr + 4, V.vh + 2); c.fill();
+  if (seen('trees')) {
   c.fillStyle = '#0a0e21';                              // a line of round trees along the far edge of the park
   for (const [x, r] of [[132, 7], [143, 9], [154, 6.4], [236, 8], [248, 10], [262, 7], [276, 8.6], [290, 6.4]]) {
     const y = farY(V, x) + 2; c.beginPath(); c.arc(x, y - r * .9, r, 0, TAU); c.fill(); c.fillRect(x - .8, y - 2, 1.6, 4);
   }
+  }
+  if (seen('bandstand')) {
   c.strokeStyle = '#141b38'; c.lineWidth = 1.4;          // the path, thin where it climbs the far slope to the bandstand
   c.beginPath(); c.moveTo(PARK_BANDSTAND, farY(V, PARK_BANDSTAND) + 1);
   c.quadraticCurveTo(170, farY(V, 175) + 8, 186, nearY(V, 186) - 2); c.stroke();
@@ -4536,9 +4585,11 @@ function landPark(c, V) {
     for (const dx of [-8, -3, 2, 7]) c.fillRect(x + dx, y - 11, 1, 8);
     c.beginPath(); c.moveTo(x - 11, y - 11); c.quadraticCurveTo(x - 5, y - 13, x - 2, y - 17); c.quadraticCurveTo(x, y - 19, x + 2, y - 17); c.quadraticCurveTo(x + 5, y - 13, x + 11, y - 11); c.closePath(); c.fill();
     c.fillRect(x - .4, y - 22, .8, 4); }
+  }
   c.fillStyle = '#090d1b'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
   for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, nearY(V, x));
   c.lineTo(V.xr + 4, V.vh + 2); c.fill();
+  if (seen('path')) {
   { // the path across the lawn: wide at our feet, curving away and narrowing towards the far slope
     const y0 = nearY(V, 186) - 1, y1 = V.vh + 2;
     const at = u => ({ x: lerp(186, 150, u) + 30 * Math.sin(u * Math.PI), y: lerp(y0, y1, u), w: lerp(1.4, 26, u * u) });
@@ -4546,11 +4597,15 @@ function landPark(c, V) {
     for (let i = 0; i <= 12; i++) { const p = at(i / 12); i ? c.lineTo(p.x - p.w / 2, p.y) : c.moveTo(p.x - p.w / 2, p.y); }
     for (let i = 12; i >= 0; i--) { const p = at(i / 12); c.lineTo(p.x + p.w / 2, p.y); }
     c.fill(); }
+  }
+  if (seen('oak')) {
   { const x = 36, y = nearY(V, 36) + 1;                // the big oak, well left of the moon
     c.fillStyle = '#141114'; c.beginPath(); c.moveTo(x - 6, y); c.quadraticCurveTo(x - 3, y - 20, x - 2, y - 40); c.lineTo(x + 2, y - 40); c.quadraticCurveTo(x + 3, y - 20, x + 6, y); c.fill();
     c.strokeStyle = '#141114'; c.lineWidth = 2.4; c.lineCap = 'round';
     c.beginPath(); c.moveTo(x - 1, y - 30); c.quadraticCurveTo(x - 12, y - 36, x - 22, y - 44); c.moveTo(x + 1, y - 34); c.quadraticCurveTo(x + 12, y - 40, x + 24, y - 46); c.stroke();
     c.fillStyle = '#0d1517'; for (let i = 0; i < 60; i++) { const a = rnd() * TAU, d = Math.sqrt(rnd()) * 30; c.beginPath(); c.ellipse(x + Math.cos(a) * d * 1.25, y - 62 + Math.sin(a) * d * .65, 5 + rnd() * 3, 3 + rnd() * 2, rnd() * 3, 0, TAU); c.fill(); } }
+  }
+  if (seen('lamps')) {
   for (const x of PARK_LAMPS) {                         // lamp posts and the warm pools under them (their lamps glow in livePark)
     const y = nearY(V, x) + 2;
     c.save(); c.translate(x, y); c.scale(1, .22); drawGlow(c, 0, 0, 30, '#ffcf87', .32); c.restore();
@@ -4558,10 +4613,14 @@ function landPark(c, V) {
     c.fillStyle = '#11141e'; c.fillRect(x - 2.6, y - 2, 5.2, 2); c.fillRect(x - 3.2, y - 34.6, 6.4, 1.2);
     c.beginPath(); c.moveTo(x - 4.2, y - 40.5); c.lineTo(x, y - 44.5); c.lineTo(x + 4.2, y - 40.5); c.closePath(); c.fill();
   }
+  }
+  if (seen('bench')) {
   { const x = 132, y = nearY(V, 132) + 3;              // the bench, in the first lamp's light
     c.fillStyle = '#3a2c22'; c.fillRect(x - 13, y - 7, 26, 2.2); c.fillRect(x - 13, y - 14, 26, 1.6); c.fillRect(x - 13, y - 11, 26, 1.6);
     c.fillStyle = '#16141a'; c.fillRect(x - 12, y - 14, 1.6, 14); c.fillRect(x + 10.4, y - 14, 1.6, 14);
     c.fillRect(x - 13.4, y - 9, 3, 1); c.fillRect(x + 10.4, y - 9, 3, 1); }
+  }
+  if (seen('fountain')) {
   { const x = PARK_FOUNTAIN, y = G + 3;                 // the fountain: a low stone basin (its water moves in livePark)
     c.fillStyle = '#1c2133'; c.beginPath(); c.ellipse(x, y, 44, 7.5, 0, 0, Math.PI); c.lineTo(x - 44, y - 4); c.ellipse(x, y - 4, 44, 7.5, 0, Math.PI, 0, true); c.lineTo(x + 44, y); c.fill();
     c.fillStyle = '#272d42'; c.beginPath(); c.ellipse(x, y - 4, 44, 7.5, 0, 0, TAU); c.fill();
@@ -4572,19 +4631,25 @@ function landPark(c, V) {
     c.fillStyle = '#272d42'; c.beginPath(); c.ellipse(x, y - 26, 12, 2.4, 0, 0, TAU); c.fill();
     c.fillStyle = '#122046'; c.beginPath(); c.ellipse(x, y - 26, 10, 1.6, 0, 0, TAU); c.fill();
     c.fillStyle = '#1c2133'; c.fillRect(x - 1.2, y - 34, 2.4, 8); }
+  }
+  if (seen('lawn')) {
   c.strokeStyle = '#142029'; c.lineWidth = .8;            // the lawn
   for (let x = V.xl; x < V.xr; x += 3 + rnd() * 5) {
     if (x > 212 && x < 312) continue;
     const y = nearY(V, x) + 1;
     for (let k = 0; k < 2; k++) { const h = 2 + rnd() * 4, lean = (rnd() - .5) * 4; c.beginPath(); c.moveTo(x + k, y); c.quadraticCurveTo(x + k, y - h * .6, x + k + lean, y - h); c.stroke(); }
   }
+  }
+  if (seen('daisies')) {
   for (const [x, dy] of [[64, 6], [88, 12], [308, 9], [372, 6], [226, 14]]) {   // a few daisies shut for the night
     const y = nearY(V, x) + dy; if (y > V.vh - 1) continue;
     c.fillStyle = 'rgba(214,206,186,.55)'; c.beginPath(); c.arc(x, y, .9, 0, TAU); c.arc(x + 4, y + 1.5, .8, 0, TAU); c.fill();
   }
+  }
 }
 /** The park's live parts: the lamps, the fountain's jet and the glints on its water, the bandstand's little lights, moths at a lamp. */
 function livePark(c, V, t) {
+  if (seen('lamps')) {
   for (const [i, x] of PARK_LAMPS.entries()) {
     const y = nearY(V, x) + 2, a = .85 + .06 * Math.sin(t * 1.3 + i * 2) + .04 * Math.sin(t * 3.7 + i);
     drawGlow(c, x, y - 37, 30, '#ffcf87', .48 * a);
@@ -4596,6 +4661,8 @@ function livePark(c, V, t) {
       c.fillStyle = 'rgba(240,226,200,.75)'; c.fillRect(mx - .6, my - .4, 1.2, .8);
     }
   }
+  }
+  if (seen('fountain')) {
   { const x = PARK_FOUNTAIN, y = V.G + 3;              // the jet: drops rise and fall back into the bowl and the basin
     c.fillStyle = 'rgba(205,226,245,.7)';
     for (let k = 0; k < 14; k++) {
@@ -4618,11 +4685,14 @@ function livePark(c, V, t) {
       c.strokeStyle = `rgba(200,215,240,${.25 * (1 - p)})`; c.lineWidth = .5; c.beginPath(); c.ellipse(rx, y - 1, 1 + p * 4, (1 + p * 4) * .3, 0, 0, TAU); c.stroke();
     }
   }
+  }
+  if (seen('bandlights')) {
   { const x = PARK_BANDSTAND, y = farY(V, x) + 1 - 10.6; // the bandstand's string of lights, far off
     for (let k = 0; k < 5; k++) {
       const lx = x - 9 + k * 4.5, ly = y + 1.6 * Math.sin((k / 4) * Math.PI), a = .55 + .35 * Math.sin(t * 1.1 + k * 1.9);
       drawGlow(c, lx, ly, 3.2, '#ffd27a', a * .6); c.globalAlpha = a; c.fillStyle = ['#ffd27a', '#f7a3a3', '#b8e0a8'][k % 3]; c.fillRect(lx - .4, ly - .4, .8, .8); c.globalAlpha = 1;
     }
+  }
   }
 }
 
@@ -4990,6 +5060,7 @@ function landLane(c, V) {
   c.fillStyle = '#0c1127'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
   for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, farY(V, x));
   c.lineTo(V.xr + 4, V.vh + 2); c.fill();
+  if (seen('town')) {
   // The rest of the town on the far hill: a few roofs and a steeple, all dark.
   c.fillStyle = '#0a0e20';
   for (const [x, w, h] of [[-6, 14, 8], [12, 10, 10], [26, 16, 7], [106, 12, 8], [120, 14, 10], [330, 12, 7]]) {
@@ -4998,17 +5069,20 @@ function landLane(c, V) {
   }
   { const x = 124, y = farY(V, 124) + 3; c.fillRect(x - 4, y - 16, 8, 19); tri(c, x - 4.6, y - 16, x, y - 32, x + 4.6, y - 16); }
   c.fillStyle = '#3a3448'; c.fillRect(30, farY(V, 33) - 4, 2, 2);   // one far window, still lit
+  }
 
   c.fillStyle = '#090d1b'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
   for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, nearY(V, x));
   c.lineTo(V.xr + 4, V.vh + 2); c.fill();
 
+  if (seen('cottage')) {
   { const x = 52, y = nearY(V, 52) + 1;                // a cottage on its own, with a rounded thatch
     c.fillStyle = '#121729'; c.fillRect(x - 22, y - 22, 44, 23);
     c.fillStyle = '#0d1122'; c.beginPath(); c.moveTo(x - 27, y - 20); c.quadraticCurveTo(x - 26, y - 40, x, y - 42); c.quadraticCurveTo(x + 26, y - 40, x + 27, y - 20); c.closePath(); c.fill();
     c.fillRect(x + 8, y - 46, 8, 12);                  // its chimney (smoke in liveLane)
     c.fillStyle = '#1a2036'; c.fillRect(x - 15, y - 15, 8, 7); c.fillRect(x + 7, y - 15, 8, 7);
     c.fillStyle = '#0a0d1a'; c.fillRect(x - 3, y - 13, 7, 14); }
+  }
 
   for (const hse of LANE_ROW) {                        // the terrace
     const x = hse.x, y = nearY(V, x + LANE_W / 2) + 1;
@@ -5028,6 +5102,7 @@ function landLane(c, V) {
     c.fillRect(x - 5, y + 2, 10, 20); c.fillRect(x - 3.6, y - .6, 2.4, 3); c.fillRect(x + 1.2, y, 2.4, 2.6);
   }
 
+  if (seen('wall')) {
   c.fillStyle = '#151a2b';                             // the garden wall in front of the terrace, a gap for each gate
   for (let x = 128; x < 300; x += 2) {
     const gate = LANE_ROW.some(h => Math.abs(x - (h.x + (h.door ? 29 : 12))) < 6);
@@ -5039,20 +5114,28 @@ function landLane(c, V) {
     const gx = h.x + (h.door ? 29 : 12), y = nearY(V, gx) + 2;
     c.fillStyle = '#1c2236'; c.fillRect(gx - 7.5, y - 9, 2.4, 9); c.fillRect(gx + 5.1, y - 9, 2.4, 9);
   }
+  }
 
+  if (seen('hedge')) {
   c.fillStyle = '#0c141a';                             // a hedge along the right, under the moon
   for (let i = 0; i < 34; i++) { const x = 318 + rnd() * (V.xr - 318), y = nearY(V, x) - 2 - rnd() * 7; c.beginPath(); c.ellipse(x, y, 4 + rnd() * 3, 3 + rnd() * 2, 0, 0, TAU); c.fill(); }
   c.fillRect(318, nearY(V, 318) - 5, V.xr - 318, 7);
+  }
+  if (seen('postbox')) {
   { const x = 314, y = nearY(V, 314) + 2;              // the post box
     c.fillStyle = '#3a1a20'; c.fillRect(x - 4.5, y - 15, 9, 15);
     c.beginPath(); c.ellipse(x, y - 15, 5.2, 3.2, 0, Math.PI, 0); c.fill();
     c.fillStyle = '#2a1015'; c.fillRect(x - 5.2, y - 15.4, 10.4, 1.4); c.fillRect(x - 3, y - 11, 6, 1); c.fillRect(x - 5, y - 1.4, 10, 1.4); }
+  }
+  if (seen('lamps')) {
   for (const lx of [104, 350]) {                       // the lamp posts (their light is in liveLane)
     const y = nearY(V, lx) + 2;
     c.strokeStyle = '#11141e'; c.lineWidth = 2; c.beginPath(); c.moveTo(lx, y); c.lineTo(lx, y - 36); c.stroke();
     c.fillStyle = '#11141e'; c.fillRect(lx - 3, y - 3, 6, 3); c.fillRect(lx - 3.6, y - 36.6, 7.2, 1.4);
     c.beginPath(); c.moveTo(lx - 4.4, y - 42); c.lineTo(lx, y - 46); c.lineTo(lx + 4.4, y - 42); c.closePath(); c.fill();
   }
+  }
+  if (seen('cobbles')) {
   c.fillStyle = '#121728';                             // cobbles down the lane
   for (let y0 = 0; y0 < 30; y0 += 3.4) {
     const off = (y0 / 3.4) % 2 ? 3 : 0;
@@ -5061,11 +5144,13 @@ function landLane(c, V) {
       c.beginPath(); c.ellipse(x + rnd(), y, 2.4, 1.1, 0, 0, TAU); c.fill();
     }
   }
+  }
 }
 /** The lane's live parts: lit windows (some flickering, one up for a feed), the lamps, chimney smoke, a moth or two at the lamp. */
 function liveLane(c, V, t) {
   for (const hse of LANE_ROW) {
     for (const [w, how] of hse.lit) {
+      if (how === 'feed' ? !seen('feed') : !seen('windows')) continue;   // lit windows (and someone up for a feed) come with the lane's scenery
       const r = laneWindow(V, hse, w);
       let a = 1;
       if (how === 'flicker') a = .78 + .1 * Math.sin(t * 2.3 + hse.x) + .06 * Math.sin(t * 5.7 + hse.x * .3) + .04 * Math.sin(t * 11.3);
@@ -5078,9 +5163,12 @@ function liveLane(c, V, t) {
       if (w === 'd') { c.fillStyle = 'rgba(19,24,48,.55)'; c.fillRect(r.x, r.y, 2.6, r.h); c.fillRect(r.x + r.w - 2.6, r.y, 2.6, r.h); }   // half-drawn curtains
     }
   }
+  if (seen('cottage')) {
   { const x = 52, y = nearY(V, 52) + 1, a = .8 + .08 * Math.sin(t * 1.9) + .05 * Math.sin(t * 4.7);   // the cottage's front window, by the fire
     drawGlow(c, x - 11, y - 11, 14, '#ffbf6a', .4 * a); c.globalAlpha = a; c.fillStyle = '#ffbf6a'; c.fillRect(x - 15, y - 15, 8, 7); c.globalAlpha = 1;
     c.fillStyle = '#121729'; c.fillRect(x - 11.5, y - 15, 1, 7); }
+  }
+  if (seen('lamps')) {
   for (const lx of [104, 350]) {
     const y = nearY(V, lx) + 2, a = .95 + .05 * Math.sin(t * 3.1 + lx);
     drawGlow(c, lx, y - 2, 22, '#ffcf87', .1 * a);
@@ -5091,9 +5179,11 @@ function liveLane(c, V, t) {
     const a = t * (1.6 + i * .5) + i * 2.4, x = 104 + Math.cos(a) * (6 + i * 2), y = nearY(V, 104) + 2 - 40 + Math.sin(a * 1.3) * 4;
     c.fillStyle = 'rgba(230,220,200,.75)'; c.fillRect(x - .7, y - .5, 1.4, 1);
   }
+  }
   // Smoke: a thin plume of many faint puffs, so it reads as one soft curl.
   // The curl's wave travels up it slowly, and it leans off with the breeze.
   for (const [k, ch] of laneChimneys(V).entries()) {
+    if (!seen('smoke') || (k === 0 && !seen('cottage'))) continue;   // the first chimney is the cottage's
     for (let i = 0; i < 26; i++) {
       const p = i / 26, x = ch.x + p * p * 12 + Math.sin(p * 7 - t * .7 + k * 2) * (.6 + p * 3), y = ch.y - 1 - p * 32;
       c.fillStyle = `rgba(150,158,192,${.1 * (1 - p) * Math.min(1, p * 8 + .3)})`;
@@ -5538,16 +5628,20 @@ function landHarbour(c, V) {
   harbourHill(c, V, [[V.xl - 4, 17], [16, 19], [42, 15], [68, 9], [92, 3.4], [112, 0]], '#0b1028');
   harbourHill(c, V, [[256, 0], [278, 5], [300, 12], [320, 17], [336, 18], [350, 12], [366, 7], [386, 5], [V.xr + 4, 6]], '#0a0e24');
   c.fillStyle = 'rgba(120,132,192,.22)'; c.fillRect(V.xl, H - .3, V.xr - V.xl + 4, .7);   // where the sea meets the sky
+  if (seen('cottage')) {
   { const x = 30, y = H - 18;                          // a cottage up on the left headland, a light still on
     c.fillStyle = '#070a1a'; c.fillRect(x - 7, y - 8, 14, 9);
     c.beginPath(); c.moveTo(x - 9, y - 7.5); c.lineTo(x, y - 14); c.lineTo(x + 9, y - 7.5); c.closePath(); c.fill();
     c.fillRect(x + 4, y - 15, 2.4, 5);
     drawGlow(c, x - 2.5, y - 4, 10, '#f2b866', .5); c.fillStyle = '#f2b866'; c.fillRect(x - 4, y - 5.6, 3, 2.8); }
+  }
+  if (seen('lighthouse')) {
   { const x = HARBOUR_LIGHT, y = H - 17.4;             // the lighthouse: white, two dark bands (its lamp and beam are live)
     c.fillStyle = '#3a4060'; c.beginPath(); c.moveTo(x - 3.4, y); c.lineTo(x - 2.3, y - 19); c.lineTo(x + 2.3, y - 19); c.lineTo(x + 3.4, y); c.closePath(); c.fill();
     c.fillStyle = '#222740'; c.fillRect(x - 3.1, y - 7, 6.2, 2.4); c.fillRect(x - 2.7, y - 13.4, 5.4, 2.4);
     c.fillRect(x - 3.4, y - 19.6, 6.8, 1); c.fillRect(x - 1.8, y - 23.6, .5, 4); c.fillRect(x + 1.3, y - 23.6, .5, 4);
     c.beginPath(); c.ellipse(x, y - 23.6, 2.5, 2, 0, Math.PI, 0); c.fill(); }
+  }
 
   // The quay, in two halves either side of the slip.
   c.fillStyle = '#0d1120'; harbourQuay(c, V, true); c.fill(); harbourQuay(c, V, false); c.fill();
@@ -5573,6 +5667,7 @@ function landHarbour(c, V) {
   for (let x = Math.ceil(V.xl / 9) * 9; x <= V.xr; x += 9) { if (x > sa - 2 && x < sb + 2) continue; const y = nearY(V, x); c.moveTo(x, y); c.lineTo(x, y + 2.2); }
   c.stroke();
 
+  if (seen('bridge')) {
   // The footbridge across the slip's mouth: posts in the water, a deck, a rail.
   { const deck = x => nearY(V, x) - .4;
     c.strokeStyle = '#121019'; c.lineWidth = 1.4; c.beginPath();
@@ -5589,25 +5684,34 @@ function landHarbour(c, V) {
     for (let x = sa; x <= sb; x += 3) { x === sa ? c.moveTo(x, deck(x) - 7) : c.lineTo(x, deck(x) - 7); }
     for (let x = sa; x <= sb; x += 11) { c.moveTo(x, deck(x) - 7); c.lineTo(x, deck(x) - 1); }
     c.stroke(); }
+  }
 
   // On the left quay: a bollard, a coil of rope, a stack of lobster pots, another bollard, the lamp.
   harbourBollard(c, 30, nearY(V, 30) + 3);
+  if (seen('pots')) {
   { const x = 84, y = nearY(V, 84) + 7;
     c.strokeStyle = '#2b2722'; c.lineWidth = 1;
     for (let k = 0; k < 4; k++) { c.beginPath(); c.ellipse(x, y - k * .9, 6 - k * .8, 2.2 - k * .3, 0, 0, TAU); c.stroke(); } }
   { const y = nearY(V, 110) + 5;
     harbourPot(c, 100, y, 7.5); harbourPot(c, 116, y + .6, 7.5); harbourPot(c, 108, y - 7.6, 7);
     c.fillStyle = '#4a2c24'; ell(c, 126, y - .8, 2.6, 2.2); c.fillStyle = '#5c372c'; ell(c, 125.4, y - 1.6, 1.2, .7); }
+  }
   harbourBollard(c, 184, nearY(V, 184) + 3);
+  if (seen('lamp')) {
   { const x = 197, y = nearY(V, 197) + 3;                 // the quay lamp (lit in liveHarbour)
     drawGlow(c, x, y, 22, '#ffcf87', .1);
     c.strokeStyle = '#11141e'; c.lineWidth = 2; c.beginPath(); c.moveTo(x, y); c.lineTo(x, y - 30); c.stroke();
     c.fillStyle = '#11141e'; c.fillRect(x - 3.2, y - 30.6, 6.4, 1.2); }
+  }
   // On the right quay: a bollard, a pot and its float.
   harbourBollard(c, 330, nearY(V, 330) + 3);
+  if (seen('pots')) {
   { const y = nearY(V, 386) + 6; harbourPot(c, 386, y, 7.5); c.fillStyle = '#4a2c24'; ell(c, 397, y - 1, 2.6, 2.2); }
+  }
+  if (seen('pebbles')) {
   c.fillStyle = 'rgba(30,40,58,.5)';                       // weed and pebbles in the joints
   for (let i = 0; i < 26; i++) { const x = lerp(V.xl, V.xr, rnd()); if (x > sa - 4 && x < sb + 12) continue; const y = nearY(V, x) + 3 + rnd() * 18; if (y < V.vh) { c.fillRect(x, y, .8 + rnd(), .5); } }
+  }
 }
 
 /** The harbour's live parts: the moon on the sea, the lighthouse beam, the two boats, the quay lamp, ripples in the slip. */
@@ -5623,6 +5727,7 @@ function liveHarbour(c, V, t) {
     c.fillRect(m.x + dx - w / 2, y, w, .6 + u * .5);
   }
   // Now and then a glint of moonlight further out.
+  if (seen('glints')) {
   for (let i = 0; i < 10; i++) {
     const x = V.xl + ((i * 97.3 + 40) % (V.xr - V.xl)), y = H + 3 + ((i * 13.7) % 22);
     if (y > nearY(V, x) - 3) continue;
@@ -5630,12 +5735,15 @@ function liveHarbour(c, V, t) {
     if (a < .02) continue;
     c.fillStyle = `rgba(214,222,245,${a})`; c.fillRect(x - 1.4, y, 2.8, .5);
   }
+  }
 
   // The lighthouse. Its beam turns slowly (about 19 s a turn): seen side-on it
   // reaches out long and faint, turning toward you it shortens to nothing and
   // the lamp warms a little. No flash. The moon is left out of it.
+  if (seen('lighthouse')) {
   { const x = HARBOUR_LIGHT, y = H - 17.4 - 21.6, th = t * .33, side = Math.cos(th), f = Math.pow(Math.max(0, Math.sin(th)), 2);
     const len = 150 * Math.abs(side), s = Math.sign(side) || 1;
+    if (seen('beam')) {
     if (len > 2) {
       c.save(); c.beginPath(); c.rect(V.xl - 10, -10, V.xr - V.xl + 20, V.vh + 20); c.arc(m.x, m.y, 16, 0, TAU); c.clip('evenodd');
       const g = c.createLinearGradient(x, y, x + s * len, y);
@@ -5643,12 +5751,15 @@ function liveHarbour(c, V, t) {
       c.fillStyle = g; c.beginPath(); c.moveTo(x, y - 1); c.lineTo(x + s * len, y - 1 - len * .08); c.lineTo(x + s * len, y + 1 + len * .05); c.lineTo(x, y + 1); c.closePath(); c.fill();
       c.restore();
     }
+    }
     drawGlow(c, x, y, 9 + 5 * f, '#ffe3a0', .4 + .25 * f);
     c.fillStyle = '#ffeab4'; c.fillRect(x - 1.5, y - 1.6, 3, 3.2);
+  }
   }
 
   // Two boats in for the night, bobbing: a fishing boat moored to the
   // bollard, and a rowing boat further out. Only what's above the water is drawn.
+  if (seen('boat')) {
   { const x = 140, w = G - 14 + Math.sin(t * .8) * .7, tilt = Math.sin(t * .6 + 1) * .035;
     c.fillStyle = 'rgba(5,8,20,.5)'; ell(c, x, w + 1.4, 15, 1.6);
     for (let k = 0; k < 4; k++) {                          // the mast lantern's reflection
@@ -5669,6 +5780,8 @@ function liveHarbour(c, V, t) {
     const bx = 184, by = nearY(V, 184) - 3;                   // the mooring line, from the bow to the bollard
     c.strokeStyle = 'rgba(48,46,52,.9)'; c.lineWidth = .5; c.beginPath(); c.moveTo(x + 15.5, w - 8.4); c.quadraticCurveTo((x + 15.5 + bx) / 2, Math.max(w - 8.4, by) + 4, bx, by); c.stroke();
   }
+  }
+  if (seen('rowboat')) {
   { const x = 262, w = G - 21 + Math.sin(t * .7 + 2) * .5, tilt = Math.sin(t * .5 + 3) * .05;
     c.fillStyle = 'rgba(5,8,20,.45)'; ell(c, x, w + 1, 8, 1.1);
     c.save(); c.translate(x, w); c.rotate(tilt);
@@ -5676,6 +5789,7 @@ function liveHarbour(c, V, t) {
     c.fillStyle = '#151b36'; c.beginPath(); c.moveTo(-8, -3); c.quadraticCurveTo(0, -2, 8.4, -4.2); c.quadraticCurveTo(7, -.4, 5, 0); c.lineTo(-6, 0); c.quadraticCurveTo(-7.6, -.6, -8, -3); c.fill();
     c.strokeStyle = '#3b4672'; c.lineWidth = .5; c.beginPath(); c.moveTo(-8, -3); c.quadraticCurveTo(0, -2, 8.4, -4.2); c.stroke();
     c.restore();
+  }
   }
 
   // Water lapping in the slip, and the quay lamp's light on it.
@@ -5685,14 +5799,18 @@ function liveHarbour(c, V, t) {
     c.fillStyle = `rgba(120,140,200,${.12 + .06 * Math.sin(t + k)})`; c.fillRect(x, y, 7 + k, .5);
   }
   const la = .85 + .08 * Math.sin(t * 1.9) + .04 * Math.sin(t * 5.1);
+  if (seen('lamp')) {
   for (let k = 0; k < 6; k++) {
     const y = G + 2 + k * 3, ww = 3 + k * .6 + Math.sin(t * 1.2 + k * 1.9) * 1.2;
     c.fillStyle = `rgba(255,207,135,${(.2 - k * .028) * la})`; c.fillRect(sa + 3 + Math.sin(t * .9 + k * 2.4) * 1.4, y, ww, .6);
   }
+  }
   c.restore();
+  if (seen('lamp')) {
   { const x = 197, y = nearY(V, 197) + 3 - 33;
     drawGlow(c, x, y, 24, '#ffcf87', .42 * la); c.globalAlpha = la; c.fillStyle = '#ffd796'; c.fillRect(x - 2.2, y - 2.6, 4.4, 5); c.globalAlpha = 1;
     c.fillStyle = '#11141e'; c.beginPath(); c.moveTo(x - 3.8, y - 2.6); c.lineTo(x, y - 6.2); c.lineTo(x + 3.8, y - 2.6); c.closePath(); c.fill(); }
+  }
 }
 
 /* ============================================================
@@ -6110,19 +6228,24 @@ function landChapel(c, V) {
   c.fillStyle = '#0c1127'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
   for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, farY(V, x));
   c.lineTo(V.xr + 4, V.vh + 2); c.fill();
+  if (seen('farms')) {
   c.fillStyle = '#0a0e21';                              // a few far trees, and a farmhouse light or two (in liveChapel)
   for (const [x, r] of [[262, 6], [272, 8], [283, 5.6], [338, 6.4], [350, 5]]) { const y = farY(V, x) + 2; c.beginPath(); c.arc(x, y - r * .9, r, 0, TAU); c.fill(); }
+  }
   // The churchyard: a gentle rise the chapel stands on, between the far hills and the wall.
   const rise = x => B + 1 + Math.pow((x - 180) / 150, 2) * 9;
   c.fillStyle = '#0b1023'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
   for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, Math.min(rise(x), nearY(V, x) - 1));
   c.lineTo(V.xr + 4, V.vh + 2); c.fill();
+  if (seen('path')) {
   { // the path, from the lychgate up to the door, narrowing as it goes
     const at = u => ({ x: lerp(CHAPEL_GATE, CHAPEL_X, u) + 14 * Math.sin(u * Math.PI), y: lerp(nearY(V, CHAPEL_GATE) - 1, B + .6, Math.pow(u, .8)), w: lerp(9, 3.2, u) });
     c.fillStyle = '#141a33'; c.beginPath();
     for (let i = 0; i <= 14; i++) { const p = at(i / 14); i ? c.lineTo(p.x, p.y - p.w * .22) : c.moveTo(p.x, p.y - p.w * .22); }
     for (let i = 14; i >= 0; i--) { const p = at(i / 14); c.lineTo(p.x, p.y + p.w * .22); }
     c.fill(); }
+  }
+  if (seen('tower')) {
   { const x = 103, w = 24, top = B - 43;               // the bell tower, at the west end
     c.fillStyle = '#181d33'; c.fillRect(x - w / 2, top, w, B - top + 1);
     c.fillStyle = '#12162a'; c.fillRect(x + w / 2 - 6, top, 6, B - top + 1);   // its shadowed side
@@ -6134,6 +6257,7 @@ function landChapel(c, V) {
     c.fillStyle = '#0a0c17'; c.fillRect(x - 1.8, top + 22, 1.6, 6);           // a slit window
     c.strokeStyle = '#1c2139'; c.lineWidth = .6;                               // courses of stone, faint
     for (let y = top + 6; y < B; y += 7) { c.beginPath(); c.moveTo(x - w / 2, y); c.lineTo(x + w / 2 - 6, y); c.stroke(); } }
+  }
   { // the nave, running back from the west front, with its long roof
     const x0 = CHAPEL_X + 28, x1 = 238, eave = B - 26, ridge = B - 45;
     c.fillStyle = '#151a2f'; c.fillRect(x0, eave, x1 - x0, B - eave + 1);
@@ -6158,6 +6282,7 @@ function landChapel(c, V) {
     c.fillStyle = '#20253f'; c.fillRect(x - 9, B - .4, 18, 1.6);               // the step
     c.fillStyle = '#11141f'; c.fillRect(x + 11.4, B - 12, .8, 3); c.fillRect(x + 10.4, B - 9.4, 3, .7);   // the lantern's bracket (its light is in liveChapel)
   }
+  if (seen('yew')) {
   { const x = 44, y = nearY(V, 44) + 1;                 // the old yew: dark, broad and dense, older than the chapel
     c.fillStyle = '#16120f'; c.beginPath(); c.moveTo(x - 7, y); c.quadraticCurveTo(x - 3, y - 8, x - 4, y - 14); c.lineTo(x + 4, y - 14); c.quadraticCurveTo(x + 3, y - 8, x + 8, y); c.fill();
     c.fillStyle = '#0a1412';                                                   // clumps of foliage in a broad, rounded cone
@@ -6171,6 +6296,8 @@ function landChapel(c, V) {
       const u = rnd(), half = 25 * (1 - Math.pow(u, 1.7)) + 4, cx = x + (.25 + rnd() * .6) * half * .85, cy = y - 11 - u * 38;
       c.beginPath(); c.ellipse(cx, cy, 3 + rnd() * 2.4, 1.6 + rnd(), (rnd() - .5) * .4, Math.PI, TAU); c.fill();
     } }
+  }
+  if (seen('headstones')) {
   for (const [x, h, lean] of [[256, 8, -.08], [272, 9.6, .05], [290, 7.4, .12]]) {   // a few old headstones, soft-edged and leaning
     const y = rise(x) + 1;
     c.save(); c.translate(x, y); c.rotate(lean);
@@ -6180,6 +6307,7 @@ function landChapel(c, V) {
   }
   c.fillStyle = 'rgba(214,206,186,.5)';                 // somebody's left flowers
   c.beginPath(); c.arc(273.6, rise(273) - .4, .8, 0, TAU); c.arc(275.2, rise(275) - 1.2, .7, 0, TAU); c.arc(276.4, rise(276) - .2, .7, 0, TAU); c.fill();
+  }
   c.fillStyle = '#090d1b'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
   for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, nearY(V, x));
   c.lineTo(V.xr + 4, V.vh + 2); c.fill();
@@ -6193,6 +6321,7 @@ function landChapel(c, V) {
     c.strokeStyle = '#0e111e'; c.lineWidth = .5;
     for (let x = a + 2, k = 0; x < b; x += 4.6, k++) { const y = nearY(V, x) - WH + 1.5 + (k % 2) * 1.8; c.beginPath(); c.moveTo(x, y); c.lineTo(x + 2.4, y); c.stroke(); }
   }
+  if (seen('lychgate')) {
   { const x = CHAPEL_GATE, y = nearY(V, x) + 1, ph = 17;   // the lychgate: two posts, a little roof, and the gate left ajar
     c.fillStyle = '#17131a'; c.fillRect(x - 11, y - ph, 2.6, ph); c.fillRect(x + 8.4, y - ph, 2.6, ph);
     c.fillRect(x - 12, y - ph - 1, 24, 2);
@@ -6201,6 +6330,7 @@ function landChapel(c, V) {
     c.strokeStyle = '#1e2338'; c.lineWidth = 1; c.beginPath(); c.moveTo(x - 16, y - ph + 1); c.lineTo(x, y - ph - 10); c.lineTo(x + 16, y - ph + 1); c.stroke();
     c.strokeStyle = '#2b2226'; c.lineWidth = .9;                               // the gate, swung half open
     c.beginPath(); c.moveTo(x - 8.4, y - 2); c.lineTo(x - 2, y - 3.4); c.moveTo(x - 8.4, y - 8); c.lineTo(x - 2, y - 9.4); c.moveTo(x - 2, y - 3.4); c.lineTo(x - 2, y - 9.4); c.moveTo(x - 5, y - 2.7); c.lineTo(x - 5, y - 8.7); c.stroke(); }
+  }
   c.strokeStyle = '#142029'; c.lineWidth = .8;          // grass along the foot of the wall
   for (let x = V.xl; x < V.xr; x += 3 + rnd() * 5) {
     if (Math.abs(x - CHAPEL_GATE) < 10) continue;
@@ -6211,23 +6341,30 @@ function landChapel(c, V) {
 /** The chapel's live parts: the west window's slow shimmer, the side windows and the door lantern, and the candles in jars up the path. */
 function liveChapel(c, V, t) {
   const B = V.G - CHAPEL_LIFT, x = CHAPEL_X, W = CHAPEL_WIN;
+  if (seen('glass')) {
   { // the stained glass, as if a candle burns just inside: each pane breathes a little on its own
     const a0 = .72 + .07 * Math.sin(t * .7) + .04 * Math.sin(t * 1.9);
     drawGlow(c, x, B - (W.y0 + W.y2) / 2, 30, '#f2c27e', .28 * a0);
     chapelGlass(c, x, W.w, B - W.y0, B - W.y1, B - W.y2, i => a0 * (.86 + .14 * Math.sin(t * (.5 + (i % 5) * .09) + i * 1.7)));
     c.strokeStyle = 'rgba(42,38,48,.9)'; c.lineWidth = .6; chapelArch(c, x, W.w, B - W.y0, B - W.y1, B - W.y2); c.stroke();
   }
+  }
+  if (seen('lancets')) {
   for (const [i, lx] of CHAPEL_LANCETS.entries()) {      // the side windows: plain glass, warm
     const a = .7 + .08 * Math.sin(t * 1.1 + i * 2.3) + .04 * Math.sin(t * 3.1 + i);
     drawGlow(c, lx, B - 13, 10, '#ffcf87', .3 * a);
     c.globalAlpha = a; c.fillStyle = '#f2c27e'; chapelArch(c, lx, 4, B - 7, B - 15.4, B - 19.6); c.fill(); c.globalAlpha = 1;
     c.fillStyle = 'rgba(42,30,30,.7)'; c.fillRect(lx - 2, B - 12, 4, .5);
   }
+  }
+  if (seen('lantern')) {
   { const lx = x + 11.8, ly = B - 14.6, a = .85 + .06 * Math.sin(t * 1.4) + .04 * Math.sin(t * 4.1);   // the lantern by the door
     drawGlow(c, lx, ly, 16, '#ffcf87', .42 * a);
     c.fillStyle = '#11141f'; c.fillRect(lx - 1.8, ly - 3.4, 3.6, .8);
     c.globalAlpha = a; c.fillStyle = '#ffd796'; c.fillRect(lx - 1.4, ly - 2.6, 2.8, 3.6); c.globalAlpha = 1;
   }
+  }
+  if (seen('jars')) {
   for (const [i, [jx, u]] of CHAPEL_JARS.entries()) {     // candles in jars, up the path: each flickers on its own
     const jy = lerp(nearY(V, CHAPEL_GATE) - 1, B + .6, Math.pow(u, .8)) - .4;
     const f = .8 + .1 * Math.sin(t * 2.3 + i * 1.9) + .06 * Math.sin(t * 5.7 + i * 3.1), k = 1 - u * .35;
@@ -6235,9 +6372,12 @@ function liveChapel(c, V, t) {
     c.fillStyle = `rgba(190,200,220,${.28})`; c.fillRect(jx - 1.4 * k, jy - 3.4 * k, 2.8 * k, 3.4 * k);   // the jar
     c.globalAlpha = f; c.fillStyle = '#ffe2a0'; c.fillRect(jx - .45 * k, jy - 2.6 * k - .5 * Math.sin(t * 4 + i), .9 * k, 1.5 * k); c.globalAlpha = 1;
   }
+  }
+  if (seen('farms')) {
   for (const [i, fx] of [[0, 268], [1, 344]]) {           // a farmhouse light or two, far off
     const fy = farY(V, fx) + 2 - 2.4, a = .6 + .2 * Math.sin(t * .4 + i * 2);
     drawGlow(c, fx + 10, fy, 4, '#ffd27a', a * .5); c.fillStyle = `rgba(255,214,140,${a})`; c.fillRect(fx + 9.6, fy - .5, 1, 1);
+  }
   }
   if (churchSeason().name === 'christmas') drawCreche(c, V, t);
 }
@@ -6573,24 +6713,27 @@ function landNursery(c, V) {
   c.fillStyle = '#0c1127'; c.beginPath(); c.moveTo(V.xl, V.vh + 2);
   for (let x = V.xl; x <= V.xr + 4; x += 4) c.lineTo(x, farY(V, x));
   c.lineTo(V.xr + 4, V.vh + 2); c.fill();
+  if (seen('hedgerows')) {
   c.fillStyle = '#0a0e20';                             // the rest of the town, far off: a few roofs and the chapel's steeple
   for (const [x, w, h] of [[214, 12, 7], [228, 10, 9]]) {
     const y = farY(V, x + w / 2) + 3;
     c.fillRect(x, y - h, w, h + 3); tri(c, x - 1.5, y - h, x + w / 2, y - h - 5, x + w + 1.5, y - h);
   }
-  { const x = 252, y = farY(V, 252) + 3; c.fillRect(x - 4, y - 14, 8, 17); tri(c, x - 4.6, y - 14, x, y - 28, x + 4.6, y - 14); }
   c.fillStyle = '#0b1022';                             // hedgerows over the far fields
   for (let i = 0; i < 26; i++) { const x = -10 + rnd() * 120, y = farY(V, x) + 4 + (i % 2) * 6; c.beginPath(); c.ellipse(x, y, 3 + rnd() * 2, 1.6, 0, 0, TAU); c.fill(); }
+  }
 
   c.fillStyle = '#0b1024';                             // the house's hill
   c.beginPath(); c.moveTo(V.xl, V.vh + 2);
   for (let x = V.xl; x <= V.xr + 4; x += 2) c.lineTo(x, nurseryHillY(V, x));
   c.lineTo(V.xr + 4, V.vh + 2); c.fill();
 
+  if (seen('tree')) {
   { const x = 40, y = nurseryHillY(V, 40) + 1;         // an old apple tree on the hill
     c.fillStyle = '#121014'; c.beginPath(); c.moveTo(x - 3, y); c.quadraticCurveTo(x - 1, y - 14, x - 6, y - 24); c.lineTo(x - 3, y - 25); c.quadraticCurveTo(x + 1, y - 18, x + 2, y - 26); c.lineTo(x + 4, y - 25); c.quadraticCurveTo(x + 2, y - 12, x + 3, y); c.fill();
     c.fillStyle = '#0d1518'; for (let i = 0; i < 34; i++) { const a = rnd() * TAU, d = Math.sqrt(rnd()) * 17; c.beginPath(); c.ellipse(x + Math.cos(a) * d * 1.25, y - 32 + Math.sin(a) * d * .7, 5 + rnd() * 3, 3.4 + rnd() * 2, rnd() * 3, 0, TAU); c.fill(); }
     c.fillStyle = '#2a1e22'; for (let i = 0; i < 6; i++) { c.beginPath(); c.arc(x - 14 + rnd() * 28, y - 38 + rnd() * 14, 1.1, 0, TAU); c.fill(); } }   // a few apples
+  }
 
   const H = nurseryHouse(V), { x, w, base } = H, eave = base - 38;
   c.fillStyle = '#141a30'; c.fillRect(x, eave, w, base - eave + 4);                   // the walls
@@ -6610,6 +6753,7 @@ function landNursery(c, V) {
   c.fillStyle = '#20263e'; c.fillRect(dx - 7, base - 1, 14, 1.8);                     // the step
   c.fillStyle = '#0f1424'; c.fillRect(dx + 8.4, base - 15, 2.6, 4);                    // the porch lamp (lit in liveNursery)
 
+  if (seen('pram')) {
   { const px = x + w - 14, py = base;                  // the pram, parked by the door for the morning walk
     c.save(); c.translate(px, py); c.scale(.8, .8); c.translate(-px, -py);   // drawn at a size, then made pram-sized beside the door
     c.fillStyle = '#242a4c';
@@ -6618,23 +6762,29 @@ function landNursery(c, V) {
     c.strokeStyle = '#242a4c'; c.lineWidth = 1.1; c.beginPath(); c.moveTo(px + 8, py - 12); c.lineTo(px + 13, py - 18); c.lineTo(px + 15.5, py - 18); c.moveTo(px - 4, py - 5); c.lineTo(px - 4, py - 3); c.moveTo(px + 4, py - 5); c.lineTo(px + 4, py - 3); c.stroke();
     c.strokeStyle = '#3a4166'; c.lineWidth = 1; for (const wx of [px - 4.5, px + 4.5]) { c.beginPath(); c.arc(wx, py - 2.4, 2.6, 0, TAU); c.stroke(); }
     c.restore(); }
+  }
 
+  if (seen('path')) {
   c.fillStyle = '#0f1426';                             // the path, from the door down the hill to the gate
   c.beginPath();
   for (let u = 0; u <= 1.001; u += .05) { const px = lerp(dx, NURSERY_GATE, u) + Math.sin(u * Math.PI) * 6, py = lerp(base, nearY(V, NURSERY_GATE) + 1, u); c.lineTo(px - 2.6 - u * 3, py); }
   for (let u = 1; u >= -.001; u -= .05) { const px = lerp(dx, NURSERY_GATE, u) + Math.sin(u * Math.PI) * 6, py = lerp(base, nearY(V, NURSERY_GATE) + 1, u); c.lineTo(px + 2.6 + u * 3, py); }
   c.fill();
+  }
 
+  if (seen('hedge')) {
   c.fillStyle = '#0d141a';                             // a hedge by the house, and a rose under the window
   for (let i = 0; i < 14; i++) { const hx = x - 16 + rnd() * 14, hy = nurseryHillY(V, hx) - 2 - rnd() * 5; c.beginPath(); c.ellipse(hx, hy, 3.4 + rnd() * 2, 2.6 + rnd() * 1.4, 0, 0, TAU); c.fill(); }
   for (let i = 0; i < 9; i++) { const rx = x + 6 + i * 2.6; c.beginPath(); c.ellipse(rx, base - 1.5 - (i % 3) * 1.2, 2.6, 2.2, 0, 0, TAU); c.fill(); }
   c.fillStyle = '#3a2434'; for (let i = 0; i < 5; i++) { c.beginPath(); c.arc(x + 8 + rnd() * 20, base - 2.4 - rnd() * 2.4, .9, 0, TAU); c.fill(); }
+  }
 
   c.fillStyle = '#090d1b';                             // the near ground
   c.beginPath(); c.moveTo(V.xl, V.vh + 2);
   for (let x2 = V.xl; x2 <= V.xr + 4; x2 += 4) c.lineTo(x2, nearY(V, x2));
   c.lineTo(V.xr + 4, V.vh + 2); c.fill();
 
+  if (seen('fence')) {
   c.fillStyle = '#161b2d';                             // the picket fence along the front, and its gate
   for (let fx = V.xl + 1; fx < 262; fx += 4.2) {
     const gate = Math.abs(fx - NURSERY_GATE) < 7, y = nearY(V, fx) + 1, h = gate ? 9 : 8;
@@ -6643,9 +6793,12 @@ function landNursery(c, V) {
   c.fillStyle = '#131828';
   for (const ry of [3, 6.4]) { c.beginPath(); for (let fx = V.xl; fx <= 262; fx += 4) { const y = nearY(V, fx) + 1 - ry; fx === V.xl ? c.moveTo(fx, y) : c.lineTo(fx, y); } for (let fx = 262; fx >= V.xl; fx -= 4) c.lineTo(fx, nearY(V, fx) + 1 - ry + 1.1); c.fill(); }
   c.fillStyle = '#1c2236'; for (const gx of [NURSERY_GATE - 8.6, NURSERY_GATE + 7.4]) c.fillRect(gx, nearY(V, gx) - 11, 2.4, 12);   // gateposts
+  }
 
+  if (seen('washing')) {
   c.fillStyle = '#141a28';                             // the washing line's posts (the line and the washing are live)
   for (const lx of NURSERY_LINE) { const y = nearY(V, lx) + 2; c.fillRect(lx - 1, y - 28, 2, 28); c.fillRect(lx - 4, y - 28, 8, 1.6); }
+  }
   c.strokeStyle = '#142029'; c.lineWidth = .8;          // grass
   for (let gx = V.xl; gx < V.xr; gx += 3 + rnd() * 5) {
     const y = nearY(V, gx) + 1;
@@ -6662,17 +6815,20 @@ const NURSERY_WASHING = [[.12, 'vest', '#3e4568'], [.3, 'sock', '#46506e'], [.38
 /** The nursery's live parts: the lit nursery window with its mobile turning and a paper-star garland, the landing light over the door, the porch lamp, the washing swaying on the line. */
 function liveNursery(c, V, t) {
   const H = nurseryHouse(V), r = H.win, cx = r.x + r.w / 2;
+  if (seen('nursery')) {
   { const a = .9 + .06 * Math.sin(t * .9) + .03 * Math.sin(t * 2.3);   // a lamp turned low, breathing a little
     drawGlow(c, cx, r.y + r.h / 2, 30, NURSERYC.glow, .4 * a);
     const g = c.createLinearGradient(0, r.y, 0, r.y + r.h); g.addColorStop(0, '#ffe2a4'); g.addColorStop(1, '#f6b870');
     c.globalAlpha = a; c.fillStyle = g; c.fillRect(r.x, r.y, r.w, r.h); c.globalAlpha = 1;
     c.fillStyle = 'rgba(110,62,52,.55)'; c.fillRect(r.x, r.y, 3, r.h); c.fillRect(r.x + r.w - 3, r.y, 3, r.h);   // curtains, open a crack
+    if (seen('garland')) {
     // The paper-star garland, across the top of the window, swaying a little.
     c.strokeStyle = 'rgba(96,56,44,.7)'; c.lineWidth = .35; c.beginPath();
     for (let u = 0; u <= 1.001; u += .1) { const x = lerp(r.x + 2, r.x + r.w - 2, u), y = r.y + 1.2 + 4 * u * (1 - u) * 1.6; u ? c.lineTo(x, y) : c.moveTo(x, y); }
     c.stroke();
     c.fillStyle = 'rgba(96,56,44,.8)';
     for (const [k, u] of [.1, .27, .73, .9].entries()) { const sw = Math.sin(t * .8 + k * 1.7) * .25; nurseryStar(c, lerp(r.x + 2, r.x + r.w - 2, u) + sw, r.y + 2.3 + 4 * u * (1 - u) * 1.6, 1.1, sw); }
+    }
     // The cot mobile, a silhouette against the lamp: three shapes on a slow ring.
     const hy = r.y + 4.4, top = r.y;
     c.strokeStyle = 'rgba(80,46,36,.75)'; c.lineWidth = .3; c.beginPath(); c.moveTo(cx, top); c.lineTo(cx, hy); c.stroke();
@@ -6687,6 +6843,8 @@ function liveNursery(c, V, t) {
     }
     c.strokeStyle = '#141a30'; c.lineWidth = .8; c.strokeRect(r.x + .4, r.y + .4, r.w - .8, r.h - .8);   // the frame (one big pane, so the mobile shows)
   }
+  }
+  if (seen('porch')) {
   { const dx = H.x + 36, a = .55 + .04 * Math.sin(t * .7);       // the landing light, through the fanlight
     c.save(); c.beginPath(); c.arc(dx, H.base - 15, 4.2, Math.PI, 0); c.closePath(); c.clip();
     drawGlow(c, dx, H.base - 16, 6, NURSERYC.glow, a); c.restore();
@@ -6695,6 +6853,8 @@ function liveNursery(c, V, t) {
     drawGlow(c, lx, ly, 20, '#ffcf87', .38 * a); drawGlow(c, lx, H.base, 18, '#ffcf87', .1 * a);
     c.fillStyle = '#ffdc9c'; c.fillRect(lx - 1, ly - 1.4, 2, 2.8);
     for (let i = 0; i < 2; i++) { const m = t * (1.4 + i * .6) + i * 2.2; c.fillStyle = 'rgba(230,220,200,.7)'; c.fillRect(lx + Math.cos(m) * (4 + i * 2) - .5, ly + Math.sin(m * 1.3) * 3 - .4, 1, .8); } }
+  }
+  if (seen('washing')) {
   // The washing line, and what's on it, swaying in the night air.
   const [a0, a1] = NURSERY_LINE;
   c.strokeStyle = '#2a3048'; c.lineWidth = .5; c.beginPath();
@@ -6709,6 +6869,7 @@ function liveNursery(c, V, t) {
     else { c.beginPath(); c.moveTo(-4.4, 0); c.lineTo(4.4, 0); c.lineTo(4.8, 9); c.lineTo(-4, 9.6); c.closePath(); c.fill(); }
     c.fillStyle = '#5a5f7a'; c.fillRect(-.5, -1, 1, 2);   // a peg
     c.restore();
+  }
   }
 }
 
@@ -6729,6 +6890,7 @@ const AREAS = [
   },
   {
     id: 'farm', name: 'The Farm', items: FARM_ITEMS, art: FARM_ART, visitors: FARM_VISITORS,
+    scenery: [['fence', 'A fence round the field'], ['grass', 'Long grass'], ['bales', 'Hay bales'], ['fields', 'Ploughed fields, far off'], ['oak', 'An old oak'], ['silo', 'The silo'], ['fireflies', 'Fireflies over the field'], ['barn', 'The red barn'], ['windmill', 'The windmill'], ['loft', 'A light in the loft']],
     steeple: { x: 150 },   // the chapel, far off over the hills (drawFarSteeple)
     shapes: FARM_SHAPES, spots: FARM_SPOTS, renderLand: landFarm, drawLive: liveFarm, pond: null,
     opens: { from: 'garden', tier: OPEN_TIER, need: 'Grow a Firefly jar in the garden to open the lane to the farm.' },
@@ -6742,8 +6904,9 @@ const AREAS = [
   },
   {
     id: 'park', name: 'The Park', items: PARK_ITEMS, art: PARK_ART, visitors: PARK_VISITORS,
+    scenery: [['oak', 'The big oak'], ['trees', 'Trees along the far edge'], ['lawn', 'The lawn'], ['bench', 'A bench'], ['lamps', 'Lamp posts'], ['path', 'A path across the grass'], ['fountain', 'The fountain'], ['bandstand', 'The bandstand, far off'], ['daisies', 'Daisies, shut for the night'], ['bandlights', 'Lights on the bandstand']],
     steeple: { x: 300 },   // the chapel, far off over the hills (drawFarSteeple)
-    shapes: PARK_SHAPES, spots: PARK_SPOTS, renderLand: landPark, drawLive: livePark, pond: () => true,
+    shapes: PARK_SHAPES, spots: PARK_SPOTS, renderLand: landPark, drawLive: livePark, pond: () => seen('fountain'),
     opens: { from: 'farm', tier: OPEN_TIER, need: 'Raise a Red barn on the farm to open the gate to the park.' },
     map: { x: 82, y: 58, icon: 2 },
     words: { pouch: 'Acorns', last: 'the highest of all', book: 'Park book',
@@ -6755,6 +6918,7 @@ const AREAS = [
   },
   {
     id: 'lane', name: 'The Lane', items: LANE_ITEMS, art: LANE_ART, visitors: LANE_VISITORS,
+    scenery: [['cobbles', 'Cobbles down the lane'], ['wall', 'Garden walls and gates'], ['lamps', 'Lamp posts'], ['windows', 'Lights in the windows'], ['postbox', 'The post box'], ['hedge', 'A hedge'], ['town', 'The rest of the town, far off'], ['smoke', 'Smoke from the chimneys'], ['cottage', 'The thatched cottage'], ['feed', 'Someone else up for a feed']],
     steeple: { x: 318 },   // the chapel, far off over the hills (drawFarSteeple)
     shapes: LANE_SHAPES, spots: LANE_SPOTS, renderLand: landLane, drawLive: liveLane, pond: null,
     opens: { from: 'park', tier: OPEN_TIER, need: 'Put up a Bandstand in the park to open the lane.' },
@@ -6768,6 +6932,7 @@ const AREAS = [
   },
   {
     id: 'harbour', name: 'The Harbour', items: HARBOUR_ITEMS, art: HARBOUR_ART, visitors: HARBOUR_VISITORS,
+    scenery: [['pebbles', 'Weed and pebbles on the quay'], ['glints', 'Moonlight further out'], ['rowboat', 'A rowing boat'], ['pots', 'Lobster pots and rope'], ['cottage', 'A cottage on the headland'], ['boat', 'A fishing boat'], ['lamp', 'The quay lamp'], ['bridge', 'The footbridge'], ['lighthouse', 'The lighthouse'], ['beam', 'The lighthouse beam']],
     steeple: { x: 60, y: V => harbourSeaY(V) - 9 },   // the chapel, far off over the hills (drawFarSteeple)
     shapes: HARBOUR_SHAPES, spots: HARBOUR_SPOTS, renderLand: landHarbour, drawLive: liveHarbour, pond: () => true,
     opens: { from: 'lane', tier: OPEN_TIER, need: 'Light a Fireplace on the lane to open the way down to the harbour.' },
@@ -6781,6 +6946,7 @@ const AREAS = [
   },
   {
     id: 'chapel', name: 'The Chapel', items: CHAPEL_ITEMS, art: CHAPEL_ART, visitors: CHAPEL_VISITORS,
+    scenery: [['path', 'The path to the door'], ['jars', 'Candles up the path'], ['lantern', 'A lantern by the door'], ['headstones', 'Old headstones'], ['yew', 'The old yew'], ['lychgate', 'The lychgate'], ['lancets', 'Light in the side windows'], ['glass', 'The stained-glass window'], ['tower', 'The bell tower'], ['farms', 'Farmhouse lights, far off']],
     shapes: CHAPEL_SHAPES, spots: CHAPEL_SPOTS, renderLand: landChapel, drawLive: liveChapel, pond: null,
     opens: { from: 'harbour', tier: OPEN_TIER, need: 'Build a Pier at the harbour to open the path up to the chapel.' },
     map: { x: 50, y: 28, icon: 2 },
@@ -6793,6 +6959,7 @@ const AREAS = [
   },
   {
     id: 'nursery', name: 'The Nursery', items: NURSERY_ITEMS, art: NURSERY_ART, visitors: NURSERY_VISITORS,
+    scenery: [['washing', 'A washing line'], ['path', 'The path to the gate'], ['fence', 'A picket fence'], ['tree', 'An old apple tree'], ['nursery', 'The nursery window, lit'], ['hedge', 'A hedge and a rose'], ['pram', 'The pram by the door'], ['hedgerows', 'Hedgerows on the far fields'], ['porch', 'The porch lamp'], ['garland', 'A paper-star garland']],
     steeple: { x: 244 },   // the chapel, far off over the hills (drawFarSteeple)
     shapes: NURSERY_SHAPES, spots: NURSERY_SPOTS, renderLand: landNursery, drawLive: liveNursery, pond: null,
     opens: { from: 'chapel', tier: OPEN_TIER, need: 'Light a Stained-glass window in the chapel to open the way to the nursery.' },
