@@ -165,7 +165,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '2.11.0';
+const VERSION = '2.11.1';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -712,12 +712,13 @@ function layout() {
 
   const by = L.barTop + barH / 2 - 7;
   L.pouch = { x: W / 2, y: by, r: Math.min(barH * .36, 40) };
-  // The bar: five evenly spaced, the pouch in the middle. Basket, Sort | Seeds | Merge, Undo.
+  // The bar: five evenly spaced, the pouch in the middle, in pairs: Basket,
+  // Undo | Seeds | Sort, Merge (the two tidy-up helpers side by side).
   const slot = Math.min(L.cw * .2, 86);
   L.basket = { x: W / 2 - slot * 2, y: by, r: 27 };
-  L.sort = { x: W / 2 - slot, y: by, r: 20 };
-  L.merge = { x: W / 2 + slot, y: by, r: 20 };
-  L.undo = { x: W / 2 + slot * 2, y: by, r: 27 };
+  L.undo = { x: W / 2 - slot, y: by, r: 27 };
+  L.sort = { x: W / 2 + slot, y: by, r: 20 };
+  L.merge = { x: W / 2 + slot * 2, y: by, r: 20 };
   const hy = st + L.headerH / 2;
   L.gear = { x: L.cx + L.cw - 18, y: hy, r: 22 };
   L.book = { x: L.cx + L.cw - 62, y: hy, r: 22 };
@@ -3415,7 +3416,7 @@ function hitTest(x, y, dropping) {
   if (inC(L.basket, dropping ? 1.9 : 1.5)) return { kind: 'basket' };
   if (!dropping && inC(L.sort, 1.15)) return { kind: 'sort' };
   if (!dropping && inC(L.merge, 1.15)) return { kind: 'merge' };
-  if (!dropping && inC(L.undo, 1.5)) return { kind: 'undo' };
+  if (!dropping && inC(L.undo, 1.2)) return { kind: 'undo' };
   if (!dropping && inC(L.book, 1)) return { kind: 'book' };
   if (!dropping && inC(L.map, 1)) return { kind: 'map' };
   if (!dropping && inC(L.sounds, 1)) return { kind: 'sounds' };
