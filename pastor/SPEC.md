@@ -100,6 +100,8 @@ window.PASTOR = {
     // Krause's Tap, the town tavern:
     tap:      [ ... ],  // one beer with the guys (fx may include person ids, e.g. { walt: -10 })
     bowling:  [ ... ],  // Tuesday league night on the two lanes behind the Tap (the Unaltered Pins)
+    fishFry:  [ ... ],  // the Lenten Friday fish fry at the Tap, with Sam and Bea
+    quilters: [ ... ],  // Wednesday-morning coffee with the quilting group in the fellowship hall
     theologyOnTap:[ ... ], // hosting Theology on Tap, Thursday afternoon/evening
   },
   //    Any pool entry may carry `when` (minWeek, maxWeek, season, flag, notFlag) to be seasonal.

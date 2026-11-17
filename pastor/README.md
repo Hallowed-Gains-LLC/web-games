@@ -16,6 +16,9 @@ About half an hour from Advent to the Last Sunday of the Church Year.
   make hospital rounds, bring Communion to the homebound, have coffee at the
   café, visit your people, rest, or spend time with your wife Sam and your
   daughter Bea.
+- **Sermon prep.** The church office offers four ways in: study the readings, work through the Greek, read Luther and the fathers, or write the manuscript (best after some study). They share one week's worth of fresh insight. From Thursday you can preach it to the empty church.
+- **Krause's Tap.** The town tavern: a beer with the guys, league night with the Unaltered Pins (Tuesdays), Theology on Tap (Thursdays), and the Friday fish fry in Lent with Sam and Bea.
+- **Getting away.** Some invitations take the whole day: the Symposia in Fort Wayne, the district pastors' conference, a retreat. If that afternoon has a service or class, you go for the morning only.
 - **Fixed points.** Confirmation class meets every Wednesday afternoon.
   Advent and Lent add midweek Vespers. Christmas Eve, Ash Wednesday,
   Maundy Thursday, Good Friday, the Easter sunrise service, a baptism,
@@ -46,6 +49,8 @@ and the year ends tired.
 | `game.json` | The website's listing. |
 
 Progress is saved in `localStorage` under `pastor_save_v1`.
+
+Lines are drawn without repeats: none comes back until every line that fits the moment has been shown. The save remembers which lines you've seen.
 
 ## Getting it right
 
