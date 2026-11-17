@@ -15,7 +15,25 @@ window.PASTOR = {
       { text: "“Thy word is a lamp unto my feet, and a light unto my path” (Psalm 119:105). Josh points out that it’s also, technically, a flashlight." },
       { text: "The Office of the Keys. A girl asks if you can really forgive sins. “Not my own power,” you say. “Christ’s word, in my mouth.” She writes that down." },
       { text: "Confession: the class practices the questions from the catechism, and nobody laughs, and then everybody laughs, and that’s all right." },
-      { text: "“And that from a child thou hast known the holy scriptures” (2 Timothy 3:15). Class ends with the Small Catechism’s evening prayer, read together." }
+      { text: "“And that from a child thou hast known the holy scriptures” (2 Timothy 3:15). Class ends with the Small Catechism’s evening prayer, read together." },
+      { text: "The First Commandment: “We should fear, love, and trust in God above all things.” You ask what they trust most. One girl says her phone battery. Honest. A good place to start." },
+      { text: "The Eighth Commandment: “put the best construction on everything.” The class practises on each other. It gets competitive. Josh puts the best construction on a classmate’s burp." },
+      { text: "The First Article’s list: “clothing and shoes, meat and drink, house and homestead.” The kids add their own: dogs, grandmas, snow days, the bus driver. You let every one stand. All gifts." },
+      { text: "Second Article memory work. A boy reaches “a lost and condemned creature” and stops. “That’s harsh,” he says. Then he reads on, “purchased and won,” and says, quietly, “Oh.”" },
+      { text: "The Third Article: “I cannot by my own reason or strength believe in Jesus Christ.” A girl says that’s a relief, actually. You agree. It may be the most relieving sentence in the book." },
+      { text: "The Fourth Petition’s list of daily bread includes “good weather” and “faithful neighbors.” A farmer’s son in the back row says “Amen” to the first one, out loud." },
+      { text: "Baptism: “How can water do such great things?” You fill the font, let them touch the water, and read the answer: the Word in and with the water. One girl holds up her wet fingers like a trophy." },
+      { text: "The Sacrament of the Altar. You show them the paten, chalice and flagon. A boy asks if it’s really Jesus. “His words say so,” you answer: “Take, eat; this is my body” (Matthew 26:26)." },
+      { text: "The Lord’s Prayer, conclusion: “Amen, Amen; that is, Yea, yea, it shall be so.” Eight teenagers say “Yea, yea” with more enthusiasm than the Reformers ever imagined." },
+      { text: "Table of Duties night. Each kid finds their own station. Then they gleefully find yours: “apt to teach.” They grade you on it. You get a B-plus and a note: “talks with hands.”" },
+      { text: "The Office of the Keys, with real keys: you bring the church’s big key ring and they guess what each one opens. One opens nothing anybody knows. It becomes the class mascot." },
+      { text: "Confession and the seal: what is told the pastor stays with the pastor, always. A boy asks, “Even if it’s really bad?” “Especially then,” you say. The room goes very still." },
+      { text: "A girl asks why we say “He descended into hell.” Good question. You spend the hour in 1 Peter 3. Nobody looks at the clock, which is how you know it went well." },
+      { text: "Sermon notes, read aloud. One says, “Pastor said ‘dear friends’ eleven times.” Another, “Jesus forgives. Pastor talks with his hands.” Both entirely accurate." },
+      { text: "Advent: the class learns the Magnificat. Half of them know it from a Christmas card. You start there. Mary’s song turns out to have a lot of overturned tables in it.", when: { season: "advent" } },
+      { text: "Lent: the class reads Matthew 26 aloud, parts assigned. The boy reading Peter’s denial does it far too well. Everyone goes quiet at the rooster.", when: { season: "lent" } },
+      { text: "Snow closed the school but not catechism. Three kids come anyway, in boots, because the church is warm. You teach the Creed standing around the coffee urn.", when: { minWeek: 5, maxWeek: 7 } },
+      { text: "Confirmation is close. A girl asks what happens if she breaks her promises someday. You tell her the promise she stands on was made first, by God, at the font. She exhales.", when: { minWeek: 12, maxWeek: 14 } }
     ],
     // Monthly Communion calls on the homebound and at Pine Haven.
     communion: [
@@ -24,7 +42,15 @@ window.PASTOR = {
       { text: "Mr. Krause can’t remember your name, but when you begin the Lord’s Prayer he says every word with you, and he receives the Sacrament with folded hands." },
       { text: "“For as often as ye eat this bread, and drink this cup, ye do shew the Lord’s death till he come” (1 Corinthians 11:26). You say it to a farmer who can no longer farm." },
       { text: "A shut-in confesses, you absolve her in Christ’s stead, and she receives His body and blood at her own table. “Now I can sleep,” she says." },
-      { text: "Arne’s mother has her best tablecloth out for you, the one from her wedding. The Lord’s Supper on 1951 linen. She says it was saved for something important." }
+      { text: "Arne’s mother has her best tablecloth out for you, the one from her wedding. The Lord’s Supper on 1951 linen. She says it was saved for something important." },
+      { text: "A farmhouse at the end of a gravel road. Elmer, 88, oxygen tube and all, insists on standing for the Words of Institution. He makes it. Then he sits down very fast, and kneels in his heart." },
+      { text: "At Pine Haven a member’s daughter asks if she may commune with her mother. She belongs to another church body. You talk with her kindly first; she comes up for a blessing, holding her mother’s hand." },
+      { text: "You set the little chalice on a TV tray between the remote and a crossword. Mrs. Dahl turns off her game show for the Sacrament, then turns it back on for the final round." },
+      { text: "A man home after surgery asks to confess before the Supper. You hear him and absolve him in Christ’s stead, and whatever he said is sealed, gone like a stone in the creek." },
+      { text: "At Pine Haven you read the Gospel for {sunday}, so the homebound hear what the congregation will hear. “They’re our members too,” you tell the aide. She brings more chairs." },
+      { text: "Snow on the Bergmanns’ lane. You park at the mailbox and walk the last quarter mile with the Communion set inside your coat. Mrs. Bergmann has coffee waiting on the step.", when: { minWeek: 0, maxWeek: 7 } },
+      { text: "Christmas at Pine Haven: the residents sing “Silent Night” before the Supper, at four speeds and in three keys. It is perfect.", when: { minWeek: 3, maxWeek: 5 } },
+      { text: "Easter season: you bring each shut-in a lily from the altar along with the Sacrament. Mrs. Dahl thanks you for the lily, and for the rest she thanks the Lord directly.", when: { season: "easter" } }
     ],
     study: [
       { text: "You read {gospel} three times. On the third, one word catches like a burr on a sock. That’s Sunday’s sermon, if you’re patient with it.", fx: { sermon: 2 } },
@@ -54,7 +80,22 @@ window.PASTOR = {
       { text: "You write {sunday} at the top of a clean page. The old Latin names still feel like a door opening. You walk through it into {gospel}." },
       { text: "The readings for {sunday} rhyme with each other in a way you didn’t expect, as if somebody planned it a thousand years ago. Somebody did." },
       { text: "You write one sentence you’re sure of: Christ is for you. You build the rest around it, like a house around a hearth.", fx: { sermon: 4 } },
-      { text: "You look up what the old church called {sunday} and why. Ten minutes of happy rabbit trail, then back to {gospel}, refreshed." }
+      { text: "You look up what the old church called {sunday} and why. Ten minutes of happy rabbit trail, then back to {gospel}, refreshed." },
+      { text: "“Of making many books there is no end; and much study is a weariness of the flesh” (Ecclesiastes 12:12). You close four of the books and keep one open: the Bible.", fx: { sermon: 2 } },
+      { text: "You phone a retired pastor in Elm Grove to ask about {gospel}. He talks for forty minutes, mostly about 1974. Two of his sentences are gold. You write them both down." },
+      { text: "You lay out the propers side by side: Introit, Epistle, {gospel}. They agree like an old married couple finishing each other’s sentences." },
+      { text: "Advent study is mostly waiting: signs in the sun, John in prison, a voice in the wilderness. You notice how much of {gospel} is people not being told when, and trusting anyway.", when: { season: "advent" } },
+      { text: "Christmas week, and {gospel} gives you Simeon and Anna, who waited all their lives and weren’t disappointed. You underline Anna: a widow of fourscore and four, still in the temple.", when: { minWeek: 4, maxWeek: 4 } },
+      { text: "Epiphany means showing. You list where Jesus shows who He is in {gospel}, and where people don’t see it yet. The second list turns out to be the more comforting one.", when: { season: "epiphany" } },
+      { text: "Transfiguration: shining garments, a voice from the cloud, and then “they saw no man, save Jesus only” (Matthew 17:8). You decide the sermon should end exactly there.", when: { minWeek: 7, maxWeek: 7 } },
+      { text: "Lent, and the readings grow quieter and harder. You read {gospel} slowly, the way you walk on ice. “Is not my word like as a fire? saith the LORD” (Jeremiah 23:29).", when: { season: "lent" } },
+      { text: "Palm Sunday’s Gospel is Matthew 21 again, the same text as Advent I. You dig out your December notes. The donkey looks different with Good Friday five days off.", when: { minWeek: 10, maxWeek: 10 } },
+      { text: "Holy Week. You study Mark 16 between services, like reading the last page first. The women at the tomb only knew the middle of the story. You know the end, and still need it.", when: { minWeek: 11, maxWeek: 11 } },
+      { text: "Easter season, and the risen Jesus keeps eating fish, showing wounds, breathing on people. You resist the urge to make Easter an idea. It was a body. It still is.", when: { season: "easter" } },
+      { text: "Pentecost and confirmation in one service. In John 14 you keep landing on the word “Comforter.” Eight nervous kids in white robes are going to need one.", when: { minWeek: 14, maxWeek: 14 } },
+      { text: "Holy Trinity. You read the Athanasian Creed twice and {gospel} three times. Nicodemus asked, “How can these things be?” You decide to let an honest question stand a while.", when: { minWeek: 15, maxWeek: 15 } },
+      { text: "Reformation week, and the temptation is to preach Luther. But {gospel} says “the truth shall make you free” (John 8:32), and Luther would want Christ preached, not Luther.", when: { minWeek: 16, maxWeek: 16 } },
+      { text: "The Last Sunday: ten virgins, ten lamps, one shut door. You skip the sermon on lamp-oil logistics and write the one about the Bridegroom who comes.", when: { minWeek: 17, maxWeek: 17 } }
     ],
 
     pray: [
@@ -74,7 +115,14 @@ window.PASTOR = {
       { text: "“Come unto me, all ye that labour and are heavy laden, and I will give you rest” (Matthew 11:28). You came. You rest.", fx: { strength: 3 } },
       { text: "You pray for the whole town: the Willow Café, the grain elevator, the school bus driver, the folks at First Methodist down the street." },
       { text: "The old pews creak when nobody’s in them. You pray to the sound of a building settling, which is also a kind of prayer." },
-      { text: "You meant to pray for an hour and dozed for twenty minutes in the back pew. “For so he giveth his beloved sleep” (Psalm 127:2). Allowed.", fx: { strength: 4, sermon: -1 } }
+      { text: "You meant to pray for an hour and dozed for twenty minutes in the back pew. “For so he giveth his beloved sleep” (Psalm 127:2). Allowed.", fx: { strength: 4, sermon: -1 } },
+      { text: "At the rail, on your own knees: “Create in me a clean heart, O God” (Psalm 51:10). The pastor needs the forgiveness he speaks on Sunday as much as anyone in the pews.", fx: { strength: 3 } },
+      { text: "You pray the Small Catechism’s morning prayer at your desk: “Let Thy holy angel be with me, that the Wicked Foe may have no power over me.” Then you open the inbox, armoured." },
+      { text: "The furnace kicks on mid-prayer and you lose your place. You start over: “Our Father.” It’s a good place to start over from, every time." },
+      { text: "You pray for the people who left Zion, and for why they left. Some names make you sad, some make you wince. You hand them all over. They were always His, not yours." },
+      { text: "You read the names on the old memorial plaque in the narthex, slowly, one by one, and pray for their great-grandchildren, wherever they are tonight." },
+      { text: "You catch yourself praying for the budget more fervently than for Pete. You go back and pray for Pete again, properly. The budget can wait its turn.", fx: { harmony: 1 } },
+      { text: "Holy Week. You kneel with Isaiah 53: “All we like sheep have gone astray” (Isaiah 53:6). You count yourself among the sheep and stay down a while.", when: { minWeek: 11, maxWeek: 11 } }
     ],
 
     office: [
@@ -100,7 +148,15 @@ window.PASTOR = {
       { text: "A man calls to ask if Zion does weddings for “mostly spiritual” people. You have a long, kind talk. He might come Sunday." },
       { text: "A teenager rearranged the church sign from COME AS YOU ARE to COME AS YOUR ARE. You fix it. It’s still true." },
       { text: "Pete’s budget spreadsheet is color-coded. Green is good. Yellow is “pray.” Red is “pray harder.” There is a lot of yellow.", fx: { building: 2 } },
-      { text: "You type up the altar flower calendar. Easter is booked solid. The Sundays after it are wide open, which is how it always goes." }
+      { text: "You type up the altar flower calendar. Easter is booked solid. The Sundays after it are wide open, which is how it always goes." },
+      { text: "The church directory needs new photos. The photographer can come Thursday; seventeen families can’t. Marge maintains that her 1998 photo is still accurate. It is, roughly." },
+      { text: "Newsletter column on the Third Commandment, titled “Gladly Hear and Learn It.” Pete asks if the title is a hint about attendance. It is." },
+      { text: "The website says Vespers at 7. The sign says 6:30. The bulletin says 7:00 (soup at 6). You fix all three and feel like a minor prophet." },
+      { text: "Erin Bauer, who teaches Sunday school, is applying to the deaconess program and asks for your letter. Three drafts. It goes out with a prayer and a stamp.", fx: { harmony: 2 } },
+      { text: "The insurance form asks whether the church owns a trampoline. You check, to be thorough. Biscuit owns a cardboard box. You tick “No.”" },
+      { text: "The register of official acts goes back to 1911. You enter a baptism in your best handwriting, and it looks like every pastor’s before you, which is the point." },
+      { text: "A covered dish appears in the office fridge with a note: “PASTOR.” No name. You don’t know what it is. You eat it. It’s wonderful. You will never be able to say thank you." },
+      { text: "Hymn numbers for {sunday}: Hannah’s spreadsheet, the bulletin, the hymn board. Three chances to get it wrong. This week you get all three right, and tell nobody, and glow." }
     ],
 
     property: [
@@ -117,7 +173,13 @@ window.PASTOR = {
       { text: "Biscuit has found a way into the organ chamber again. You block it with a hymnal. She finds another." },
       { text: "The trustees paint over the scuff marks in the narthex. You bring doughnuts. It looks brand new, if new means 1974.", fx: { building: 3 } },
       { text: "Ninety-one folding chairs. Last year, ninety-three. The chairs are leaving, one at a time, for other congregations." },
-      { text: "Gus patches the Sunday school wall where an enthusiastic Noah’s Ark lesson put a giraffe through the drywall. You hand him things.", fx: { building: 4, strength: -2 } }
+      { text: "Gus patches the Sunday school wall where an enthusiastic Noah’s Ark lesson put a giraffe through the drywall. You hand him things.", fx: { building: 4, strength: -2 } },
+      { text: "You and Gus walk the roof line with binoculars. Two shingles gone above pew nine. You write it up for the trustees in Gus’s exact words: “Not yet a problem. Soon a problem.”" },
+      { text: "A sign on the kitchen dishwasher: DO NOT USE (GUS). Below it, newer: WHY? (MARGE). Below that: BECAUSE (GUS). You add it to the trustees’ list, verbatim." },
+      { text: "The fire inspector’s annual visit. Exit signs good, extinguishers good, the fire lane currently occupied by Gus’s truck. Gus moves it with enormous dignity.", fx: { building: 2 } },
+      { text: "The stairs to the basement Sunday school: fourteen steps, and the twelfth is loose. Gus says it’s been loose since Nixon. It goes on the trustees’ list anyway, at the top." },
+      { text: "Gus walks the grounds pointing at what the frost moved: a leaning sign post, a flower bed that has relocated, a heaved sidewalk. You take notes for the trustees like a court reporter.", when: { minWeek: 11, maxWeek: 15 } },
+      { text: "The new boiler’s manual runs 212 pages. Gus has read it twice and annotated it in pencil. He walks you through page 88 with real emotion. You report to the trustees: all is well.", when: { flag: "newBoiler" } }
     ],
 
     rounds: [
@@ -133,7 +195,15 @@ window.PASTOR = {
       { text: "Four rooms at the care center, four stories, one bag of peppermints. The peppermints run out first." },
       { text: "The hospital chapel has a fake plant and a real Bible. You sit there for five minutes between visits and breathe.", fx: { strength: 2 } },
       { text: "A teenager in the ER after a fender-bender, banged up but fine. His mom grips your arm: “Thank you for coming.” You barely did anything. You came." },
-      { text: "Mrs. Dahl at Pine Haven turns 100 next week and wants to know if you’ll bring cake. Of course you’ll bring cake." }
+      { text: "Mrs. Dahl at Pine Haven turns 100 next week and wants to know if you’ll bring cake. Of course you’ll bring cake." },
+      { text: "Bingo in Pine Haven’s activity room, and you’re drafted to call. “B-12!” A woman shouts that’s her favourite hymn number. It isn’t anybody’s, but you sing her a verse anyway." },
+      { text: "The night nurse says Room 9 hasn’t slept. A man who wants to talk tractors until two in the morning. Then he sleeps, and you drive home through the fog, praying for him.", fx: { strength: -3, harmony: 2 } },
+      { text: "A Zion farmer in for chest pains, and very cross about it. He asks you to check on his cows. You do, on the way home. The cows are fine. They are also cross." },
+      { text: "A young mother on the maternity ward, not from Zion, asks for a blessing for her son. You trace a small cross on his forehead and pray. She takes a picture for her grandmother." },
+      { text: "The county jail, forty minutes away. Plastic chairs, a phone through glass. You read to a member: “If thou, LORD, shouldest mark iniquities, O Lord, who shall stand?” (Psalm 130:3).", fx: { strength: -2 } },
+      { text: "Arne’s brother-in-law, two towns over, after a stroke. He can’t speak. You pray the Lord’s Prayer holding his hand, and his lips move at “forgive us.” That will do." },
+      { text: "At Pine Haven a retired schoolteacher corrects your grammar in the middle of the Psalm. You thank her. She is right. You preach better grammar on Sunday, for her." },
+      { text: "The hospital’s part-time chaplain shares half his sandwich in a converted supply closet. You compare notes on who on the third floor needs a visit and who needs a nap." }
     ],
 
     cafe: [
@@ -152,7 +222,16 @@ window.PASTOR = {
       { text: "Lemon meringue today. Deb cuts you a slice “for the sermon.” You’re not sure how pie helps a sermon. It does." },
       { text: "A trucker passing through asks for directions and a prayer, in that order. You give both." },
       { text: "Father Mike from St. Bridget’s meets you for coffee, as he does every month. You compare boilers. His is from 1958. He wins." },
-      { text: "On the café bulletin board, between a lost dog and a tractor for sale, your church flyer. Someone has drawn a mustache on the sheep." }
+      { text: "On the café bulletin board, between a lost dog and a tractor for sale, your church flyer. Someone has drawn a mustache on the sheep." },
+      { text: "The county extension agent explains soil moisture to you at length. You learn about subsoil. He learns that pastors work Saturdays. A fair trade." },
+      { text: "The family in the next booth has a baby who throws a spoon. You return it. It is thrown again. You return it. A whole liturgy of call and response, really." },
+      { text: "The round table argues whether the 1983 Wildcats would beat this year’s team. They ask you to rule. You decline, citing the separation of church and football." },
+      { text: "Deb’s granddaughter interviews you for a school report on “a job in town.” Question one: “Do you get paid?” Question two: “For what?” Both excellent questions." },
+      { text: "At the next booth two women are planning a wedding you are officiating. You learn three things nobody has told you yet, including the doves." },
+      { text: "The café Wi-Fi password is “pie4ever.” The farmers have known for years. Deb tells you today. You feel, at last, truly local." },
+      { text: "A college student home on break asks, quietly, if you still believe all of it. You say yes, and tell her how it holds on the bad days. She stays for a second coffee.", fx: { harmony: 2 } },
+      { text: "Snowplough drivers in at six, red-faced and frozen. You buy the round. One says he did the church lot first. He did. You noticed.", when: { minWeek: 0, maxWeek: 7 }, fx: { harmony: 2 } },
+      { text: "Pete slides into your booth with a napkin budget: $340 found in the hymnal fund. You split a celebratory cinnamon roll. It costs $4.25. Pete enters it." }
     ],
 
     rest: [
@@ -168,7 +247,27 @@ window.PASTOR = {
       { text: "You play the piano badly for half an hour. Nobody’s listening but God, and God is very kind about it." },
       { text: "You turn off your phone and bake bread. The dough needs time, and so do you." },
       { text: "You lie on the living-room rug with your eyes closed. The fridge hums. Sam turns a page. Bea sings to herself upstairs.", fx: { family: 2 } },
-      { text: "“Come ye yourselves apart into a desert place, and rest a while” (Mark 6:31). Willow Creek is not a desert, but the back porch will do." }
+      { text: "“Come ye yourselves apart into a desert place, and rest a while” (Mark 6:31). Willow Creek is not a desert, but the back porch will do." },
+      { text: "The Small Catechism’s evening prayer ends with a rubric: “Then go to sleep promptly and cheerfully.” You obey it at 8:40 p.m. Sam calls it a parsonage record." },
+      { text: "You mow the parsonage lawn in straight lines. A lawn needs nothing from you but mowing. It is restful to be needed so simply." },
+      { text: "Bea’s library book about octopuses is on the coffee table. You read all of it. Octopuses have three hearts. You feel you understand them." },
+      { text: "A hot shower until the water turns lukewarm. You come out a slightly different man, mostly in the shoulders." },
+      { text: "You fall asleep in the recliner during a ballgame and wake to the postgame show. You don’t know who won. You feel that you did." },
+      { text: "Sam has hidden the church phone in the bread box. You find it at four. Two messages, both about the thermostat. They kept.", fx: { family: 2 } },
+      { text: "You sit in the truck in the driveway with the engine off, listening to rain on the roof. Ten minutes. Nobody knows where you are except God and the neighbour’s dog." },
+      { text: "A grilled cheese, eaten standing over the sink like a bachelor. Then you sit down and eat a second one like a civilized man." },
+      { text: "A jigsaw puzzle on the card table: a covered bridge, a thousand pieces. You find three edge pieces and a kind of peace you can’t quite explain." },
+      { text: "You take the long way home from the post office, past the grain elevator and over the creek bridge. Eleven minutes added. Worth every one." },
+      { text: "You lie in the hammock with your eyes shut while Bea narrates the clouds. One is a sheep. One is Gus. She is right about both.", fx: { family: 2 } },
+      { text: "You empty your coat pockets: four bulletins, a peppermint from Pine Haven, a crayon, and a note that says “call Erv?” You will call Erv tomorrow." },
+      { text: "You put on an old record and sit through the whole side without getting up. When it ends, the silence feels like part of the music." },
+      { text: "A nap, and an honest one. “I laid me down and slept; I awaked; for the LORD sustained me” (Psalm 3:5). The sermon can wait until Thursday." },
+      { text: "You doze off over Chemnitz’s Examination of the Council of Trent and dream you are explaining the boiler to the Council of Trent. They are unmoved." },
+      { text: "Sam bans the word “should” for the afternoon. You make it to 3:15. She fines you a back rub, payable at once.", fx: { family: 2 } },
+      { text: "You split firewood behind the parsonage. Every log does exactly what you expect it to. After a week of people, it’s a holiday.", when: { minWeek: 0, maxWeek: 8 } },
+      { text: "Snow all afternoon. You watch it with a mug of cocoa and don’t shovel. Later Gus texts you a photo of the church walk, cleared, with no comment.", when: { minWeek: 0, maxWeek: 7 } },
+      { text: "The first warm afternoon. You sit on the porch steps in shirtsleeves with your eyes closed and let the sun do its pastoral work on you.", when: { minWeek: 11, maxWeek: 15 } },
+      { text: "Leaves to rake, and you lie down in the pile instead. Bea finds you and jumps in. The leaves are now everywhere. Worth it.", when: { minWeek: 16, maxWeek: 17 }, fx: { family: 2 } }
     ],
 
     family: [
@@ -189,7 +288,176 @@ window.PASTOR = {
       { text: "Bea draws the family. You’re the one in black holding a cup of coffee. It’s accurate." },
       { text: "Sam cuts your hair in the kitchen. Not the best haircut. The best fifteen minutes of the week." },
       { text: "Bea asks why you work Sundays. “It’s the day everybody comes home to God,” you say. She thinks. “Even you?” Even you." },
-      { text: "You pack Bea’s lunch with a note: a joke and a Bible verse. She reports that her friends liked the joke better." }
+      { text: "You pack Bea’s lunch with a note: a joke and a Bible verse. She reports that her friends liked the joke better." },
+      { text: "Bea is learning the books of the Bible with a song. She gets stuck at Habakkuk every time. So do you, honestly, even without the song." },
+      { text: "Sam asks how you are, and then waits, and you actually answer. Twenty minutes on the porch. She doesn’t try to fix anything. Neither do you.", fx: { strength: 2 } },
+      { text: "Bea’s homework is a family tree. She adds Biscuit, the Apostle Paul and “Mrs. Olsen (church grandma).” You don’t correct any of it." },
+      { text: "Grocery shopping with Sam counts as a date. You split a pretzel at the checkout. Three members stop you. Sam times it: forty-one minutes for a gallon of milk." },
+      { text: "Bea makes you play church with her stuffed animals. She is the organist. The giraffe is on council and has concerns about the budget." },
+      { text: "Sam reads you a chapter of her book in bed. You fall asleep on page four. She keeps reading anyway. It’s that kind of book, and that kind of marriage." },
+      { text: "Bea’s loose tooth comes out in an apple at supper. Great rejoicing. The tooth fairy, it is discovered, is short of cash and pays in two quarters and an IOU." },
+      { text: "You dry while Sam washes, and she tells you about her day. She has a whole life in Willow Creek you only ever hear about at the sink. You ask for more of it." },
+      { text: "Bea learns the catechism’s table prayer: “The eyes of all wait upon Thee, O Lord.” Biscuit, under the table, waits upon Bea, chiefly for ham." },
+      { text: "Someone at the store remarked on Bea’s haircut, and on Sam. You take Sam out for ice cream and listen. She doesn’t owe Willow Creek anything but being Sam. You tell her so.", fx: { family: 2 } },
+      { text: "Bea and Sam have a secret handshake. You are not allowed to learn it. You are allowed to watch it, with admiration, from a distance." },
+      { text: "A snow fort in the parsonage yard: Bea is the architect and you are the labour. The fort gets a steeple. Of course it does.", when: { minWeek: 0, maxWeek: 7 } },
+      { text: "No more training wheels. You run behind, holding the seat, then not holding it. She doesn’t know yet. You don’t tell her until the corner.", when: { minWeek: 12, maxWeek: 15 } }
+    ],
+
+    // Working through the week’s Gospel in the Greek (and the Old Testament in the Hebrew).
+    exegesis: [
+      { text: "{gospel} in the Greek, verb by verb. You parse an aorist as a perfect, catch it, and silently apologize to your seminary Greek professor, who is in St. Louis and has no idea." },
+      { text: "λόγος (logos). You know the word. You sit with it anyway: word, reason, speech, account. Then you remember the Word was made flesh, and the lexicon can only take you so far." },
+      { text: "χάρις (charis): gift, favour, kindness. The lexicon notes it’s inside εὐχαριστέω, to give thanks, and so inside the word Eucharist. Grace given, thanks returned. You sit back.", fx: { sermon: 2 } },
+      { text: "σπλαγχνίζομαι, “moved with compassion,” from the word for a person’s insides. Jesus doesn’t pity the crowd from a distance. He feels it in His gut. You put the lexicon down for a minute." },
+      { text: "μετάνοια (metanoia): a change of mind, a turning around. More than feeling sorry. Your coffee, forgotten for an hour, has also undergone a change. You drink it anyway." },
+      { text: "ἄφεσις (aphesis): forgiveness, but also release, the word for a debt cancelled or a prisoner let go. The sermon suddenly gets much more concrete, and much more freeing." },
+      { text: "εὐαγγέλιον: good news, the word for a messenger’s shout from the battlefield. You write it in the margin by {gospel}. It was always meant to be announced, not just explained." },
+      { text: "πίστις (pistis): faith, trust, faithfulness. You notice, again, how often the word leans on the One trusted rather than on the trusting. You underline it and feel steadier." },
+      { text: "The Old Testament reading in Hebrew, the lexicon open like a hymnal. חֶסֶד, hesed: mercy, steadfast love, loyalty that won’t let go. The KJV says “lovingkindness.” You like all of them." },
+      { text: "You parse a Hebrew verb as a Qal. It is a Hiphil. On the third check you realise the sentence says God causes it, not the people. Worse parsing; better theology.", fx: { sermon: 2 } },
+      { text: "ἀγάπη in the Greek, and the lexicon spends a whole column on it. You close the book and think of Walt’s eleven casserole dishes. That’s the definition, really." },
+      { text: "σκανδαλισθῇ in Matthew 11:6: tripped up, snared. “And blessed is he, whosoever shall not be offended in me” (Matthew 11:6). Even John the Baptist needed that one.", when: { minWeek: 2, maxWeek: 2 } },
+      { text: "John 2 in the Greek: six stone jars of two or three μετρηταί each. You do the arithmetic and get somewhere between 120 and 180 gallons of the best wine. Grace is not measured by the thimble.", when: { minWeek: 6, maxWeek: 6 } },
+      { text: "μετεμορφώθη, metamorphosis: “was transfigured” (Matthew 17:2). Bea’s school unit on caterpillars suddenly has a sermon illustration in it. You’ll ask her permission first.", when: { minWeek: 7, maxWeek: 7 } },
+      { text: "γέγραπται, “it is written,” in the perfect tense: written once and still standing. Jesus answers the devil three times with a verb that won’t move. You underline all three.", when: { minWeek: 8, maxWeek: 8 } },
+      { text: "εὐχαριστήσας: “when he had given thanks” (John 6:11), over five barley loaves. You circle it. The church has had a name for that kind of meal ever since.", when: { minWeek: 9, maxWeek: 9 } },
+      { text: "ὡσαννά isn’t Greek at all. It’s Hebrew, hoshia na, “save, please,” carried into the Greek like a coin in a coat pocket. The crowd shouts a prayer. By Friday it is answered.", when: { minWeek: 10, maxWeek: 10 } },
+      { text: "Mark’s Gospel ends on ἐφοβοῦντο γάρ: “for they were afraid” (Mark 16:8), a sentence that stops on a little word, like a door left open. Easter walks through it.", when: { minWeek: 11, maxWeek: 11 } },
+      { text: "ἐνεφύσησεν: “he breathed on them” (John 20:22). The same verb the Greek Old Testament uses when God breathes life into Adam. You draw an arrow from Genesis 2 to the upper room.", when: { minWeek: 12, maxWeek: 12 } },
+      { text: "ὁ ποιμὴν ὁ καλός: the good shepherd. But καλός also means beautiful, noble, fine. You try “the beautiful shepherd” out loud in the empty office and decide to use it once, carefully.", when: { minWeek: 13, maxWeek: 13 } },
+      { text: "παράκλητος: the one called alongside. Comforter, advocate, helper. You think of Erv sitting next to Walt at the funeral home last fall, saying nothing, and you know what the word means.", when: { minWeek: 14, maxWeek: 14 } },
+      { text: "ἄνωθεν in John 3: “again,” or “from above.” Nicodemus hears one, Jesus means both. Your Greek professor called it a pun with eternal consequences. You steal the line.", when: { minWeek: 15, maxWeek: 15 } },
+      { text: "γρηγορεῖτε: “Watch therefore” (Matthew 25:13). Stay awake. You note the irony of studying it at 10:40 p.m. with your eyes closing.", when: { minWeek: 17, maxWeek: 17 } }
+    ],
+
+    // Reading the fathers on the text: describe and paraphrase, never invent quotations.
+    fathers: [
+      { text: "Luther’s Church Postil on {gospel}. He began it in hiding at the Wartburg, as model sermons for pastors who couldn’t yet preach well. You feel personally addressed, five centuries late." },
+      { text: "The House Postil: sermons Luther preached at home to his own household when he was too ill for the city pulpit. A table, the children, the Gospel. You read one aloud to Biscuit." },
+      { text: "Walther’s Law and Gospel, evening lectures to his students in St. Louis. You read one thesis and find your last three sermons in it, gently corrected.", fx: { sermon: 2 } },
+      { text: "Walther’s last thesis: the Gospel must predominate. You count your draft’s paragraphs. Law, six. Gospel, two. You know what this afternoon is for.", fx: { sermon: 3 } },
+      { text: "Chemnitz’s Examination of the Council of Trent, all four volumes, bottom shelf. You open it for a single footnote and surface an hour later, thoroughly examined yourself." },
+      { text: "Gerhard’s Sacred Meditations, a little book from 1606 with a cracked spine. You read one meditation on the Passion and have to stand at the window for a while afterward." },
+      { text: "The Augsburg Confession, Article IV: justified freely, for Christ’s sake, through faith, not by our own strength. You read it like news. You walk to the copier a little lighter." },
+      { text: "Augsburg Confession, Article VII: the church is where the Gospel is purely taught and the Sacraments rightly given. Not the boiler, not the budget. You write that on a sticky note for Pete." },
+      { text: "The Large Catechism’s preface, where Luther admits that he, a doctor and preacher, still says the catechism daily like a child. You put down Gerhard and pick up the Small Catechism. Fair." },
+      { text: "In the church library, an 1889 German sermon book in Fraktur, its margins full of a long-dead pastor’s pencil. He underlined the very verse you did. You feel oddly accompanied." },
+      { text: "The Formula of Concord on the Lord’s Supper: dense, careful and long. You read it with a pencil and a sandwich, and the sandwich loses." },
+      { text: "The Smalcald Articles, which Luther drew up while sick and expecting to die: what he would never give up. You read the first and chief article, on Christ, and see why it comes first." },
+      { text: "Gerhard’s Loci on the ministry, open beside the church directory. Seventeenth-century Latin, twenty-first-century phone numbers. The same job, more or less." },
+      { text: "Luther’s sermon on {gospel} runs a dozen pages. Yours will run a dozen minutes. You read his for what it sees in the text, not for length, and borrow the seeing." },
+      { text: "Melanchthon’s Apology, Article IV, the long one. It reads like a letter from a careful friend who wants to be completely sure you understand you are forgiven." },
+      { text: "A bound run of 1950s church periodicals in the library: sermon outlines, hotdish recipes and letters about the thermostat. Some things are eternal." },
+      { text: "Chemnitz on the two natures of Christ. Heavy going. Then one paragraph on why the Son took our flesh, and suddenly you’re back in Bethlehem with the shepherds.", when: { maxWeek: 5 } }
+    ],
+
+    // Writing the sermon.
+    manuscript: [
+      { text: "The first line. You write eleven of them. The twelfth is just the first verse of {gospel}. That’ll do. Start with the text and let it talk first." },
+      { text: "You cut the third illustration. It was about your seminary roommate’s car, and it was funny, and nobody would remember Jesus afterward. Into the drafts folder it goes." },
+      { text: "Eleven p.m. at the kitchen table, sermon in longhand. Sam comes down for water, reads one page over your shoulder and taps a sentence. “That one.” Everything else now serves that one.", fx: { sermon: 3, family: 1 } },
+      { text: "Six paragraphs of Law and the people are in the ditch. Now you have to get them out, and you can’t. Christ can. You write that down, and the sermon turns.", fx: { sermon: 3 } },
+      { text: "The conclusion won’t land. You try a story, a question, a poem. Finally you just write what the text gives: “for you.” It lands." },
+      { text: "You print the draft and mark it up in red as if a student wrote it. The student is clearly bright and needs to cut the middle by a third." },
+      { text: "Your draft says “we must” nine times. You change most of them to “Christ has.” The sermon turns from homework into good news.", fx: { sermon: 2 } },
+      { text: "A sentence you love: forty words, three commas and a semicolon. Nobody in pew nine will survive it. You break it into four, and it finally breathes." },
+      { text: "Bea asks what your sermon is about. You tell her in one sentence. “Then just say that,” she says. You put her sentence at the top of the page." },
+      { text: "Draft one: too clever. Draft two: too long. Draft three: too tired. You reread draft one and notice it was mostly fine. Ministry." },
+      { text: "You print the sermon in 16-point type because your reading glasses are in the car and the car is in the shop. Big letters force short sentences. It’s better." },
+      { text: "Saturday night. The sermon is done. You go back in to change one word. Then three. Sam calls down the stairs. You save it and walk away. Mostly." },
+      { text: "You write the prayer for after the sermon first, then the sermon. The sermon behaves itself better for knowing where it has to end up." },
+      { text: "The word processor flags “Zion” and suggests “Zinc.” You add it to the dictionary, along with “Sabaoth,” “Introit” and “Biscuit.”" },
+      { text: "The outline on index cards across the living-room floor. Bea rearranges them while you get coffee. Her order is better. You keep it.", fx: { family: 1 } },
+      { text: "You write a paragraph for the people who will come in grieving this Sunday. You don’t know who they are yet. Someone always is. The paragraph stays." }
+    ],
+
+    // Preaching to the empty nave, Thursday to Saturday.
+    rehearse: [
+      { text: "Thursday, the empty nave. You preach to the back wall, and the back wall preaches the echo back half a second late. You slow down to let it catch up. So will the people." },
+      { text: "Biscuit, front pew, paws tucked: the most attentive congregation you have ever had, until a moth appears during the third point." },
+      { text: "You time it on your phone: seventeen minutes. Then again, slower, the way you’ll really say it: twenty-one. The history of the hymn board comes out." },
+      { text: "The second pulpit step squeaks. You’ve stepped over it for years without thinking. Today you rehearse the walk up too. A preacher should know his own stairs." },
+      { text: "Hannah is practising the hymn of the day while you rehearse. You pause, she plays, you go on. By the end your paragraphs are timed to her verses." },
+      { text: "You practise reading {gospel} aloud. The hardest word is a name nobody can pronounce. You say it the same way three times, so at least you’ll be consistent." },
+      { text: "Marge comes in to change the paraments and sits down to listen, arms folded. At the end she says, “Shorter.” Then, “Good.” You take both.", fx: { marge: -6 } },
+      { text: "No notes this time. You lose your place at the second point, find it again, and discover the sermon actually lives in you now. Back on paper it goes, smaller.", fx: { sermon: 3 } },
+      { text: "The microphone is dead. You preach unplugged to the empty church and find you don’t need it. You tell Gus not to fix it. Gus fixes it anyway, lovingly." },
+      { text: "Late Saturday light across the pews. You preach the ending once, slowly, to nobody. It sounds like a promise. That’s what an ending should sound like." },
+      { text: "You record yourself and listen back. You say “so” before every sentence. So you fix that. So it goes." },
+      { text: "Gus walks through with a ladder, says “Don’t mind me,” and stays to hear the end. “Good,” he says, and goes back to his light bulb. Rehearsal approved." },
+      { text: "Josh wanders in for his lost hoodie, listens two minutes and says, “The part about the door was good.” There was no part about a door. You add one." },
+      { text: "The church is at 58 degrees. You rehearse in your coat and scarf. Even your illustrations come out in little clouds.", when: { minWeek: 0, maxWeek: 7 } }
+    ],
+
+    // One beer at Krause’s Tap, the town tavern (the Krause family, German since 1890-something).
+    tap: [
+      { text: "Krause’s Tap at six. Hank Krause, third generation behind the bar, pours you one dark lager without asking. The Packers are losing. Nobody blames the pastor. Yet." },
+      { text: "Sheepshead at the back table with Arne and two retired farmers. You don’t really understand the rules. They don’t really explain them. You lose a dollar and gain three friends.", fx: { harmony: 3 } },
+      { text: "Walt at the end of the bar with a root beer. You sit beside him with your one beer and watch the game, mostly not talking. In the second quarter he says, “Ruth hated football,” and laughs.", fx: { walt: -10 } },
+      { text: "Gus explains the boiler to Hank on a coaster, with diagrams. Hank nods like a man who has heard of Old Faithful before. You buy Gus his beer and keep the coaster.", fx: { gus: -8 } },
+      { text: "Darts. You hit the board twice and the wall once. Arne says your aim is very Lutheran: nothing of your own doing." },
+      { text: "The high school coach buys your beer to ask if you’d pray with the Wildcats before homecoming. You say you’ll pray for both teams, and their knees." },
+      { text: "A man from the feed mill’s night shift asks, over a beer, whether God cares about a man who sweeps grain dust at 3 a.m. You talk about vocation. Nobody had ever told him it counted.", fx: { harmony: 2 } },
+      { text: "Pete, one beer in, admits he dreams in spreadsheets. Last night the boiler fund balanced and Biscuit was treasurer. You suggest that isn’t a nightmare.", fx: { pete: -6 } },
+      { text: "On Hank’s top shelf, a stein dated 1911, the year Zion’s cornerstone went in. His great-grandfather helped lay it. You raise your glass to the stein." },
+      { text: "Polka night on the jukebox. Two widowers dance with their daughters, and an old couple dances like it’s 1962. You keep your one beer and your seat and are glad." },
+      { text: "Arne lifts his glass and announces that the Bible is pro-beer. You look it up for him: “wine that maketh glad the heart of man” (Psalm 104:15). Close enough, says Arne, delighted." },
+      { text: "Euchre: you and Gus against Arne and Hank. Gus goes alone on a hand he shouldn’t. He takes all five tricks and talks about it until closing.", fx: { gus: -6 } },
+      { text: "A young farmer, quietly, over one beer: his dad is drinking too much and he doesn’t know who to tell. You listen. You give him your number, and a counselor’s in the county seat.", fx: { harmony: 2, strength: -2 } },
+      { text: "Friday fish fry in Lent: Hank’s beer-battered perch. Half of Zion is here; the other half is at St. Bridget’s fish fry and will hear about this.", when: { season: "lent" } },
+      { text: "Somebody asks why a pastor drinks beer at all. Arne answers for you: Jesus made wine at a wedding, and the good stuff, too. He sits back, pleased. You let him have the point." },
+      { text: "The Wildcats win on a last-second field goal and the Tap erupts. Hank rings the bell behind the bar. You find yourself hugging a dairy farmer. It’s fine." },
+      { text: "Hank asks, drying a glass, if you ever get tired of people telling you their troubles. You say no. He says he doesn’t either. Two men in the listening trade nod at each other." },
+      { text: "Walt brings photos of Ruth to show Hank, who knew her in high school. The three of you look at them a long while. Hank pours Walt a coffee on the house.", fx: { walt: -8 } },
+      { text: "A retired trucker says something unrepeatable about a Packers fumble, then sees you. “Sorry, Pastor.” You tell him the Psalms have said worse, and more poetically." },
+      { text: "Hank’s pretzels are the size of a hubcap, with his mother’s mustard. You split one with Gus and Arne. It isn’t a fellowship hall, but it does a fair impression of one." },
+      { text: "One beer, a basket of cheese curds and a long talk with Arne about his late father’s farm. He tells you things he has never told anyone. You keep them where such things are kept.", fx: { harmony: 2 } },
+      { text: "A man at the bar announces he’s an atheist and waits. You ask what he does. Welding. Forty minutes on welding, then ten on God. He shakes your hand at the door." },
+      { text: "Sam comes along for once and beats Hank at darts. Three times. The Tap talks of nothing else for a week.", fx: { family: 4 } },
+      { text: "The Packers have a bye, so the TV shows a fishing program. Nobody watches. Everybody talks. Hank says bye weeks are good for business, and for marriages." },
+      { text: "Hank’s grandfather is the Mr. Krause at Pine Haven who says the Lord’s Prayer with you every month. Hank asks how he is. You tell him: every word, every month." }
+    ],
+
+    // Theology on Tap: the back room at Krause’s, young adults, real questions.
+    theologyOnTap: [
+      { text: "Theology on Tap, the back room at Krause’s. Nine people under thirty. “Does my job matter to God?” You talk about vocation: God serving neighbours through nurses, welders and accountants. A nurse cries a little. Good tears.", fx: { harmony: 4 } },
+      { text: "Topic: doubt. A young teacher admits some days she isn’t sure. You tell her about the father in Mark 9: “Lord, I believe; help thou mine unbelief” (Mark 9:24). Faith is held as much as holding." },
+      { text: "Topic: why the liturgy? A guy raised on praise bands asks why Lutherans say the same words every week. You ask if he only tells his wife he loves her when he thinks of new words. He laughs. He gets it." },
+      { text: "Topic: Baptism. A young dad asks if his son’s baptism counts, since the baby slept through it. You say it’s God’s work, not the baby’s performance. The dad looks relieved. The baby, at home, sleeps on." },
+      { text: "Topic: suffering. A woman lost her brother last year. You don’t explain it away. You talk about the cross, where God does not stand outside our suffering. The room goes quiet. Nobody touches their beer." },
+      { text: "Topic: the Lord’s Supper. Why can’t everyone commune at Zion? You explain close communion as a matter of confession and care, not a velvet rope. A man says it’s the first time it made sense to him." },
+      { text: "Topic: grace. A young accountant cannot believe anything is free. You say grace isn’t a discount; it’s a gift paid in full by someone else. She writes that on a napkin and keeps it." },
+      { text: "Topic: is the Bible true? Two hours, pitchers of root beer for the designated drivers, and a guy with a highlighted printout. You don’t win. You answer honestly. He comes back next month." },
+      { text: "Nobody comes for fifteen minutes, then six people arrive at once from softball, sweaty and starving. Tonight’s topic is the Sabbath. You order pretzels and start with rest." },
+      { text: "Topic: prayer. A young woman asks if it’s all right that she mostly prays in the car. You say shepherds prayed the Psalms in fields; a Ford will do. She laughs, relieved." },
+      { text: "Topic: heaven. Will their dogs be there? You say Scripture promises a new creation and doesn’t list the dogs. “That’s not a no,” says the dog owner. You concede it is not a no." },
+      { text: "Topic: forgiveness. A young man asks what you do if you can’t forgive yourself. You tell him that’s fine, because you were never the one who does it. Christ does. He sits back as if something heavy came off." },
+      { text: "A newcomer asks, nervously, whether she has to “make a decision for Christ” to belong. You tell her Christ decided for her, on the cross and at the font. Later she asks about Baptism. You set a time to talk." },
+      { text: "Topic: why go to church if I can pray at home? You talk about the Word preached, the Supper given, and the forgiveness spoken out loud by another mouth. Someone says, “So it’s not about us showing up.” Exactly." }
+    ],
+
+    // Tuesday league night at Krause’s Tap: the Unaltered Pins (Gus, Pete, Arne Schroeder and you).
+    bowling: [
+      { text: "League night. Your hook hooks the wrong way, then no way at all. Gus says it isn’t a hook, it’s a theological position. You bowl a 98." },
+      { text: "Gus’s lucky ball, a green marbled thing from 1977, comes out of its bag like a relic. He murmurs to it before every frame. He bowls a 189. The ball takes no credit.", fx: { gus: -8 } },
+      { text: "Pete keeps score in a spreadsheet, though the machine keeps score too. When they disagree, Pete is right. He is always right.", fx: { pete: -6 } },
+      { text: "The rental shoes: size eleven, red and blue, still warm from someone else. You bowl your best game ever in them. You consider not returning them." },
+      { text: "A 7–10 split in the fifth frame. Arne studies it for a long time and says, “Well.” He misses both pins. The whole Tap applauds the attempt anyway." },
+      { text: "First Methodist’s team bowls on the next lane. They are very good and very nice about it. Their captain asks after your boiler. You ask after theirs. Neighbourliness, by the frame." },
+      { text: "Between frames the Feed Mill Strikers’ anchor asks if God hears prayers for spares. Then, quieter, about his marriage. You step outside with him and miss your turn. Gus bowls it for you.", fx: { strength: -2, harmony: 2 } },
+      { text: "Pull-tabs at the bar for the fire department. Gus wins five dollars and gives it to the boiler fund. Pete files it under “Miscellaneous joy.”" },
+      { text: "You bowl a strike. Everyone stops. Gus takes a photo. It runs in next month’s newsletter: “Pastor’s strike, ninth frame, witnessed.”" },
+      { text: "One beer, a basket of popcorn, and a gutter ball that rolls the whole lane with tremendous dignity. Arne calls it a procession." },
+      { text: "Arne asks between frames whether his late wife can see him bowl. You talk about the communion of saints for one frame. Then he bowls a strike, and you both agree not to over-interpret it.", fx: { harmony: 2 } },
+      { text: "The pinsetter jams. Gus walks down the lane to fix it, as he would in any building. Hank lets him. Nobody else is allowed down there. Gus is, in spirit, trustee of all buildings." },
+      { text: "The Unaltered Pins lose by 140. Pete has a chart. The chart is not encouraging. You buy a round of root beer and declare a moral victory." },
+      { text: "Hank tells you his grandfather built the two back lanes in 1952 from the timbers of an old barn. You run your hand along the lane. It’s practically a pew." },
+      { text: "Your shoulder is sore from Sunday’s handshakes, so you try a two-handed granny roll. It works better than your hook. Gus is torn between pride and shame." },
+      { text: "The Feed Mill Strikers have matching shirts, wristbands and a fight song. The Unaltered Pins have Gus’s thermos. You win by four. Gus credits the thermos.", fx: { gus: -4 } },
+      { text: "A kid’s birthday party on lane two, and you’re drafted to sing. You do it at full liturgical volume. The kid is thrilled. The parents look alarmed." },
+      { text: "League runs late. Sam texts: “Did you win?” You text back: “We bowled.” She sends a heart. She knows what that means." },
+      { text: "Walt bowls his first frame in a year: an eight, then the spare. He turns around and the whole Tap is clapping. He doesn’t know what to do with his hands. Then he grins.", when: { flag: "waltBowls" }, fx: { walt: -10 } }
     ]
   },
 
@@ -866,56 +1134,102 @@ window.PASTOR = {
       { text: "She quizzes you on the Third Article of the Creed. You pass. She seems slightly disappointed." },
       { text: "Tea, lefse and twenty minutes of news about people you’ve never met but now feel you know." },
       { text: "She reads you a letter from a 1964 Sunday school student, now a grandmother in Oregon. “They grow up,” she says. “Then they write.”" },
-      { text: "You pray together through her prayer list. Her list is longer than yours." }
+      { text: "You pray together through her prayer list. Her list is longer than yours." },
+      { text: "Mrs. Olsen shows you how to roll lefse thin enough to read the newspaper through. Yours could stop a door. She eats it anyway, “for the effort.”", when: { notFlag: "olsenDied" } },
+      { text: "She has the farm report on the radio, which she has not needed since 1987. “Hog futures keep me humble,” she says.", when: { notFlag: "olsenDied" } },
+      { text: "She asks for Psalm 91 and corrects your pace twice. “Slower, Pastor. God isn’t in a hurry, and neither am I.”", when: { notFlag: "olsenDied" } },
+      { text: "She sends you home with a jar of rhubarb sauce for Sam and a second, smaller jar for Biscuit, who does not eat rhubarb. It’s the thought.", when: { notFlag: "olsenDied" } },
+      { text: "Her prayer list is written on the back of a 1971 bulletin. Half the children on it are grandparents now. She still prays for every one of them.", when: { notFlag: "olsenDied" } },
+      { text: "She wants every detail of Hannah’s plans for Easter. Then she hums the old descant from memory, in tune, at ninety-one.", when: { notFlag: "olsenDied" } }
     ],
     gus: [
       { text: "Gus shows you a gasket. You admire the gasket. This is the relationship." },
       { text: "Gus is in the boiler room talking softly. When you come in he pretends he was on the phone." },
       { text: "Gus fixes the squeaky pew in four minutes flat and refuses to be thanked." },
       { text: "At the café Gus orders “the usual,” which is coffee and an opinion about the weather." },
-      { text: "Gus asks if you’ve noticed the gutters. You have not. You will now." }
+      { text: "Gus asks if you’ve noticed the gutters. You have not. You will now." },
+      { text: "Gus is oiling the church door hinges and has named each one. The squeaky one is called Pete. Do not tell Pete." },
+      { text: "Gus shows you his thermos. It has been to every trustees’ meeting since 1979. The coffee, he implies, is the same coffee." },
+      { text: "Gus walks you round the parking lot pointing out frost heaves like a ranger at a national park." },
+      { text: "At the café Gus explains gate valves versus ball valves with sugar packets. You will remember it forever, against your will." },
+      { text: "Gus asks, out of nowhere, whether his dad is in heaven. You talk a long while in the boiler room. He thanks you by handing you a wrench to hold." },
+      { text: "Gus is polishing his bowling ball, the lucky one, and asks if you’ve been working on your hook. You haven’t. He can tell." }
     ],
     marge: [
       { text: "Marge is polishing the brass candlesticks and humming. When she sees you she stops humming but keeps polishing." },
       { text: "Marge hands you a lint roller before you’ve said hello. You use it." },
       { text: "Marge walks you through the altar guild schedule for the next six months. You did not ask." },
       { text: "Marge checks the thermostat on her way past you and nods, like a sentry." },
-      { text: "Over coffee Marge confides she’s never liked the green paraments. “Too cheerful,” she says." }
+      { text: "Over coffee Marge confides she’s never liked the green paraments. “Too cheerful,” she says." },
+      { text: "Marge teaches you to fold a corporal properly. On the fourth try she says “acceptable,” and you feel ordained all over again." },
+      { text: "Marge is measuring the altar candles and projecting their inches to Pentecost. There will be enough. Barely. She has a backup box." },
+      { text: "Marge tells you about Leonard’s fishing trips: every lake, every fish. At the end she laughs, which she rarely does." },
+      { text: "At the café Marge orders hot water with lemon and steals your toast. “Leonard always did that,” she says. “Somebody has to.”" },
+      { text: "Marge has hemmed new purificators and lays them in the drawer like newborns. She asks you to say a prayer over the drawer. You do." }
     ],
     nguyen: [
       { text: "Daniel tells you a chemistry joke. You don’t get it. He explains. You still don’t, but you laugh because he’s so pleased." },
       { text: "Linh feeds you something delicious and won’t say what’s in it until you’ve had seconds." },
       { text: "The Nguyens ask what “hotdish” really means. You try to explain. You fail. Nobody can." },
       { text: "Linh asks you to bless the house. You go room to room with a short prayer. In the kitchen she points at the stove: “Extra for this one.”" },
-      { text: "You compare Willow Creek winters with Houston summers and agree that God made both and loves the people in them anyway." }
+      { text: "You compare Willow Creek winters with Houston summers and agree that God made both and loves the people in them anyway." },
+      { text: "Daniel has assembled the crib from instructions in four languages. One screw is left over. Daniel is at peace with this. Linh is not.", when: { notFlag: "graceBorn" } },
+      { text: "Linh asks you to explain the church year. You draw a circle of colours on a napkin. It goes on the fridge next to the grocery list." },
+      { text: "The Nguyens are learning the liturgy by heart, a line a week. Daniel has the Nunc Dimittis; Linh has the Kyrie and won’t let him forget it." },
+      { text: "Daniel asks how Lutherans pray before meals. You teach them the catechism’s table prayer. Linh says it’s shorter than her grandmother’s and longer than Daniel’s." },
+      { text: "Grace grips your finger and won’t let go. Linh says she only does that to people she likes. Daniel says she does it to everyone.", when: { flag: "graceBorn" } },
+      { text: "Grace is asleep on Daniel’s chest, so the whole visit is whispered. It’s the quietest pastoral call of the year, and one of the best.", when: { flag: "graceBorn" } }
     ],
     walt: [
       { text: "Walt makes the coffee too strong, the way Ruth did. You drink it." },
       { text: "You and Walt watch Ruth’s bird feeder. He knows every bird by name, and some by personality." },
       { text: "Walt shows you his woodshop. A birdhouse for somebody’s grandchild. “Keeps the hands busy,” he says." },
       { text: "At the café Walt asks for “Ruth’s booth.” Deb has been saving it." },
-      { text: "Walt tells you a joke Ruth used to tell badly, on purpose. You laugh. So does he." }
+      { text: "Walt tells you a joke Ruth used to tell badly, on purpose. You laugh. So does he." },
+      { text: "Walt is doing the crossword in pen. 14 across: “Lutheran reformer, six letters.” You both pretend it’s hard." },
+      { text: "Walt asks for help moving Ruth’s sewing machine to the spare room. You carry it together, slowly, and set it down gently. Then he makes coffee." },
+      { text: "Walt is reading Ruth’s recipe cards in her slanting hand. He reads you the hotdish one aloud. At the bottom it says, “Walt likes extra.”" },
+      { text: "Walt shows you the old sheepshead scores from Krause’s Tap, kept in Ruth’s notebook. “Haven’t played since,” he says. “Might.”" },
+      { text: "At the café Walt pays for your coffee before you can stop him. “Ruth would have,” he says, and that settles it." },
+      { text: "Walt asks about the bowling league. He used to anchor the Zion team. “The knees say no,” he says. “The rest of me says maybe.”" }
     ],
     josh: [
       { text: "Josh asks whether Jonah’s fish was really a whale. Twenty minutes on fish. Somehow it counts as catechism." },
       { text: "Josh shows you a video of a cat falling off a piano. You both watch it four times." },
       { text: "Josh has memorized the Ten Commandments to win a bet with his cousin. He recites them at speed. All correct." },
       { text: "Over hot chocolate Josh asks what you actually do all week. You tell him. He looks surprised and slightly impressed." },
-      { text: "Josh asks a Trinity question you answer, then a follow-up you can’t. You promise to read up. He looks delighted to have stumped you." }
+      { text: "Josh asks a Trinity question you answer, then a follow-up you can’t. You promise to read up. He looks delighted to have stumped you." },
+      { text: "Josh has a question about Revelation and it involves a dragon. You answer about Christ. He accepts this but would like more on the dragon." },
+      { text: "Josh is teaching Biscuit to high-five. Biscuit is not learning. Josh is learning patience, which may have been God’s plan all along." },
+      { text: "Josh asks why Lutherans make the sign of the cross if they’re not Catholic. You show him the catechism’s morning prayer. He checks. It’s there. He’s annoyed to be wrong." },
+      { text: "Over fries Josh admits he likes the old hymns. “Don’t tell anyone. They’re kind of intense.” You promise to keep it between you and the organist." },
+      { text: "Josh wants to know what seminary is like. Greek, Hebrew, too much coffee. He says it sounds terrible, then asks three follow-up questions." },
+      { text: "Josh asks if pastors ever doubt. You tell him the truth, and Who holds on to you when you can’t hold on. He nods slowly and changes the subject to basketball." }
     ],
     pete: [
       { text: "Pete shows you a new chart. It goes up and to the right. He isn’t sure whether to be happy about it." },
       { text: "Pete asks if you’ve seen the latest utility bill. You haven’t. He tells you anyway, in detail." },
       { text: "At the café Pete orders decaf, then worries the decaf has caffeine." },
       { text: "Pete wants to talk about the endowment fund: $2,140 and one savings bond from 1977." },
-      { text: "Pete tells you, almost shyly, that he now reads a psalm before he opens the spreadsheet. It helps." }
+      { text: "Pete tells you, almost shyly, that he now reads a psalm before he opens the spreadsheet. It helps." },
+      { text: "Pete has made a spreadsheet of his spreadsheets. He is not joking. He shows you the index tab. It is beautiful." },
+      { text: "Pete asks your advice about his daughter’s college applications. Budgets don’t come up once. He’s a dad today, and a good one." },
+      { text: "At the café Pete divides the bill to the penny on a napkin, tax included. Deb rounds it up. Pete lets her." },
+      { text: "Pete reads you the 1958 council minutes, in which Zion voted to buy a new boiler. “History,” he says, “is a circle.”" },
+      { text: "Pete wants to know if it’s a sin to enjoy balancing the books. You tell him it’s a vocation. He looks like a man pardoned." },
+      { text: "Pete keeps the bowling league scores in a spreadsheet with conditional formatting. Strikes are green. Your frames are mostly yellow." }
     ],
     hannah: [
       { text: "Hannah plays the postlude for the eleventh time. It’s perfect. She frowns and starts over." },
       { text: "Hannah shows you her hymn plans for six weeks, cross-referenced to the readings. They are better than your sermon plans." },
       { text: "Hannah asks if you could sing a little louder in the liturgy. Then a little softer." },
       { text: "Hannah lets you sit on the organ bench while she plays “Beautiful Savior.” The whole floor hums." },
-      { text: "Hannah needs a recorder soloist for next year. She looks at you. You leave quickly." }
+      { text: "Hannah needs a recorder soloist for next year. She looks at you. You leave quickly." },
+      { text: "Hannah is tuning the handbells with an app and the patience of a saint. Bell seven is flat, and she takes it personally." },
+      { text: "Hannah plays you the opening of Bach’s chorale prelude on “Wake, Awake, for Night Is Flying.” Then she says she isn’t ready. It sounded ready." },
+      { text: "Hannah asks if the choir could sing the Introit on Sunday. Then whether they could sing it in German. Then whether you’d mind if she didn’t tell Pete." },
+      { text: "Hannah is fixing a broken organ key with superglue and nerve. “Don’t tell Gus,” she says. Gus, in the doorway, already knows." },
+      { text: "Hannah tells you about her first organ teacher, who rapped her knuckles with a pencil and taught her that every note is for God. She still has the pencil." }
     ]
   },
 
@@ -1407,6 +1721,185 @@ window.PASTOR = {
           reply: "Brats, sauerkraut and mustard on the church lawn. Gus mans the grill and explains the history of the bratwurst to anyone within range." },
         { label: "A hymn sing instead", fx: { harmony: 3, sermon: 4, hannah: -8 },
           reply: "An afternoon of Reformation hymns around the organ. Hannah is in heaven. Gus sings bass on “A Mighty Fortress” loud enough to rattle the hymn board." }
+      ] },
+
+    // Trips, colleagues and Krause’s Tap. `away: true` on a choice spends the rest of that day
+    // away from Willow Creek. Away choices keep off Wednesdays, weeks 4, 8 and 11, and the funeral.
+    { id: "symposia", when: { minWeek: 6, maxWeek: 6, day: 0, chance: 1 }, from: "Concordia Theological Seminary", kind: "email", title: "The Symposia in Fort Wayne",
+      text: "The January Symposia start today at the seminary in Fort Wayne: papers on the Gospels and the Confessions, chapel in Kramer Chapel, three hundred pastors in one hallway. You registered in October.",
+      choices: [
+        { label: "Drive to Fort Wayne", away: true, fx: { strength: 8, sermon: 10, family: -6 },
+          reply: "Two papers on John, Matins sung by three hundred men in parts, and a hallway full of classmates. Bea phones to ask if you’ve met the Pope yet. You explain, again, gently." },
+        { label: "Stay home this year", fx: { family: 4, harmony: 2 },
+          reply: "You’ll read the papers when they’re published. Bea brings cocoa to the office and asks what a symposium is. “A lot of pastors talking,” you say. “So, church,” she says." }
+      ] },
+
+    { id: "districtConference", when: { minWeek: 15, maxWeek: 15, day: 0, chance: 1 }, from: "District office", kind: "email", title: "Pastors’ Conference",
+      text: "The district pastors’ conference opens today at a hotel off the interstate: a paper on the care of the dying, sectional meetings, and the famous breakfast buffet. Your circuit is carpooling.",
+      choices: [
+        { label: "Ride along with the circuit", away: true, fx: { strength: 6, sermon: 6, harmony: 2, family: -4 },
+          reply: "A good paper, a better hallway, and eleven kinds of sausage at breakfast. Three seminary classmates save you a seat. You laugh more in one day than in a month." },
+        { label: "Skip it and catch up at home", fx: { sermon: 4, building: 2, strength: -2 },
+          reply: "You read the best paper at your desk. The district president will notice your empty chair. He notices everything, kindly, and will ask after you." }
+      ] },
+
+    { id: "retreatWinter", when: { minWeek: 5, maxWeek: 7, day: 2, chance: 0.3 }, from: "Grace Place Wellness", kind: "email", title: "Two Places Open",
+      text: "Grace Place Wellness: two places have opened at this week’s retreat for church workers and their spouses, two hours away, starting this afternoon. Sam’s mother can keep Bea. Sam is already looking at you.",
+      choices: [
+        { label: "Go, both of you", away: true, set: "retreatOffered", fx: { strength: 14, family: 10, sermon: -4 },
+          reply: "Rest, good food, a counselor who asks real questions, and a long walk with Sam by a frozen lake. Nobody needs the pastor. You’d forgotten what that felt like." },
+        { label: "Not this time", set: "retreatOffered", fx: { harmony: 2, family: -3 },
+          reply: "You write back with thanks. Sam says she understands, and she does. You notice you have said “not this time” before." }
+      ] },
+
+    { id: "retreatSpring", when: { minWeek: 12, maxWeek: 16, day: 2, chance: 0.3, notFlag: "retreatOffered" }, from: "DOXOLOGY", kind: "email", title: "A Cancellation",
+      text: "DOXOLOGY, the retreat for pastors and their wives: a couple cancelled, and the spring retreat starts this evening, three hours away. “Come,” the director writes. “The church will still be there Monday.”",
+      choices: [
+        { label: "Pack the car", away: true, set: "retreatOffered", fx: { strength: 14, family: 10, sermon: -4 },
+          reply: "Daily prayer, good teaching on care of souls, and long talks with Sam over real tablecloths. A pastor from Kansas confesses the same tiredness you have. You both laugh, then pray." },
+        { label: "Ask them for the autumn dates", set: "retreatOffered", fx: { family: -2, harmony: 1 },
+          reply: "They send the dates. Sam circles them on the calendar in red, which is the parsonage’s highest form of commitment." }
+      ] },
+
+    { id: "callDay", when: { minWeek: 12, maxWeek: 12, day: 1, chance: 1 }, from: "Concordia Seminary", kind: "email", title: "Call Day",
+      text: "Tonight is Call Day at Concordia Seminary in St. Louis, streamed live. Candidates in their best suits, families in the pews, and each man’s name read out with a congregation and a town most have never heard of.",
+      choices: [
+        { label: "Watch it with Sam", fx: { family: 4, strength: 4 },
+          reply: "You remember your own: your name, then “Zion, Willow Creek,” and Sam whispering “Where?” You both laugh now. Then she squeezes your hand and says she’s glad it was here." },
+        { label: "Pray for the new pastors", fx: { harmony: 2, sermon: 2, strength: 2 },
+          reply: "Name by name, with the sound off. “The harvest truly is plenteous, but the labourers are few” (Matthew 9:37). Somewhere a congregation is praying for each one of them." }
+      ] },
+
+    { id: "circuitVisitor", when: { minWeek: 5, maxWeek: 16, chance: 0.25 }, from: "Pastor Bremer, circuit visitor", kind: "call", title: "Just Checking In",
+      text: "Pastor Bremer, the circuit visitor, calls from his truck. “Not about the congregation. About you. How are you sleeping? When did you last take a Monday?”",
+      choices: [
+        { label: "Tell him the truth", fx: { strength: 6, harmony: 1 },
+          reply: "You tell him: the boiler, the budget, the two a.m. calls. He listens, prays with you right there on the phone, and makes you promise to take Monday. He asks after Sam by name." },
+        { label: "Say you’re fine", fx: { strength: -2 },
+          reply: "“Fine,” you say. “Everybody says fine,” he says. “I’ll call next month.” He does, and you’re a little more honest." },
+        { label: "Invite him to lunch at Deb’s", fx: { strength: 4, sermon: 2, family: -1 },
+          reply: "Deb’s hot beef sandwich and two hours of shop talk. He has been a pastor thirty-one years and has two pieces of advice. You write both on a napkin." }
+      ] },
+
+    { id: "higherThings", when: { minWeek: 14, maxWeek: 17, chance: 0.4 }, from: "Josh", kind: "knock", title: "A Lot of Church",
+      text: "Josh, at the office door, holding a printout: “There’s this youth conference in July. Higher Things. Lutheran kids from everywhere, chapel four times a day. It’s kind of a lot of church.” Pause. “I want to go. It costs money.”",
+      choices: [
+        { label: "Plan a fundraiser with him", fx: { josh: -12, harmony: 4, strength: -4 },
+          reply: "A spaghetti supper, Josh decides. He makes the poster himself: ALL YOU CAN EAT, ALL OF IT LUTHERAN. Marge volunteers to supervise the sauce, and possibly Josh." },
+        { label: "Ask Pete about the youth fund", fx: { josh: -8, harmony: 2 },
+          reply: "Pete finds $300 in the youth line the voters passed in January. Josh shakes his hand like a businessman. Pete is visibly moved." },
+        { label: "Offer to chaperone", fx: { josh: -10, family: -3, strength: -2 },
+          reply: "Five July days with a great many Lutheran teenagers. Sam laughs for a full minute. Josh says, “You’d come?” in a voice that makes it worth it." }
+      ] },
+
+    { id: "fieldWork", when: { minWeek: 5, maxWeek: 16, chance: 0.25 }, from: "A seminarian", kind: "email", title: "A Sunday with a Seminarian",
+      text: "A second-year seminarian, home for the weekend in the next county, asks if he can spend Sunday at Zion: Bible class, the Divine Service, and the questions they can’t answer for him in a classroom.",
+      choices: [
+        { label: "Have him read the lessons", fx: { harmony: 3, sermon: 2, strength: -2 },
+          reply: "Too fast, then too slow, then just right. Mrs. Dahl tells him he has a lovely voice and should eat more. He reports both to his field-work supervisor." },
+        { label: "Take him on a Communion call", fx: { harmony: 2, strength: -3 },
+          reply: "At Pine Haven he watches you give the Supper to a woman who can no longer speak. In the car he is quiet a long time. “They didn’t teach that,” he says. “They can’t,” you say." },
+        { label: "Lunch and hard questions", fx: { strength: 2, family: -2 },
+          reply: "He asks about the two a.m. calls, the council, the loneliness. You tell him the truth, and about the winkel. He takes notes on a napkin. Everyone does, apparently." }
+      ] },
+
+    { id: "oktoberfest", when: { minWeek: 16, maxWeek: 16, day: 3, chance: 1 }, from: "Hank Krause", kind: "call", title: "Oktoberfest at the Tap",
+      text: "Hank Krause: “Oktoberfest at the Tap tonight, Pastor. Brats from the meat market, the polka band from Elm Grove, my mother’s potato salad. Half of Zion’s coming. Say the table prayer? In German, if you’ve got it.”",
+      choices: [
+        { label: "Go, and pray in German", fx: { harmony: 6, strength: 2, family: 2 },
+          reply: "You get through the old table prayer in German, mostly. Hank’s mother corrects one word and beams. Erv polkas with his wife. One beer, three brats, no regrets." },
+        { label: "Bring Sam and Bea", fx: { family: 8, harmony: 3, strength: -2 },
+          reply: "Bea learns the chicken dance and teaches it to the entire Tap. Sam wins the pretzel contest by a dignified margin. You carry Bea home asleep, smelling of mustard." },
+        { label: "Stay in and finish the sermon", fx: { sermon: 6, harmony: -2 },
+          reply: "You can hear the tuba from the parsonage. Reformation Sunday will be better for it. Hank saves you a brat in foil, labelled PASTOR." }
+      ] },
+
+    { id: "tapQuestion", when: { minWeek: 2, maxWeek: 17, chance: 0.3 }, from: "Arne Schroeder", kind: "call", title: "Not in a Church",
+      text: "Arne: “A few of us are at the Tap. Dale Hoffmann’s here. His boy’s been deployed six months, and Dale wants to ask a pastor something. But not in a church, he says.”",
+      choices: [
+        { label: "Go and listen", fx: { harmony: 4, strength: -3 },
+          reply: "One beer, a corner booth. Dale asks if God keeps his boy. You read him “The LORD shall preserve thy going out and thy coming in” (Psalm 121:8). Dale copies it down." },
+        { label: "Ask Dale to stop by the office", fx: { sermon: 2, harmony: -1 },
+          reply: "Dale says maybe, and doesn’t. A week later Arne mentions Dale is at the Tap most Thursdays, if you wanted to happen by." }
+      ] },
+
+    { id: "theologyOnTapNight", when: { minWeek: 3, maxWeek: 16, chance: 0.3 }, from: "Megan Schulz", kind: "email", title: "Theology on Tap",
+      text: "Megan Schulz, 26, a nurse: “Some of us want to start Theology on Tap in the back room at Krause’s. Would you lead it? Pick a topic. Nobody wants to be preached at. We want real answers.”",
+      choices: [
+        { label: "Topic: does my job matter to God?", fx: { harmony: 5, strength: -3 },
+          reply: "Fourteen people come. You talk about vocation: God feeding the world through farmers and tending it through nurses. A welder says nobody ever told him. He brings two friends next month." },
+        { label: "Topic: why is church so old?", fx: { harmony: 4, sermon: 2, strength: -3 },
+          reply: "You explain the liturgy as the Word set to music for everyone. A young dad says it’s the one hour of his week when nobody tries to sell him anything. Best line of the night." },
+        { label: "Topic: what happens when we die?", fx: { harmony: 4, strength: -4 },
+          reply: "Heavy for a Thursday. One woman lost her father in March. You talk about the resurrection of the body, and afterward she asks you to visit her mother. You go Saturday." }
+      ] },
+
+    { id: "confessor", when: { minWeek: 8, maxWeek: 10, chance: 0.35 }, from: "Pastor Dietz", kind: "call", title: "Your Confessor Calls",
+      text: "Pastor Dietz from Elm Grove, your father confessor: “It’s been since Advent, my friend. Lent is a good time for it. I have an hour Thursday, and the coffee is terrible.”",
+      choices: [
+        { label: "Make the appointment", fx: { strength: 10, sermon: 3 },
+          reply: "You kneel in his chancel and say what you would tell no one else. He absolves you in Christ’s stead. You drive home with the radio off, forgiven, and you know it." },
+        { label: "Maybe after Easter", fx: { strength: -3 },
+          reply: "He says that’s fine, and calls again after Easter, because he is that kind of confessor. Physician, heal thyself, you think, and put it on the calendar." }
+      ] },
+
+    { id: "baptismBirthday", when: { minWeek: 0, maxWeek: 17, chance: 0.2 }, from: "Bea", kind: "knock", title: "A Baptism Birthday",
+      text: "Bea, holding her baptismal candle: “It’s my baptism birthday! Eight years! Can we light it at supper? Mom says you have to say the words.”",
+      choices: [
+        { label: "Light it at supper", fx: { family: 8, strength: 2 },
+          reply: "Candle, cake, and the story again: the snowstorm, Grandpa’s tie, Bea yelling through the whole thing. You trace a cross on her forehead. “Still His,” you say. “Still His,” she says." },
+        { label: "Read her the catechism on it", fx: { family: 5, sermon: 2 },
+          reply: "“What does Baptism give or profit?” you read. Bea knows the answer better than some confirmands. She adds, unprompted, that it works even if you were crying." }
+      ] },
+
+    { id: "votersAssembly", when: { minWeek: 12, maxWeek: 16, chance: 0.35 }, from: "Pete", kind: "call", title: "The Voters Decide",
+      text: "Pete: “Voters’ assembly Sunday after church. New hymnals or a new parking lot. The trustees want the lot. The choir wants hymnals. You’re advisory, Pastor. Please advise.”",
+      choices: [
+        { label: "Lay out both; let them vote", fx: { harmony: 5, strength: -3 },
+          reply: "You set out both fairly and pray before the vote. The voters choose the lot, 31 to 29, with hymnals next year. Hannah takes it graciously. Gus takes it very graciously." },
+        { label: "Speak up for the hymnals", fx: { hannah: -8, gus: 4, harmony: -1 },
+          reply: "Hymnals, you say, are how the faith gets sung at bedsides. The voters agree, 33 to 27. Gus says the Gorge will remember this." },
+        { label: "Suggest tabling it a month", fx: { harmony: 2, building: -2 },
+          reply: "Tabled. Pete is relieved. The Gorge widens an inch, in protest." }
+      ] },
+
+    { id: "germanBible", when: { minWeek: 3, maxWeek: 16, chance: 0.2 }, from: "Arne Schroeder", kind: "knock", title: "The Family Bible",
+      text: "Arne Schroeder brings in his great-grandfather’s German Bible, the family pages in faded Fraktur. “Can you read it, Pastor? Nobody in the family can anymore.”",
+      choices: [
+        { label: "Read him the family pages", fx: { harmony: 4, strength: -1 },
+          reply: "Births, marriages, baptisms at Zion: 1889, 1892, 1901. The first entry is his great-grandfather’s confirmation, with his verse written out. Arne asks you to read it twice." },
+        { label: "Read them to the whole family", fx: { harmony: 6, strength: -3 },
+          reply: "Sunday after church, three generations of Schroeders round a folding table while you read their names. Arne’s grandson asks if his baptism will go in the book. Yes, says Arne. In English." }
+      ] },
+
+    // The bowling league at Krause’s Tap: the Unaltered Pins.
+    { id: "waltBowling", when: { minWeek: 6, maxWeek: 14, chance: 0.35 }, from: "Gus", kind: "call", title: "An Empty Anchor Spot",
+      text: "Gus: “Walt used to anchor the Unaltered Pins. Two-hundred average, back when. League’s Tuesday. Somebody ought to ask him. Somebody who isn’t me, because I’ll get emotional.”",
+      choices: [
+        { label: "Go and ask Walt yourself", set: "waltBowls", fx: { walt: -12, strength: -2 },
+          reply: "Walt turns his old ball over in his hands in the garage. Ruth’s initials are on the bag. “She kept score,” he says. “Badly.” Then: “Tuesday?” Tuesday." },
+        { label: "Let him come in his own time", fx: { walt: -4 },
+          reply: "You mention it once, lightly, at the café. Walt says nothing. You leave the door open, and the league sheet has a space with no name on it, just in case." }
+      ] },
+
+    { id: "teamShirts", when: { minWeek: 3, maxWeek: 13, chance: 0.3 }, from: "Pete", kind: "email", title: "The Team Shirts",
+      text: "The team shirts have arrived. Pete ordered them online: navy, gold lettering, THE UNALTARED PINS. He would like to know if anyone will notice.",
+      choices: [
+        { label: "Wear them proudly", fx: { harmony: 4, pete: -6 },
+          reply: "Nobody at the Tap notices except First Methodist’s team, who notice loudly and with joy. Marge offers to fix the A in gold thread. Gus says leave it: an altar never hurt anybody." },
+        { label: "Send them back", fx: { building: -2, harmony: -1 },
+          reply: "The replacements take five weeks. They say UNALTERED on the front and PINS on the back of someone else’s shirt. You decide it’s a sign and stop asking." }
+      ] },
+
+    { id: "leagueChampionship", when: { minWeek: 16, maxWeek: 16, day: 0, chance: 1 }, from: "Pete", kind: "call", title: "League Championship",
+      text: "Pete: “It’s tonight. The championship. The Unaltered Pins against the Feed Mill Strikers. I’ve run the numbers. We need you to bowl a 140.” Your average is 112.",
+      choices: [
+        { label: "Bowl, and pray for spares", fx: { harmony: 6, strength: -2, gus: -6, pete: -6 },
+          reply: "You bowl a 131: a personal best, and not enough. Then Arne converts a 7–10 split in the tenth. The Tap goes silent, then wild. The Unaltered Pins win by three pins." },
+        { label: "Let Gus bowl your frames", fx: { harmony: 3, strength: 2, gus: -8 },
+          reply: "Gus rolls a 210 with the lucky ball. The Feed Mill Strikers buy the winners a round. You have a root beer and lead the table prayer over the pretzels." },
+        { label: "Bring Sam and Bea to cheer", fx: { family: 6, harmony: 3 },
+          reply: "Bea makes a sign: GO UNALTERED PINS (AND DAD). You bowl better than ever for an audience of two. The team loses by eleven, and nobody minds at all." }
       ] }
   ],
 
@@ -1500,7 +1993,18 @@ window.PASTOR = {
       "A farmer: “Short and good. Like a rain in July.”",
       "Mrs. Dahl, 99: “I heard every word, and my hearing aid wasn’t even on.”",
       "“That’s my pastor,” Bea tells everyone in line. It is the best review you will ever get.",
-      "“I’ll be thinking about that all week,” says someone you didn’t know was listening."
+      "“I’ll be thinking about that all week,” says someone you didn’t know was listening.",
+      { who: "nguyen", text: "Linh Nguyen: “I understood every word, and I wasn’t even trying.” Daniel: “High praise. She was trying.”" },
+      "An usher: “I counted the people and forgot to count the plate. That’s never happened.”",
+      { who: "marge", text: "Marge: “I didn’t think about the thermostat once.” A pause. “Well. Once.”" },
+      "A college student home for the weekend: “Is it always like this? I should come home more.”",
+      { who: "gus", text: "Gus shakes your hand twice, which has never happened. Then he goes downstairs to tell the boiler." },
+      "Erv Lindemann, head elder: “The elders have no notes.” As far as anyone knows, a first in Zion’s history.",
+      "A visitor from Milwaukee: “We drove past three churches to get here. Worth it.”",
+      { who: "walt", text: "Walt: “I’m going to tell Ruth about that one.” He means at the cemetery, this afternoon. He means it gladly." },
+      { who: "hannah", text: "Hannah, from the organ bench, gives you a single thumbs-up. She has never done this. You may frame it." },
+      "A teenager: “That actually made sense.” Her mother looks stunned. So do you.",
+      { text: "An old farmer grips your hand: “He is risen indeed, Pastor. And you preached like it.”", when: { season: "easter" } }
     ],
     good: [
       "“Pastor, I finally wrote the church’s whole name on a check. It took both lines and the memo.”",
@@ -1514,7 +2018,18 @@ window.PASTOR = {
       "“You said exactly what I needed,” a woman says, and hurries off before you can ask which part.",
       "“Good sermon. My husband slept, but he looked very peaceful.”",
       "A kid hands you a bulletin drawing of you preaching. You have six arms. It feels accurate.",
-      "“I loved the part about the sheep,” says a man. There was no part about sheep. You’ll take it."
+      "“I loved the part about the sheep,” says a man. There was no part about sheep. You’ll take it.",
+      { who: "pete", text: "Pete: “Good sermon. I only added up the offering in my head once.”" },
+      "“Nice job, Pastor. Has the church always had that window?” It has. Since 1911.",
+      { who: "josh", text: "Josh: “I took notes.” He shows you: a drawing of Biscuit in a stole. You take it as a yes." },
+      "An usher: “Seventy-eight today, plus a baby who sang all through the Creed.”",
+      "“Good one. My mother would have liked it, and she disliked everything.”",
+      { who: "nguyen", text: "Daniel Nguyen: “I followed the whole argument. Linh followed the hymns. We’ll compare notes over lunch.”" },
+      "Erv: “Good. The elders may steal your second point for the newsletter.”",
+      { who: "gus", text: "Gus: “Good sermon. Building was warm, too.” Two compliments, possibly of equal weight." },
+      "A grandmother: “I heard every word, so either you fixed the microphone or you finally spoke up.”",
+      { who: "walt", text: "Walt: “That bit about coming home. I heard that.” He looks at his shoes. You don’t say anything clever." },
+      { text: "“Good Advent sermon,” a man says, “and you didn’t mention Christmas once. My wife owes me five dollars.”", when: { season: "advent" } }
     ],
     fine: [
       "“Nice sermon, Pastor. Where’s the coffee?”",
@@ -1527,7 +2042,18 @@ window.PASTOR = {
       "“Good effort,” says a retired teacher, as if you’d handed in a book report.",
       "A child: “Why did you say the same thing three times?” Her mother apologizes. The child is right.",
       "“The Gospel was good,” someone says. The Gospel always is. That’s the point.",
-      "“Interesting,” says a woman, in a tone that means she was thinking about lunch."
+      "“Interesting,” says a woman, in a tone that means she was thinking about lunch.",
+      "“That was a sermon,” says a man at the door, which is factually true.",
+      { who: "hannah", text: "Hannah: “The sermon ended in a different key from the one it started in. I noticed.”" },
+      "A man shakes your hand and says, “Packers at noon,” which is a review, of a sort.",
+      { who: "pete", text: "Pete: “Seventeen minutes. I timed it for the budget.” You decide not to ask what the budget has to do with it." },
+      "“Didn’t you tell that story last year?” You did. Same story, same turkey.",
+      { who: "gus", text: "Gus: “Middle bit dragged. Like the old boiler did, at the end.” He pats your shoulder, which helps." },
+      "A child asks if you’ll be done talking sooner next week.",
+      "An usher: “Nearly dozed off at the second point, Pastor. My fault. Up with the calves.”",
+      { who: "marge", text: "Marge straightens your stole at the door without a word. The straightening is the word." },
+      "“Very… thoughtful,” says a retired professor, and you can hear the ellipsis.",
+      { text: "“A very Lenten sermon,” a woman says. You aren’t sure that was a compliment. You decide to take it as one.", when: { season: "lent" } }
     ],
     thin: [
       "“Short one today!” says a man, delighted. It’s the only thing he’s delighted about.",
@@ -1541,9 +2067,114 @@ window.PASTOR = {
       { who: "walt", text: "Walt: “Ruth used to say the Gospel is sturdy enough to survive any preacher.” He means it as comfort. It is." },
       { who: "josh", text: "Josh: “That was weird.” Fair." },
       "Deb: “Pie’s on me this week, Pastor. You look like you need it.”",
-      "“Even on a thin Sunday, God’s Word does what He sends it to do,” Mrs. Dahl says, patting your hand."
+      "“Even on a thin Sunday, God’s Word does what He sends it to do,” Mrs. Dahl says, patting your hand.",
+      "An usher, kindly: “Short one, Pastor. We’ll make it up in the coffee.”",
+      { who: "pete", text: "Pete: “Off week? Happens to the stock market too.” Somehow that helps." },
+      { who: "gus", text: "Gus: “You need a day off, Pastor.” From a man who talks to boilers, it lands." },
+      "Erv waits until the line is gone. “Busy week?” You nod. “Next week, then.” He means it as a promise, not a warning.",
+      "A little boy: “I liked when you said Jesus.” So did you. It was the best part.",
+      "Someone asks if you’re coming down with something. You might be. It might be Thursday.",
+      { who: "nguyen", text: "Linh Nguyen, kindly: “The Scripture readings were beautiful today.” They were." },
+      "A farmer at the door: “Some years the crop’s thin. You plant again.” He tips his cap.",
+      "A visitor: “What lovely liturgy.” She doesn’t mention the sermon. You are grateful for the liturgy too.",
+      { who: "hannah", text: "Hannah: “Well, the hymns were strong.” Then, gently: “Get some sleep.”" },
+      { text: "“Christ is still risen, Pastor,” a woman says at the door, smiling, “even on a thin week.” Alleluia anyway.", when: { season: "easter" } }
     ]
   },
+
+  // Sunday: the one-line verdict on the sermon, by tier ({gospel} and {sunday} are filled in).
+  sermonLines: {
+    great: [
+      "Your sermon on {gospel} sang. People were still talking about it at coffee hour.",
+      "{sunday}, and the sermon simply worked: the text opened, Christ stepped out of it, and you got out of the way.",
+      "Nobody coughed for eighteen minutes. On {gospel}, in Willow Creek, that is a miracle of a minor sort.",
+      "The sermon on {gospel} landed where it was aimed: on Christ, for them. You felt the room lean in at the Gospel.",
+      "Halfway through the sermon on {gospel}, a toddler stopped fussing to listen. So did her grandfather.",
+      "Every sentence on {gospel} pulled its weight, and the last one carried the promise all the way home.",
+      "You didn’t look at your notes once. {gospel} had been living in you all week, and it showed.",
+      "It was the kind of sermon on {gospel} that people take home and argue about, kindly, over pot roast.",
+      "For {sunday}: Law that was honest and Gospel that was louder. Hannah forgot to check her watch.",
+      "Your sermon walked through {gospel} like a man who knew the house, and people followed you room by room.",
+      "Even the back pew sat up. When you said “for you,” it carried all the way to the narthex.",
+      "Clear, warm and short: three things that rarely travel together arrived at Zion at once, on {gospel}.",
+      "Someone took notes on the bulletin during the sermon on {gospel}. Someone who never takes notes."
+    ],
+    good: [
+      "Your sermon on {gospel} was solid: Law and Gospel, and home by noon.",
+      "An honest sermon on {gospel}. Not fireworks: a lamp. People could see by it.",
+      "{sunday}: the sermon held together, and Christ was in the middle of it, where He belongs.",
+      "One great paragraph on {gospel} and four good ones. That is a fine Sunday by any measure.",
+      "The sermon ran two minutes long, but the Gospel in it was clear. Nobody minded, except the roasts.",
+      "You preached {gospel} plainly, and people nodded in the places that mattered.",
+      "Not your best, not your worst: a sturdy sermon on {gospel}, the kind a congregation lives on most weeks.",
+      "The snowplough illustration worked better than expected. So did the part about Jesus, which was the point.",
+      "Your sermon on {gospel} got a laugh in the right place and a silence in a better one.",
+      "Good bones. The sermon on {gospel} knew where it was going and got there before the hymn.",
+      "The sermon for {sunday} was a good loaf of bread: nothing fancy, and enough for everyone.",
+      "You lost your place once and found it in the text, which is the right place to find it.",
+      "The sermon on {gospel} wasn’t quotable, but it was true, and it was for them."
+    ],
+    fine: [
+      "Your sermon on {gospel} got there in the end, by way of a story about your car.",
+      "The sermon on {gospel} wandered a little. It came home for supper, though.",
+      "{sunday}: three points, and the third was the second one in a different hat.",
+      "You preached {gospel}, mostly. There was a detour through your seminary days that nobody had asked for.",
+      "Halfway through, you realised you’d said “in a sense” six times. In a sense, it was fine.",
+      "The sermon on {gospel} had a good idea at the end that belonged at the beginning.",
+      "Adequate. The Gospel was in there, under a heap of background on first-century fishing.",
+      "Your sermon on {gospel} ran long and landed soft. The hymn after it did the heavy lifting.",
+      "You felt the room drift at the second point and drift back at the word “forgiven.” Good word.",
+      "A middling sermon on {gospel}. The text was better than the sermon, which at least is the right way round.",
+      "The sermon for {sunday} was fine: clear enough, warm enough, and a little too much like last week’s.",
+      "The sermon had a beginning and an end. The middle was mostly coughing, some of it yours."
+    ],
+    thin: [
+      "Your sermon on {gospel} was thin. You could feel the study you skipped. The Gospel still did its work: it always does.",
+      "Thin soup for {sunday}. You stirred {gospel} and found more water than potatoes. People ate it kindly.",
+      "You preached from half a page of notes and a prayer. The prayer did more.",
+      "The sermon on {gospel} ended three minutes early because you ran out. Some people were thrilled.",
+      "You told the same story twice and only noticed the second time. Pete noticed the first time.",
+      "{gospel} deserved better than you gave it this week. God gave it anyway: in the reading, the absolution and the Supper.",
+      "You could hear the unread commentary in every sentence. Still, “Christ died for you” was in there, and it is enough.",
+      "A thin sermon. But the text was read, sins were forgiven and the Supper was given. Zion was fed, if not by your cleverness.",
+      "Mid-sermon you remembered the better idea you had on Thursday and never wrote down. Too late now.",
+      "Your sermon on {gospel} was mostly throat-clearing. The liturgy around it carried the weight, as it has for centuries.",
+      "Short, scattered and tired. Mrs. Dahl gave you a look that said “rest,” not “try harder.”",
+      "The sermon was thin, but the Word read before it was not: “it shall not return unto me void” (Isaiah 55:11)."
+    ]
+  },
+
+  // Sunday morning around the sermon: Bible class, the Divine Service, the Supper, coffee.
+  sundayMornings: [
+      "Bible class at 9:15 on the Book of Acts: eleven people, two Bibles with tabs, one with sticky notes in five colours. Then the Divine Service at 10:30.",
+      "Bible class reads Ruth this morning. Arne admits he never knew she was a foreigner. Then the bell, the processional hymn and the Divine Service.",
+      "The acolyte lights the altar candles on the second try. The congregation exhales together, and the Divine Service begins.",
+      "Usher report: seventy-four present, two new faces, and one dog in the parking lot who would very much like to come in.",
+      "At the rail you place the host in hands old and young: Marge’s, Daniel’s, a farmer’s cracked ones. Given for you, again and again.",
+      "Bible class on the Augsburg Confession: Article IV takes the whole hour. Nobody minds. It’s the one about being forgiven.",
+      "The hymn of the day is “Now Thank We All Our God.” The third stanza comes out stronger than the first. It usually does.",
+      "Coffee hour: the big urn, three kinds of bars, and a lemon one that’s gone in four minutes. A good deal of theology happens near the lemon bars.",
+      "Confession and absolution open the service. You speak the forgiveness in Christ’s stead, and something in the room unclenches.",
+      "Before the service a visitor asks about Communion. You talk with her kindly at the door; she comes forward with arms crossed for a blessing.",
+      "The sound system squeals during the Gospel. Gus is up the stairs before the end of the verse. Silence. He sits down to grateful, scattered smiles.",
+      "Bible class runs over because someone asked about Melchizedek. You stop at 10:20 with the question open and the coffee still hot.",
+      "In the offering plate, a check with a sticky note: “for the boiler, don’t tell my wife.” Two pews back, his wife has written the same note.",
+      "The children come up for the children’s message. One brings her stuffed rabbit, who is also very interested in the parable.",
+      { text: "The Advent wreath, one more candle lit than last week. The acolyte reaches with the long taper, and the whole congregation leans with him.", when: { season: "advent" } },
+      { text: "Gaudete: the rose candle. Marge has polished the wreath stand until it reflects the windows. Bible class discusses joy, stiffly, then less stiffly.", when: { minWeek: 2, maxWeek: 2 } },
+      { text: "The Sunday after Christmas: half the regulars are visiting relatives, and the other half have brought theirs. Every carol, every stanza.", when: { minWeek: 4, maxWeek: 4 } },
+      { text: "The Wise Men in the Sunday school display finally reach the manger, having crossed the windowsill one inch a week since Advent.", when: { minWeek: 5, maxWeek: 5 } },
+      { text: "The last Alleluias until Easter. The congregation sings them loud, like people waving goodbye at a train station.", when: { minWeek: 7, maxWeek: 7 } },
+      { text: "Violet on the altar, no Alleluia, and the Litany sung slowly. The quiet of Lent feels like a held breath.", when: { minWeek: 8, maxWeek: 9 } },
+      { text: "Palm Sunday. The ushers hand out palms, and the procession winds round the outside of the church singing “All Glory, Laud and Honor.” One palm becomes a sword by the second stanza.", when: { minWeek: 10, maxWeek: 10 } },
+      { text: "Easter Day: sunrise at 6:30, the youth breakfast at 8 (ham, eggs, a dispute over the syrup), then the Festival Divine Service at 10:30, packed to the narthex.", when: { minWeek: 11, maxWeek: 11 } },
+      { text: "Easter lilies still crowd the altar steps, a bit tired now. The Alleluias are back, and the congregation won’t stop singing them.", when: { season: "easter" } },
+      { text: "Good Shepherd Sunday. Bible class reads Psalm 23 and Ezekiel 34, and a farmer explains, at length, what sheep are really like. It helps.", when: { minWeek: 13, maxWeek: 13 } },
+      { text: "Pentecost: everybody wears red, more or less. Pete’s red tie still has the price tag on. Bible class is cancelled for confirmation photos.", when: { minWeek: 14, maxWeek: 14 } },
+      { text: "The Holy Trinity, and the Athanasian Creed, all of it, read aloud standing. Nobody sits down early. Gus calls it a workout.", when: { minWeek: 15, maxWeek: 15 } },
+      { text: "Reformation: red paraments, “A Mighty Fortress” with a trumpet, and Bible class on the Augsburg Confession. Brats are already on the grill outside.", when: { minWeek: 16, maxWeek: 16 } },
+      { text: "The Last Sunday: “Wake, Awake, for Night Is Flying” with the organ open full, and gold on the altar. The year ends where it began, waiting for Christ.", when: { minWeek: 17, maxWeek: 17 } }
+  ],
 
   // ───────────────────────── 6. The year in review ─────────────────────────
   endings: {
