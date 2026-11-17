@@ -105,7 +105,7 @@
   .act small { display: block; color: #7a6c55; font-size: 12px; margin-top: 2px; }
   .act .new { color: #b0612a; font-weight: 700; }
   .act:disabled { opacity: .45; cursor: default; }
-  #hint { color: #9aa0c2; font-size: 13px; line-height: 1.45; margin-top: 10px; }
+  #hint, .empty-note { color: #9aa0c2; font-size: 13px; line-height: 1.45; margin-top: 10px; }
 
   /* the scene card */
   #modal { position: fixed; inset: 0; z-index: 20; display: none; align-items: flex-end; justify-content: center; background: rgba(8,10,20,.55); }
@@ -240,9 +240,10 @@ const SPECIAL_DAYS = [
 ];
 /**
  * Confirmation class meets every Wednesday afternoon (before the midweek
- * service, in Advent and Lent), except Christmas week, Ash Wednesday and Holy Week.
+ * service, in Advent and Lent), from Advent to Pentecost (confirmation), except
+ * Christmas week, Ash Wednesday and Holy Week.
  */
-const CLASS_DAY = 1, NO_CLASS_WEEKS = [4, 8, 11];
+const CLASS_DAY = 1, NO_CLASS_WEEKS = [4, 8, 11, 15, 16, 17];   // Christmas, Ash Wednesday, Holy Week, and after Pentecost's confirmation
 /** Communion calls on the homebound come round about once a month. */
 const COMMUNION_EVERY = 4;
 
@@ -318,7 +319,7 @@ function freshState() {
     v: 1, week: 0, day: 0, slot: 0, at: 'parsonage', started: true, over: false,
     m: { strength: 75, sermon: 0, harmony: 60, building: 58, family: 65 },
     need: { olsen: 45, gus: 30, marge: 30, nguyen: 35, walt: 55, josh: 30, pete: 35, hannah: 30 },
-    flags: {}, seen: {}, bags: {}, studies: 0, rep: 50,
+    flags: {}, seen: {}, bags: {}, done: {}, studies: 0, rep: 50, strengthLog: [],
     weekStart: null, doneToday: {},
     stats: { visits: 0, studies: 0, prayers: 0, rests: 0, family: 0, events: 0 },
     sundays: [],   // { week, att, score, tier }
@@ -329,7 +330,13 @@ let S = load();
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
-    if (d && d.v === 1) return Object.assign(freshState(), { bags: {} }, d, { m: Object.assign(freshState().m, d.m), stats: Object.assign(freshState().stats, d.stats) });
+    if (d && d.v === 1) {
+      const f = freshState();
+      return Object.assign(f, d, {
+        m: Object.assign(f.m, d.m), stats: Object.assign(f.stats, d.stats), need: Object.assign(f.need, d.need),
+        flags: d.flags || {}, seen: d.seen || {}, bags: d.bags || {}, done: d.done || {}, strengthLog: d.strengthLog || [],
+      });
+    }
   } catch (e) { /* a broken save is a fresh year */ }
   return null;
 }
@@ -390,6 +397,18 @@ function inHospital(id) {
   if (id === 'nguyen') return !!S.flags.inLabor && !S.flags.graceBorn;
   return false;
 }
+/**
+ * Each person's home base: a story scene with no `at` of its own happens only
+ * there. A scene with an `at` happens only at that place.
+ */
+const HOME_BASE = { olsen: 'home', nguyen: 'home', walt: 'home', gus: 'church', marge: 'church', josh: 'church', hannah: 'church', pete: 'office' };
+function storyAt(id, at) {
+  const sc = storyFor(id, at);
+  if (!sc) return null;
+  return (sc.when && sc.when.at) || at === HOME_BASE[id] ? sc : null;
+}
+/** True when someone has generic visit lines meant for this place. */
+const hasLinesAt = (id, at) => (P.visitLines[id] || []).some(l => l && l.when && l.when.at === at);
 /** The things you can do at a place: [{ key, label, sub, who?, isNew? }]. */
 function actionsAt(pl) {
   const A = [];
@@ -398,10 +417,10 @@ function actionsAt(pl) {
     const at = PLACES[pl].person ? 'home' : pl;
     // Someone in hospital isn't at home, and someone at home isn't in hospital.
     if ((at === 'hospital') !== inHospital(id) && (at === 'home' || at === 'hospital')) {
-      if (at === 'home') A.push({ key: 'none', label: `${visitLabel(id, at).replace('Visit ', '')}: nobody's home`, sub: 'try Willow Creek Hospital' });
+      if (at === 'home') { const who = visitLabel(id, at).replace('Visit ', ''); A.push({ key: 'none', label: `${who[0].toUpperCase() + who.slice(1)}: nobody's home`, sub: 'try Willow Creek Memorial' }); }
       return;
     }
-    const sc = storyFor(id, at);
+    const sc = storyAt(id, at);
     A.push({ key: 'visit', who: id, at, label: visitLabel(id, at), sub: needWord(id), isNew: !!sc });
   };
   if (pl === 'church') {
@@ -411,6 +430,7 @@ function actionsAt(pl) {
     if (S.day >= 2 && S.m.sermon >= 30) A.push({ key: 'rehearse', label: 'Preach it to the empty church', sub: 'polish the sermon · Thursday on' });
     A.push({ key: 'property', label: 'Walk the building with Gus', sub: 'building · a list for the trustees' });
     for (const id of ['gus', 'marge', 'josh', 'hannah']) person(id);
+    for (const id of ['walt', 'pete', 'nguyen']) if (living().includes(id) && storyAt(id, 'church')) person(id);   // here for a reason (Walt back in the loft)
   } else if (pl === 'office') {
     // Sermon prep comes in four kinds; they share one week's worth of fresh insight (S.studies).
     A.push({ key: 'study', label: 'Study the readings', sub: `${W().gospel} · sermon` });
@@ -425,8 +445,9 @@ function actionsAt(pl) {
     if (communionDue()) A.push({ key: 'communion', label: 'Communion calls', sub: 'the homebound and Pine Haven, once a month', isNew: true });
   } else if (pl === 'cafe') {
     A.push({ key: 'cafe', label: 'Coffee and pie at the counter', sub: 'harmony · town news' });
+    // At the café: anyone with a café scene, and anyone overdue for a visit who likes their coffee there.
     for (const id of ['walt', 'pete', 'gus', 'marge', 'josh']) {
-      if (storyFor(id, 'cafe')) person(id);   // at the café, only when they're there for a reason
+      if (storyAt(id, 'cafe') || (S.need[id] >= 50 && hasLinesAt(id, 'cafe'))) person(id);
     }
   } else if (pl === 'tap') {
     A.push({ key: 'tap', label: 'A beer with the guys', sub: 'strength · harmony · town news' });
@@ -477,18 +498,18 @@ const BASE = {   // what each kind of action does before its words add their own
   quilters:   () => ({ harmony: 6, strength: 2, marge: -10 }),
   bowling:    () => ({ strength: 7, harmony: 6, family: -3, gus: -8, pete: -8 }),   // your teammates count it as a visit
   theologyOnTap: () => ({ harmony: 9, sermon: 6, strength: -7 }),
-  pray:     () => ({ strength: 8, sermon: 6, harmony: 2 }),
+  pray:     () => ({ strength: 8, sermon: 4, harmony: 2 }),
   property: () => ({ building: 11, strength: -9 }),
   office:   () => ({ building: 9, strength: -7, harmony: 2 }),
-  rounds:   () => ({ harmony: 3, sermon: 4, strength: -10 }),
+  rounds:   () => ({ harmony: 3, sermon: 2, strength: -10 }),
   communion: () => ({ harmony: 5, sermon: 3, strength: -10, ...(living().includes('olsen') ? { olsen: -12 } : {}) }),
-  cafe:     () => ({ harmony: 6, sermon: 3, strength: -4 }),
+  cafe:     () => ({ harmony: 6, sermon: 1, strength: -4 }),
   rest:     () => ({ strength: 24, family: 2 }),
   family:   () => ({ family: 22, strength: 9 }),
-  visit:    id => ({ [id]: -35, strength: -10, sermon: 4, harmony: 1 }),
+  visit:    id => ({ [id]: -35, strength: -10, sermon: 2, harmony: 1 }),
 };
 const POOL_OF = { fishFry: 'fishFry', quilters: 'quilters', bowling: 'bowling', exegesis: 'exegesis', fathers: 'fathers', manuscript: 'manuscript', rehearse: 'rehearse', tap: 'tap', theologyOnTap: 'theologyOnTap', communion: 'communion', study: 'study', pray: 'pray', property: 'property', office: 'office', rounds: 'rounds', cafe: 'cafe', rest: 'rest', family: 'family' };
-const KICKER = { fishFry: 'Friday night at Krause\'s Tap', quilters: 'The fellowship hall', bowling: 'The lanes behind Krause\'s Tap', exegesis: 'The church office', fathers: 'The church office', manuscript: 'The church office', rehearse: 'The empty church', tap: 'Krause\'s Tap', theologyOnTap: 'The back room at Krause\'s Tap', communion: 'Pine Haven and the homebound', study: 'The church office', pray: 'The sanctuary', property: 'The building', office: 'The church office', rounds: 'Willow Creek Hospital', cafe: 'The Willow Café', rest: 'The parsonage', family: 'The parsonage' };
+const KICKER = { fishFry: 'Friday night at Krause\'s Tap', quilters: 'The fellowship hall', bowling: 'The lanes behind Krause\'s Tap', exegesis: 'The church office', fathers: 'The church office', manuscript: 'The church office', rehearse: 'The empty church', tap: 'Krause\'s Tap', theologyOnTap: 'The back room at Krause\'s Tap', communion: 'Pine Haven and the homebound', study: 'The church office', pray: 'The sanctuary', property: 'The building', office: 'The church office', rounds: 'Willow Creek Memorial', cafe: 'The Willow Café', rest: 'The parsonage', family: 'The parsonage' };
 const TITLE = { fishFry: 'Fish fry', quilters: 'The quilters', bowling: 'League night', exegesis: 'The Greek', fathers: 'Luther and the fathers', manuscript: 'The manuscript', rehearse: 'Preaching to the pews', tap: 'One beer', theologyOnTap: 'Theology on Tap', communion: 'Communion calls', study: 'Sermon study', pray: 'Prayer', property: 'Rounds of the building', office: 'Office hours', rounds: 'Hospital rounds', cafe: 'Coffee and pie', rest: 'Rest', family: 'Sam and Bea' };
 
 /**
@@ -498,9 +519,9 @@ const TITLE = { fishFry: 'Fish fry', quilters: 'The quilters', bowling: 'League 
  * objects with an optional `when` (the same keys as story scenes), so a list
  * can hold seasonal lines alongside everyday ones.
  */
-function draw(bagKey, list, ok = () => true) {
+function draw(bagKey, list, ok = () => true, at) {
   list = list || [];
-  const fits = list.map((e, i) => i).filter(i => ok(list[i]) && matches(typeof list[i] === 'string' ? null : list[i].when));
+  const fits = list.map((e, i) => i).filter(i => ok(list[i]) && matches(typeof list[i] === 'string' ? null : list[i].when, at));
   if (!fits.length) return null;
   const used = (S.bags[bagKey] ||= []);
   let fresh = fits.filter(i => !used.includes(i));
@@ -516,7 +537,7 @@ function poolLine(key) { return draw('pool:' + key, P.pools[key]) || { text: '' 
 
 function doAction(a) {
   if (busy()) return;
-  const where = a.who && PLACES[a.who] ? a.who : selected;   // a home visit walks to that house
+  const where = a.at === 'home' ? a.who : selected;   // a home visit walks to that house; anything else stays where you tapped
   closeMenu();
   walkTo(where, () => {
     if (a.key === 'visit') return doVisit(a);
@@ -536,14 +557,14 @@ function doAction(a) {
   });
 }
 function doVisit(a) {
-  const id = a.who, sc = storyFor(id, a.at);
+  const id = a.who, sc = storyAt(id, a.at);
   S.stats.visits++;
   const base = BASE.visit(id);
   if (sc) {
     S.seen[sc.id] = true;
     showCard({ kicker: PLACES[a.at === 'home' ? id : a.at]?.name || '', title: fill(sc.title), text: fill(sc.text), choices: sc.choices, base, then: endSlot });
   } else {
-    const line = draw('visit:' + id, P.visitLines[id]) || { text: `${CAST[id].name[0].toUpperCase() + CAST[id].name.slice(1)} is glad to see you.` };
+    const line = draw('visit:' + id, P.visitLines[id], () => true, a.at) || { text: `${CAST[id].name[0].toUpperCase() + CAST[id].name.slice(1)} is glad to see you.` };
     const changes = apply(sumFx(base, line.fx));
     showCard({ kicker: PLACES[a.at === 'home' ? id : a.at]?.name || '', title: visitLabel(id, a.at), text: fill(textOf(line)), changes, then: endSlot });
   }
@@ -551,9 +572,9 @@ function doVisit(a) {
 
 /** After every slot: the next slot, the next day, or Sunday. */
 function endSlot() {
-  save();
   S.slot++;
   if (S.slot > 1) { S.slot = 0; S.day++; S.eventToday = -1; }
+  save();   // after moving on, so a reload never replays the slot just finished
   if (S.day > 4) return sunday();
   startSlot();
 }
@@ -564,13 +585,13 @@ function startSlot() {
     banner(DAYS[S.day], W().name + (S.day === 0 ? ' · a new week' : ''));
   }
   render();
-  const sp = SPECIAL_DAYS.find(([w, d, s, , flag]) => w === S.week && d === S.day && s === S.slot && (!flag || S.flags[flag]));
+  const sp = SPECIAL_DAYS.find(([w, d, s, key, flag]) => w === S.week && d === S.day && s === S.slot && (!flag || S.flags[flag]) && !S.done[`${w}:${key}`]);
   if (S.day === CLASS_DAY && S.slot === 1 && S.classWeek !== S.week && !NO_CLASS_WEEKS.includes(S.week)) {
-    S.classWeek = S.week;
+    S.classWeek = S.week; save();
     return confirmationClass(() => sp ? special(sp[3], endSlot) : endSlot());
   }
-  if (sp) return special(sp[3], endSlot);
-  if (S.slot === 0 && S.eventToday !== S.day) { S.eventToday = S.day; const ev = dayEvent(); if (ev) return runEvent(ev); }
+  if (sp) { S.done[`${S.week}:${sp[3]}`] = true; save(); return special(sp[3], endSlot); }
+  if (S.slot === 0 && S.eventToday !== S.day) { S.eventToday = S.day; const ev = dayEvent(); save(); if (ev) return runEvent(ev); }
   if (S.m.strength < 12) {
     return showCard({ kicker: 'The parsonage', title: 'Running on empty', text: 'You sit down to tie your shoes and wake up forty minutes later. Sam brings you tea and takes the phone off the hook. Some days, rest is the work.', changes: apply({ strength: 26, family: 6 }), then: endSlot, pre: () => walkTo('parsonage') });
   }
@@ -597,12 +618,12 @@ function dayEvent() {
   const ok = (P.events || []).filter(e => !(e.when?.once !== false && S.seen[e.id]) && matches(e.when));
   const fixed = ok.filter(e => (e.when?.chance ?? 1) >= 1);
   if (fixed.length) return fixed[0];
-  if (Math.random() > .5) return null;
+  if (Math.random() > .5 || afternoonFixed()) return null;   // no random "tonight" plans on a service day
   const rnd = ok.filter(e => Math.random() < (e.when?.chance ?? 1));
   return rnd.length ? pick(rnd) : null;
 }
 function runEvent(ev) {
-  S.seen[ev.id] = true; S.stats.events++;
+  S.seen[ev.id] = true; S.stats.events++; save();   // shown once, even if the page reloads before a choice
   const kick = { call: '☎ The phone rings', knock: 'A knock at the door', mail: 'In the mailbox', email: 'An email' }[ev.kind] || DAYS[S.day];
   showCard({ kicker: `${kick}${ev.from ? ' · ' + ev.from : ''}`, title: fill(ev.title), text: fill(ev.text), choices: ev.choices,
     sound: { call: 'call', knock: 'knock', email: 'email' }[ev.kind] || 'card',
@@ -683,7 +704,7 @@ function special(key, then) {
   let i = 0;
   const next = () => {
     if (i < beats.length) { const t = beats[i++]; showCard({ kicker: W().name, title: sp.title, text: t, go: i < beats.length ? 'Continue' : 'Amen', then: next }); return; }
-    const changes = apply(sumFx({ harmony: 6, strength: -6 }, sp.fx));
+    const changes = apply(sumFx({ harmony: 3, strength: -6 }, sp.fx));
     scene = null; Sound.stopChurch(); render();
     if (changes.length) showCard({ kicker: W().name, title: sp.title, text: '', changes, then }); else then();
   };
@@ -700,14 +721,18 @@ function sunday() {
   if (S.week === 12 && S.flags.baptismPlanned) pre.push('baptism');
   if (S.week === 14) pre.push('pentecost');
   const go = () => {
-    if (pre.length) return special(pre.shift(), go);
+    while (pre.length && S.done[`${S.week}:${pre[0]}`]) pre.shift();
+    if (pre.length) { const k = pre.shift(); S.done[`${S.week}:${k}`] = true; save(); return special(k, go); }
+    if (S.sundayDone === S.week) return review();   // the sermon is already scored (a reload)
     const score = clamp(S.m.sermon - (S.m.strength < 25 ? 12 : 0), 0, 100);
     const tier = score >= 80 ? 'great' : score >= 55 ? 'good' : score >= 30 ? 'fine' : 'thin';
     S.rep = Math.round(S.rep * .7 + score * .3);
     const mult = { 4: 1.9, 11: 1.95 }[S.week] || { advent: 1.05, christmas: 1.2, epiphany: 1, lent: .95, holyweek: 1.9, easter: 1.05, pentecost: .9 }[w.season];
     const att = Math.round(72 * (.5 + care() * .0025 + S.m.harmony * .0025 + S.rep * .002) * mult * (.94 + Math.random() * .12));
     S.sundays.push({ week: S.week, att, score, tier });
-    apply({ harmony: { great: 5, good: 2, fine: 0, thin: -4 }[tier] });
+    S.sundayDone = S.week; S.strengthLog.push(S.m.strength);
+    apply({ harmony: { great: 3, good: 1, fine: 0, thin: -4 }[tier] });
+    save();
     scene = { kind: 'sunday', candles: false, att, t0: performance.now() };
     Sound.toll(3); Sound.hymn('oldHundredth');
     render();
@@ -740,7 +765,8 @@ function review() {
     return `<span>${m.label}</span><b>${now}${d ? ` <small style="color:${d > 0 ? '#3a7a3a' : '#a04a3a'}">(${d > 0 ? '+' : ''}${d})</small>` : ''}</b>`;
   }).join('');
   const lonely = living().filter(id => S.need[id] >= 70).map(id => CAST[id].name);
-  const note = lonely.length ? `${lonely.join(' and ')} could do with a visit this week.` : 'Nobody has gone too long without a visit.';
+  const names = lonely.length > 2 ? `${lonely.slice(0, -1).join(', ')}, and ${lonely[lonely.length - 1]}` : lonely.join(' and ');
+  const note = lonely.length ? `${names[0].toUpperCase() + names.slice(1)} could do with a visit this week.` : 'Nobody has gone too long without a visit.';
   showCard({ kicker: W().name, title: 'The week in review', html: `<div class="stats">${rows}</div><p>${esc(note)}</p>`,
     go: S.week >= WEEKS.length - 1 ? 'The year in review' : 'Monday, your day off', then: nextWeek });
 }
@@ -752,7 +778,7 @@ function nextWeek() {
   // Monday is the day off (strength back), but the rest of the week wears on
   // things: the building ages, the family misses you, and a congregation left
   // to itself drifts a little apart. Each needs tending again this week.
-  apply({ strength: 18, building: -5, family: -16, harmony: -15 });
+  apply({ strength: 18, building: -5, family: -16, harmony: -20 });
   for (const id of living()) S.need[id] = clamp(S.need[id] + CAST[id].rate, 0, 100);
   S.weekStart = Object.fromEntries(METERS.map(m => [m.k, meter(m.k)]));
   S.at = 'parsonage'; pastor = { ...placeXY('parsonage') };
@@ -766,11 +792,14 @@ function yearEnd() {
   S.over = true; save();
   const sun = S.sundays, avg = k => Math.round(sun.reduce((n, s) => n + s[k], 0) / Math.max(1, sun.length));
   const attAvg = avg('att'), scoreAvg = avg('score'), best = sun.reduce((a, s) => s.att > a.att ? s : a, { att: 0 });
-  const c = care(), h = S.m.harmony, b = S.m.building, st = S.m.strength, f = S.m.family;
-  let key = 'shepherd';
-  if (st < 30 || f < 30) key = 'tired';
-  else if (Math.min(scoreAvg, c, h, b) >= 50) key = 'shepherd';
-  else { const top = [['preacher', scoreAvg], ['pastor', c], ['builder', b]].sort((x, y) => y[1] - x[1])[0]; key = top[0]; }
+  const c = care(), b = S.m.building, f = S.m.family;
+  // Strength as it stood each Sunday, averaged: one tired Saturday isn't a tired year.
+  const stAvg = S.strengthLog.length ? S.strengthLog.reduce((n, v) => n + v, 0) / S.strengthLog.length : S.m.strength;
+  let key = 'shepherd';                                                // a faithful, balanced year
+  if (stAvg < 30 || f < 30) key = 'tired';                             // worn out, or the family went without
+  else if (scoreAvg >= 70 && c < 60) key = 'preacher';                  // fine sermons, kitchen tables waiting
+  else if (c >= 70 && scoreAvg < 55) key = 'pastor';                    // every bedside, thin sermons
+  else if (b >= 75 && (scoreAvg < 60 || c < 60)) key = 'builder';       // the building came first
   const end = P.endings[key] || { title: 'The year is done', text: '' };
   const story = [
     S.flags.baptismPlanned && 'Baby Grace Nguyen was baptized.',
@@ -1039,7 +1068,7 @@ function render() {
   if (selected) {
     const A = actionsAt(selected);
     acts.innerHTML = A.length ? A.map((a, i) => `<button class="act" data-i="${i}">${a.isNew ? '<span class="new">✦ </span>' : ''}${esc(a.label)}<small>${esc(a.sub || '')}</small></button>`).join('')
-      : `<div id="hint">Nobody's in here who needs you just now.</div>`;
+      : `<div class="empty-note">Nobody's in here who needs you just now.</div>`;
     acts.querySelectorAll('.act').forEach(b => { const a = A[+b.dataset.i]; if (a.key === 'none') b.disabled = true; else b.onclick = () => doAction(a); });
   } else acts.innerHTML = '';
   document.getElementById('hint').textContent = selected ? '' : hintLine();
@@ -1232,7 +1261,9 @@ function drawGroundDetails(L, t) {
 function drawChimneySmoke(t, L) {
   const cold = L.snow || L.tree === 'bare' || L.tree === 'autumn';
   const n = cold ? 6 : 2;
-  for (const [cx0, cy0] of [[PLACES.parsonage.rect[0] + 38, PLACES.parsonage.rect[1] + 1], [PLACES.olsen.rect[0] + 30, PLACES.olsen.rect[1] + 4], [PLACES.walt.rect[0] + 10, PLACES.walt.rect[1] + 4]]) {
+  const chimneys = [[PLACES.parsonage.rect[0] + 38, PLACES.parsonage.rect[1] + 1], [PLACES.walt.rect[0] + 10, PLACES.walt.rect[1] + 4]];
+  if (!S.flags.olsenDied) chimneys.push([PLACES.olsen.rect[0] + 30, PLACES.olsen.rect[1] + 4]);   // her house goes cold
+  for (const [cx0, cy0] of chimneys) {
     for (let i = 0; i < n; i++) {
       const k = ((t * .35 + i / n) % 1), x = cx0 + Math.sin(k * 6 + cx0) * 2 + k * 5, y = cy0 - k * 16, a = (1 - k) * (cold ? .55 : .25), r = 1 + k * 2.5;
       cx.fillStyle = `rgba(235,235,240,${a})`; cx.fillRect(Math.round(x - r), Math.round(y - r), Math.round(r * 2), Math.round(r * 2));
@@ -1458,14 +1489,17 @@ addEventListener('resize', fit);
 function begin() {
   S = freshState();
   S.weekStart = Object.fromEntries(METERS.map(m => [m.k, meter(m.k)]));
-  pastor = { ...placeXY('parsonage') }; scene = null; selected = null;
+  pastor = { ...placeXY('parsonage') }; scene = null; selected = null; shownMeters = null;
   document.getElementById('title').classList.add('hide');
   save();
   showCard({ kicker: 'Advent I · Tuesday morning', title: 'Welcome to Zion', text: 'Your first year as pastor of Zion Evangelical Lutheran Church of the Unaltered Augsburg Confession (everyone just says Zion) begins with Advent, with your wife Sam and your daughter Bea in the parsonage next door. Monday is your day off; Tuesday to Saturday are yours to spend, two parts a day, and Sunday is Sunday. Study, visit, teach the catechism on Wednesdays, love your people, and rest: the church is Christ\'s, not yours to carry alone.', go: 'Let\'s begin', then: startSlot });
 }
 const hadSave = !!(S && !S.over);   // a year in progress to continue (and not lose by accident)
 document.getElementById('newBtn').onclick = () => { if (hadSave && !confirm('Start a new year? Your current one will be lost.')) return; begin(); };
-document.getElementById('contBtn').onclick = () => { document.getElementById('title').classList.add('hide'); pastor = { ...placeXY(S.at || 'parsonage') }; startSlot(); };
+document.getElementById('contBtn').onclick = () => {
+  document.getElementById('title').classList.add('hide'); pastor = { ...placeXY(S.at || 'parsonage') };
+  if (S.day > 4) sunday(); else startSlot();   // a reload on Sunday picks up there
+};
 document.getElementById('ver').textContent = `Version ${VERSION} · Hallowed Gains`;
 if (hadSave) { const b = document.getElementById('contBtn'); b.hidden = false; b.textContent = `Continue (${WEEKS[S.week].name}, ${DAYS[S.day] || 'Sunday'})`; }
 else S = freshState();
