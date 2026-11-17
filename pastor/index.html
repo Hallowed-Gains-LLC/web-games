@@ -79,7 +79,7 @@
   /* places and actions */
   h3 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: #9aa0c2; margin: 14px 0 6px; font-weight: 600; }
   #head { position: sticky; top: -10px; z-index: 2; background: var(--night); padding-top: 10px; margin-top: -10px; padding-bottom: 2px; }
-  #places { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  #places { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .place { position: relative; background: linear-gradient(to bottom, #282d47, var(--night2)); color: var(--paper); border: 1px solid #343a5a; border-radius: 10px; padding: 7px 4px 8px; font-size: 12px; line-height: 1.2;
            box-shadow: 0 2px 0 #12152a; transition: transform .12s ease, border-color .2s; }
   .place:active { transform: translateY(1px); box-shadow: 0 1px 0 #12152a; }
@@ -180,7 +180,7 @@
    plain data (window.PASTOR); this file is the calendar, the rules, the
    pixel town and the screens. See README.md.
    ============================================================ */
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 const SAVE_KEY = 'pastor_save_v1';          // every game on the site shares localStorage
 const P = window.PASTOR || { pools: {}, stories: {}, visitLines: {}, events: [], specials: {}, door: {}, endings: {}, closing: '' };
 
@@ -296,6 +296,7 @@ const PLACES = {
   olsen:     { name: "Mrs. Olsen's", rect: [66, 124, 40, 42], door: [86, 118], person: 'olsen' },
   nguyen:    { name: "The Nguyens'", rect: [116, 124, 40, 42], door: [136, 118], person: 'nguyen' },
   walt:      { name: "Walt's",    rect: [166, 124, 40, 42], door: [186, 118], person: 'walt' },
+  tap:       { name: "Krause's Tap", rect: [208, 122, 31, 44], door: [222, 118] },
 };
 const STREET_Y = 107;
 
@@ -307,7 +308,7 @@ function freshState() {
     v: 1, week: 0, day: 0, slot: 0, at: 'parsonage', started: true, over: false,
     m: { strength: 75, sermon: 0, harmony: 60, building: 58, family: 65 },
     need: { olsen: 45, gus: 30, marge: 30, nguyen: 35, walt: 55, josh: 30, pete: 35, hannah: 30 },
-    flags: {}, seen: {}, lastPool: {}, studies: 0, rep: 50,
+    flags: {}, seen: {}, bags: {}, studies: 0, rep: 50,
     weekStart: null, doneToday: {},
     stats: { visits: 0, studies: 0, prayers: 0, rests: 0, family: 0, events: 0 },
     sundays: [],   // { week, att, score, tier }
@@ -318,7 +319,7 @@ let S = load();
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
-    if (d && d.v === 1) return Object.assign(freshState(), d, { m: Object.assign(freshState().m, d.m), stats: Object.assign(freshState().stats, d.stats) });
+    if (d && d.v === 1) return Object.assign(freshState(), { bags: {} }, d, { m: Object.assign(freshState().m, d.m), stats: Object.assign(freshState().stats, d.stats) });
   } catch (e) { /* a broken save is a fresh year */ }
   return null;
 }
@@ -394,11 +395,16 @@ function actionsAt(pl) {
     A.push({ key: 'visit', who: id, at, label: visitLabel(id, at), sub: needWord(id), isNew: !!sc });
   };
   if (pl === 'church') {
-    A.push({ key: 'study', label: `Study the readings`, sub: `${W().gospel} · sermon` });
     A.push({ key: 'pray', label: 'Pray in the sanctuary', sub: 'strength · a little sermon' });
+    if (S.day >= 2 && S.m.sermon >= 30) A.push({ key: 'rehearse', label: 'Preach it to the empty church', sub: 'polish the sermon · Thursday on' });
     A.push({ key: 'property', label: 'Walk the building with Gus', sub: 'building · a list for the trustees' });
     for (const id of ['gus', 'marge', 'josh', 'hannah']) person(id);
   } else if (pl === 'office') {
+    // Sermon prep comes in four kinds; they share one week's worth of fresh insight (S.studies).
+    A.push({ key: 'study', label: 'Study the readings', sub: `${W().gospel} · sermon` });
+    A.push({ key: 'exegesis', label: 'Work through the Greek', sub: 'a big sermon boost · tiring' });
+    A.push({ key: 'fathers', label: 'Read Luther and the fathers', sub: 'sermon · easier on you' });
+    A.push({ key: 'manuscript', label: 'Write the manuscript', sub: S.studies ? 'sermon · best after study' : 'better after some study' });
     A.push({ key: 'office', label: 'Bulletins, budget and the phone', sub: 'building · books' });
     person('pete');
   } else if (pl === 'hospital') {
@@ -410,6 +416,9 @@ function actionsAt(pl) {
     for (const id of ['walt', 'pete', 'gus', 'marge', 'josh']) {
       if (storyFor(id, 'cafe')) person(id);   // at the café, only when they're there for a reason
     }
+  } else if (pl === 'tap') {
+    A.push({ key: 'tap', label: 'A beer with the guys', sub: 'strength · harmony · town news' });
+    if (S.day === 2 && S.slot === 1 && S.tapWeek !== S.week) A.push({ key: 'theologyOnTap', label: 'Host Theology on Tap', sub: 'Thursday night · harmony · sermon', isNew: true });
   } else if (pl === 'parsonage') {
     A.push({ key: 'rest', label: 'Rest', sub: 'strength' });
     A.push({ key: 'family', label: 'Time with Sam and Bea', sub: 'family · strength' });
@@ -439,8 +448,16 @@ function waiting(pl) {
 /* ============================================================
    Doing things
    ============================================================ */
+/** How much fresh insight a week's next hour of sermon prep gives (it tapers as the week fills up). */
+const PREP = n => [1, .8, .62, .45, .3][Math.min(n, 4)];
 const BASE = {   // what each kind of action does before its words add their own
-  study:    () => ({ sermon: [30, 24, 18, 12, 8][Math.min(S.studies, 4)], strength: -8 }),
+  study:      () => ({ sermon: Math.round(28 * PREP(S.studies)), strength: -8 }),
+  exegesis:   () => ({ sermon: Math.round(34 * PREP(S.studies)), strength: -12 }),        // the most, at a cost
+  fathers:    () => ({ sermon: Math.round(22 * PREP(S.studies)), strength: -4 }),         // gentler
+  manuscript: () => ({ sermon: S.studies ? Math.round(30 * PREP(S.studies - 1)) : 10, strength: -9 }),   // writing pays once you've studied
+  rehearse:   () => ({ sermon: 8, strength: -4, hannah: -6 }),
+  tap:        () => ({ strength: 9, harmony: 4, family: -2 }),
+  theologyOnTap: () => ({ harmony: 9, sermon: 6, strength: -7 }),
   pray:     () => ({ strength: 8, sermon: 6, harmony: 2 }),
   property: () => ({ building: 11, strength: -9 }),
   office:   () => ({ building: 9, strength: -7, harmony: 2 }),
@@ -451,19 +468,32 @@ const BASE = {   // what each kind of action does before its words add their own
   family:   () => ({ family: 22, strength: 9 }),
   visit:    id => ({ [id]: -35, strength: -10, sermon: 4, harmony: 1 }),
 };
-const POOL_OF = { communion: 'communion', study: 'study', pray: 'pray', property: 'property', office: 'office', rounds: 'rounds', cafe: 'cafe', rest: 'rest', family: 'family' };
-const KICKER = { communion: 'Pine Haven and the homebound', study: 'The church office', pray: 'The sanctuary', property: 'The building', office: 'The church office', rounds: 'Willow Creek Hospital', cafe: 'The Willow Café', rest: 'The parsonage', family: 'The parsonage' };
-const TITLE = { communion: 'Communion calls', study: 'Sermon study', pray: 'Prayer', property: 'Rounds of the building', office: 'Office hours', rounds: 'Hospital rounds', cafe: 'Coffee and pie', rest: 'Rest', family: 'Sam and Bea' };
+const POOL_OF = { exegesis: 'exegesis', fathers: 'fathers', manuscript: 'manuscript', rehearse: 'rehearse', tap: 'tap', theologyOnTap: 'theologyOnTap', communion: 'communion', study: 'study', pray: 'pray', property: 'property', office: 'office', rounds: 'rounds', cafe: 'cafe', rest: 'rest', family: 'family' };
+const KICKER = { exegesis: 'The church office', fathers: 'The church office', manuscript: 'The church office', rehearse: 'The empty church', tap: 'Krause\'s Tap', theologyOnTap: 'The back room at Krause\'s Tap', communion: 'Pine Haven and the homebound', study: 'The church office', pray: 'The sanctuary', property: 'The building', office: 'The church office', rounds: 'Willow Creek Hospital', cafe: 'The Willow Café', rest: 'The parsonage', family: 'The parsonage' };
+const TITLE = { exegesis: 'The Greek', fathers: 'Luther and the fathers', manuscript: 'The manuscript', rehearse: 'Preaching to the pews', tap: 'One beer', theologyOnTap: 'Theology on Tap', communion: 'Communion calls', study: 'Sermon study', pray: 'Prayer', property: 'Rounds of the building', office: 'Office hours', rounds: 'Hospital rounds', cafe: 'Coffee and pie', rest: 'Rest', family: 'Sam and Bea' };
 
-/** A line from a pool, never the same one twice in a row. */
-function poolLine(key) {
-  const pool = P.pools[key] || [];
-  if (!pool.length) return { text: '' };
-  let i = Math.floor(Math.random() * pool.length);
-  if (pool.length > 1 && i === S.lastPool[key]) i = (i + 1) % pool.length;
-  S.lastPool[key] = i;
-  return pool[i];
+/**
+ * Draw a line from a list without repeats: each list has a "bag" of the
+ * indices already shown (kept in the save), and a line comes back only once
+ * every line that fits right now has been shown. Entries may be strings or
+ * objects with an optional `when` (the same keys as story scenes), so a list
+ * can hold seasonal lines alongside everyday ones.
+ */
+function draw(bagKey, list, ok = () => true) {
+  list = list || [];
+  const fits = list.map((e, i) => i).filter(i => ok(list[i]) && matches(typeof list[i] === 'string' ? null : list[i].when));
+  if (!fits.length) return null;
+  const used = (S.bags[bagKey] ||= []);
+  let fresh = fits.filter(i => !used.includes(i));
+  if (!fresh.length) { S.bags[bagKey] = used.filter(i => !fits.includes(i)); fresh = fits; }   // all shown: start this list over
+  const i = fresh[Math.floor(Math.random() * fresh.length)];
+  S.bags[bagKey].push(i);
+  return list[i];
 }
+/** The text of a drawn entry (strings or { text }). */
+const textOf = e => e == null ? '' : typeof e === 'string' ? e : e.text;
+/** A line from one of the activity pools. */
+function poolLine(key) { return draw('pool:' + key, P.pools[key]) || { text: '' }; }
 
 function doAction(a) {
   if (busy()) return;
@@ -473,7 +503,8 @@ function doAction(a) {
     if (a.key === 'visit') return doVisit(a);
     const line = poolLine(POOL_OF[a.key]);
     const fx = sumFx(BASE[a.key](), line.fx);
-    if (a.key === 'study') { S.studies++; S.stats.studies++; }
+    if (['study', 'exegesis', 'fathers', 'manuscript'].includes(a.key)) { S.studies++; S.stats.studies++; }
+    if (a.key === 'theologyOnTap') { S.tapWeek = S.week; S.stats.theologyOnTap = (S.stats.theologyOnTap || 0) + 1; }
     if (a.key === 'communion') { S.lastCommunion = S.week; S.stats.communion = (S.stats.communion || 0) + 1; }
     if (a.key === 'pray') S.stats.prayers++;
     if (a.key === 'rest') S.stats.rests++;
@@ -490,10 +521,9 @@ function doVisit(a) {
     S.seen[sc.id] = true;
     showCard({ kicker: PLACES[a.at === 'home' ? id : a.at]?.name || '', title: fill(sc.title), text: fill(sc.text), choices: sc.choices, base, then: endSlot });
   } else {
-    const lines = P.visitLines[id] || [];
-    const line = lines.length ? pick(lines) : { text: `${CAST[id].name[0].toUpperCase() + CAST[id].name.slice(1)} is glad to see you.` };
+    const line = draw('visit:' + id, P.visitLines[id]) || { text: `${CAST[id].name[0].toUpperCase() + CAST[id].name.slice(1)} is glad to see you.` };
     const changes = apply(sumFx(base, line.fx));
-    showCard({ kicker: PLACES[a.at === 'home' ? id : a.at]?.name || '', title: visitLabel(id, a.at), text: fill(line.text || line), changes, then: endSlot });
+    showCard({ kicker: PLACES[a.at === 'home' ? id : a.at]?.name || '', title: visitLabel(id, a.at), text: fill(textOf(line)), changes, then: endSlot });
   }
 }
 
@@ -552,7 +582,24 @@ function dayEvent() {
 function runEvent(ev) {
   S.seen[ev.id] = true; S.stats.events++;
   const kick = { call: '☎ The phone rings', knock: 'A knock at the door', mail: 'In the mailbox', email: 'An email' }[ev.kind] || DAYS[S.day];
-  showCard({ kicker: `${kick}${ev.from ? ' · ' + ev.from : ''}`, title: fill(ev.title), text: fill(ev.text), choices: ev.choices, then: () => { save(); render(); } });
+  showCard({ kicker: `${kick}${ev.from ? ' · ' + ev.from : ''}`, title: fill(ev.title), text: fill(ev.text), choices: ev.choices,
+    then: c => c && c.away ? goAway() : (save(), render()) });
+}
+/**
+ * A trip (a conference, a retreat): the rest of today is spent away. If this
+ * afternoon holds a fixed service or class, only the morning goes, so
+ * nothing on the calendar is ever skipped.
+ */
+function goAway() {
+  S.stats.trips = (S.stats.trips || 0) + 1;
+  pastor = { ...placeXY('parsonage') }; S.at = 'parsonage';   // home again by the time the day is done
+  if (S.slot === 0 && !afternoonFixed()) S.slot = 1;   // endSlot then moves on to tomorrow
+  endSlot();
+}
+/** True when this afternoon has a service or confirmation class. */
+function afternoonFixed() {
+  return SPECIAL_DAYS.some(([w, d, sl, , flag]) => w === S.week && d === S.day && sl === 1 && (!flag || S.flags[flag]))
+    || (S.day === CLASS_DAY && !NO_CLASS_WEEKS.includes(S.week));
 }
 
 /* ============================================================
@@ -580,7 +627,7 @@ function showCard(o) {
       if (c.set) S.flags[c.set] = true;
       const changes = apply(sumFx(o.base, c.fx));
       card.innerHTML = head + (c.reply ? `<p>${esc(fill(c.reply))}</p>` : body) + chips(changes) + `<button class="go">Continue</button>`;
-      card.querySelector('.go').onclick = () => { close(); o.then && o.then(); };
+      card.querySelector('.go').onclick = () => { close(); o.then && o.then(c); };
       card.querySelector('.go').focus();
       render();
     });
@@ -636,10 +683,10 @@ function sunday() {
     apply({ harmony: { great: 5, good: 2, fine: 0, thin: -4 }[tier] });
     scene = { kind: 'sunday', candles: false, att, t0: performance.now() };
     render();
-    const said = { great: `Your sermon on ${w.gospel} sang. People were still talking about it at coffee hour.`, good: `Your sermon on ${w.gospel} was solid: Law and Gospel, and home by noon.`, fine: `Your sermon on ${w.gospel} got there in the end, by way of a story about your car.`, thin: `Your sermon on ${w.gospel} was thin. You could feel the study you skipped. The Gospel still did its work: it always does.` }[tier];
+    const said = fill(textOf(draw('sermon:' + tier, (P.sermonLines || {})[tier])) || { great: `Your sermon on ${w.gospel} sang. People were still talking about it at coffee hour.`, good: `Your sermon on ${w.gospel} was solid: Law and Gospel, and home by noon.`, fine: `Your sermon on ${w.gospel} got there in the end, by way of a story about your car.`, thin: `Your sermon on ${w.gospel} was thin. You could feel the study you skipped. The Gospel still did its work: it always does.` }[tier]);
     const door = doorLines(tier);
     // Bible class, then the Divine Service with the Sacrament: an LCMS Sunday morning.
-    const morning = 'Bible class at 9:15, the Divine Service at 10:30, and the Lord\'s Supper at the rail.';
+    const morning = fill(textOf(draw('morning', P.sundayMornings)) || 'Bible class at 9:15, the Divine Service at 10:30, and the Lord\'s Supper at the rail.');
     // The Last Sunday remembers the saints who died in the faith this year.
     const saints = S.week === WEEKS.length - 1 && S.flags.olsenDied
       ? 'Before the prayers you read the names of the saints who died in the faith this year. “Ingrid Olsen.” Gus tolls the bell once. Then silence.' : '';
@@ -651,12 +698,12 @@ function sunday() {
 }
 /** Two things said at the door (and one from someone you've looked after, sometimes). */
 function doorLines(tier) {
-  const pool = (P.door[tier] || []).slice(), out = [];
-  const general = pool.filter(l => typeof l === 'string' || !l.who);
-  const personal = pool.filter(l => l.who && living().includes(l.who) && S.need[l.who] < 40);
-  for (let k = 0; k < 2 && general.length; k++) out.push(general.splice(Math.floor(Math.random() * general.length), 1)[0]);
-  if (personal.length && Math.random() < .6) out.push(pick(personal));
-  return out.map(l => fill(typeof l === 'string' ? l : l.text));
+  const list = P.door[tier] || [], out = [];
+  const general = l => typeof l === 'string' || !l.who;
+  for (let k = 0; k < 2; k++) { const l = draw('door:' + tier, list, e => general(e) && !out.includes(e)); if (l) out.push(l); }
+  // someone you've looked after this week says something too, sometimes
+  if (Math.random() < .6) { const l = draw('door:' + tier, list, e => !general(e) && living().includes(e.who) && S.need[e.who] < 40); if (l) out.push(l); }
+  return out.map(l => fill(textOf(l)));
 }
 function review() {
   const start = S.weekStart || {};
@@ -701,6 +748,8 @@ function yearEnd() {
     S.flags.baptismPlanned && 'Baby Grace Nguyen was baptized.',
     S.flags.joshReady && 'Josh was confirmed at Pentecost.',
     S.stats.communion && `You brought the Lord's Supper to the homebound ${S.stats.communion} time${S.stats.communion > 1 ? 's' : ''}.`,
+    S.stats.theologyOnTap && `You hosted Theology on Tap ${S.stats.theologyOnTap} time${S.stats.theologyOnTap > 1 ? 's' : ''}.`,
+    S.stats.trips && `You got out of town ${S.stats.trips} time${S.stats.trips > 1 ? 's' : ''}, and came back better for it.`,
     S.flags.waltSings && 'Walt is back in the choir.',
     S.flags.newBoiler && 'Old Faithful was retired; the new boiler purrs.',
     S.flags.trucePact && 'Gus and Marge made peace over the thermostat.',
@@ -742,7 +791,7 @@ function render() {
   document.getElementById('hint').textContent = selected ? '' : hintLine();
 }
 /** A small picture for each place button. */
-const PLACE_ICON = { parsonage: '🏡', church: '⛪', office: '📋', hospital: '🏥', cafe: '☕', olsen: '🏠', nguyen: '🏠', walt: '🏠' };
+const PLACE_ICON = { parsonage: '🏡', church: '⛪', office: '📋', hospital: '🏥', cafe: '☕', olsen: '🏠', nguyen: '🏠', walt: '🏠', tap: '🍺' };
 /**
  * The meters are built once and then updated in place, so a change can
  * animate: the bar slides, flashes, and a "+8" floats up beside it.
@@ -866,7 +915,8 @@ function drawTown(t) {
   drawParsonage(L); drawChurch(L, t); drawOffice(L); drawHospital(L, t);
   drawCafe(L); drawHouse(PLACES.olsen, '#b8786a', '#6a3a34', L, 'OLSEN'); drawHouse(PLACES.nguyen, '#7a9ab8', '#3a4a6a', L, 'NGUYEN'); drawHouse(PLACES.walt, '#a8a07a', '#5a5234', L, 'PETERSON');
   drawGroundDetails(L, t);
-  drawTree(64, 96, L); drawTree(224, 166, L); drawTree(112, 166, L, .8); drawTree(162, 166, L, .7);   // (the letterboard stands where a tree was, by the office)
+  drawTree(64, 96, L); drawTree(112, 166, L, .8); drawTree(162, 166, L, .7);   // (the letterboard and the Tap stand where trees were)
+  drawTap(L, t);
   drawChimneySmoke(t, L);
   drawTownsfolk(t, L);
   // the church cat on the steps (most days)
@@ -1034,6 +1084,18 @@ function drawHouse(p, wall, roof, L, label) {
   R(x + w / 2 - 3, y + 28, 7, 14, '#4a3020'); R(x + 7, y + 20, 7, 7, S.slot ? '#f6d28a' : '#9fc0d8'); R(x + w - 14, y + 20, 7, 7, S.slot ? '#f6d28a' : '#9fc0d8');
   if (p.person === 'olsen' && S.flags.olsenDied) R(x + w / 2 - 3, y + 30, 7, 2, '#2a2a2a');   // a black ribbon on the door
   textSmall(label, x + w / 2, y + 15, '#2a2420');   // the name over the windows
+}
+/** Krause's Tap: red brick, a glowing window with a neon glass, and its sign. */
+function drawTap(L, t) {
+  const [x, y, w, h] = PLACES.tap.rect;
+  R(x, y + 8, w, h - 8, '#8a4434');
+  for (let r = y + 11; r < y + h; r += 4) for (let c = x + ((r / 4) % 2 ? 0 : 3); c < x + w; c += 6) R(c, r, 5, 1, '#7a3a2c');   // brick courses
+  R(x - 1, y + 5, w + 2, 4, '#3a2a24'); roofSnow(x, y + 3, w, L);
+  R(x + 3, y + 1, w - 6, 5, '#24242c'); textSmall('TAP', x + w / 2, y + 1, '#f0b850');   // the sign over the door
+  const glow = .7 + .3 * Math.sin(t * 2.3);
+  R(x + 3, y + 14, 12, 11, '#3a2a20'); R(x + 4, y + 15, 10, 9, `rgba(246, 196, 110, ${glow})`);   // the window
+  R(x + 7, y + 17, 4, 4, '#f08a3a'); R(x + 8, y + 16, 2, 1, '#fff2c0');                             // a neon glass of beer
+  R(x + 18, y + 22, 9, 16, '#4a2a1c'); R(x + 25, y + 30, 1, 1, '#e0c070');                          // the door
 }
 function drawTree(x, y, L, s = 1) {
   R(x - 1, y - 10 * s, 3, 10 * s, '#5a3a24');
