@@ -165,7 +165,7 @@
 /* ============================================================
    Constants
    ============================================================ */
-const VERSION = '2.9.2';
+const VERSION = '2.9.3';
 const SAVE_KEY = 'moonflower_save_v1';       // every game on the site shares localStorage
 // Six across so every row pairs up evenly (with five, one item in each row
 // always had to pair with one in another row). Five rows keeps the garden at
@@ -240,7 +240,7 @@ const DECOR = [
   { id: 'milkyway',  name: 'The Milky Way' },
 ];
 const decorAt = k => 40 * k * k + 40 * k;
-const STAR_STEP = 3000;                       // after every wonder: a constellation per 3000 glow
+const STAR_STEP = 3000;                       // after every wonder: a new star in the sky per 3000 glow (glowStars)
 
 const DIM = [0.55, 0.32, 0.1];                // Darkest, Dim, Moonlit
 
@@ -731,7 +731,7 @@ function layout() {
    ============================================================ */
 const skyC = document.createElement('canvas');
 const landC = document.createElement('canvas');
-let stars = [], skySlots = [], shoot = null, nextShoot = 8;
+let stars = [], skySlots = [], shoot = null, nextShoot = 8;   // glowStarAt: below, with the glow stars
 
 const has = id => DECOR.findIndex(d => d.id === id) < S.decor;
 function sceneView() {
@@ -754,10 +754,8 @@ function makeStars() {
     stars.push({ x, y, r: .35 + rnd() * rnd() * 1.1, ph: rnd() * TAU, sp: .4 + rnd() * 1.2 });
   }
   // The constellations' places: a jittered grid over the open sky left of
-  // the big moon, two rows if the sky is tall enough, filled middle first.
-  // Grown moons take places from the front (drawConstellations), the glow
-  // constellations after every wonder from the back, so they never overlap.
-  // Each place also carries a loose random shape for a glow constellation.
+  // the big moon, two rows if the sky is tall enough, filled middle first,
+  // one for each grown moon (drawConstellations).
   skySlots = [];
   const srnd = mulberry32(31), top = V.top + 16, bot = V.G - 58;
   // Expanded, the sky is tall enough for more rows, and the places spread
@@ -769,16 +767,42 @@ function makeStars() {
     for (let c = 0; c < cols; c++) {
       const x = lerp(x0, x1, (c + .5) / cols) + (srnd() - .5) * 10;
       const y = (rows === 1 ? (top + bot) / 2 : lerp(top, bot, r / (rows - 1))) + (c % 2 ? 5 : -5) + (srnd() - .5) * 6;
-      const glow = []; let gx = 0, gy = 0;
+      // These draws once made a loose shape for the old glow constellations;
+      // they're kept so every place stays exactly where it has always been.
       const n = 4 + Math.floor(srnd() * 3);
-      for (let k = 0; k < n; k++) { glow.push([gx, gy]); gx += (srnd() - .4) * 9; gy += (srnd() - .5) * 7; }
-      const mx = glow.reduce((a, q) => a + q[0], 0) / n, my = glow.reduce((a, q) => a + q[1], 0) / n;
+      for (let k = 0; k < n; k++) { srnd(); srnd(); }
       if (expanded && Math.hypot(x - m.x, y - m.y) < 40) continue;
-      skySlots.push({ x, y: Math.max(V.top + 10, y), glow: glow.map(([a, b]) => [a - mx, b - my]) });
+      skySlots.push({ x, y: Math.max(V.top + 10, y) });
     }
   }
   const cx = (x0 + x1) / 2, cy = (top + bot) / 2;
   skySlots.sort((a, b) => Math.hypot(a.x - cx, (a.y - cy) * 2) - Math.hypot(b.x - cx, (b.y - cy) * 2));
+  // The glow stars' places, scattered over the open sky (clear of the big
+  // moon and of the constellations' places), the same every time.
+  glowStarAt = [];
+  const grnd = mulberry32(57);
+  for (let tries = 0; glowStarAt.length < GLOW_STARS_MAX && tries < GLOW_STARS_MAX * 20; tries++) {
+    const x = lerp(V.xl + 10, V.xr - 10, grnd()), y = lerp(V.top + 6, Math.max(V.top + 12, V.G - 50), grnd());
+    if (Math.hypot(x - m.x, y - m.y) < 26 || skySlots.some(sl => Math.hypot(x - sl.x, y - sl.y) < SHAPE_R + 4)) continue;
+    glowStarAt.push({ x, y, ph: grnd() * TAU });
+  }
+}
+/* ---------- Glow stars ---------- */
+// Once every garden wonder has come, each STAR_STEP of glow lights a new
+// star: one warm, haloed star, brighter than the rest, with no lines. They
+// are "stars", never "constellations": that word is only for the named ones
+// grown moons (and lanterns, kites…) become, so the two can't be confused.
+const GLOW_STARS_MAX = 120;
+let glowStarAt = [];
+const glowStars = () => S.decor >= DECOR.length ? Math.max(0, Math.floor((S.peak - decorAt(DECOR.length)) / STAR_STEP)) : 0;
+function drawGlowStars(c, t, mul) {
+  const n = Math.min(glowStars(), glowStarAt.length);
+  for (let i = 0; i < n; i++) {
+    const g = glowStarAt[i], tw = .75 + .25 * Math.sin(t * .9 + g.ph);
+    drawGlow(c, g.x, g.y, 7, '#ffe3a8', .6 * tw * mul);
+    sparkle(c, g.x, g.y, 2.8 * tw, `rgba(255,244,214,${.85 * mul})`);   // a small four-pointed glint: these are stars you lit
+    c.globalAlpha = mul; c.fillStyle = '#fffaf0'; c.fillRect(g.x - .8, g.y - .8, 1.6, 1.6); c.globalAlpha = 1;
+  }
 }
 
 function prepCanvas(cvs) {
@@ -1082,6 +1106,7 @@ function drawScene(c, ms) {
     c.fillStyle = '#f1ead2'; c.fillRect(s.x - s.r / 2, s.y - s.r / 2, s.r, s.r);
   }
   c.globalAlpha = 1;
+  drawGlowStars(c, t, starMul);
   drawConstellations(c, t, ms);
   drawWishStar(c, ms);
   const sea = churchSeason();
@@ -2247,7 +2272,9 @@ function doUndo() {
 }
 
 function gain(n, at, delay = 0) {
+  const starsBefore = glowStars();
   S.glow += n; S.peak = Math.max(S.peak, S.glow);
+  if (glowStars() > starsBefore) toast({ title: 'A new star', sub: 'Your glow has lit another star over the town.', dur: 3200 });
   if (at) later(delay, () => floatText(`+${fmt(n)} ✦`, at.x, at.y - L.cell * .3));
   while (S.decor < DECOR.length && S.peak >= decorAt(S.decor + 1)) {
     S.decor++; sceneDirty = true;
@@ -2566,21 +2593,13 @@ function riseMoon(cell) {
 }
 
 /**
- * The sky's constellations, in scene units: one per grown moon (named shapes,
- * brighter, from the front of skySlots) and, once every wonder has come, one
- * per STAR_STEP glow (faint loose shapes, from the back). A new moon's stars
- * come out one by one, then its lines.
+ * The sky's constellations, in scene units: one per grown moon (named
+ * shapes, in skySlots, from the middle out). A new one's stars come out one
+ * by one, then its lines. (The glow stars are drawGlowStars.)
  */
 function drawConstellations(c, t, ms) {
   const n = skySlots.length;
   const moons = Math.min(S.skyMoons - risingMoons, n);
-  const glows = S.decor >= DECOR.length ? Math.min(n - moons, 1 + Math.floor((S.peak - decorAt(DECOR.length)) / STAR_STEP)) : 0;
-  for (let i = 0; i < glows; i++) {
-    const { x, y, glow } = skySlots[n - 1 - i];
-    c.strokeStyle = 'rgba(220,210,255,.16)'; c.lineWidth = .5; c.beginPath();
-    glow.forEach(([dx, dy], k) => k ? c.lineTo(x + dx, y + dy) : c.moveTo(x + dx, y + dy)); c.stroke();
-    for (const [dx, dy] of glow) { drawGlow(c, x + dx, y + dy, 4, '#f3ecd0', .5 + .2 * Math.sin(t + x + dx)); c.fillStyle = '#f7f0d8'; c.fillRect(x + dx - .6, y + dy - .6, 1.2, 1.2); }
-  }
   for (let k = 0; k < moons; k++) {
     const { x, y } = skySlots[k], shape = moonShape(k);
     const since = newest && newest.k === k ? ms - newest.t0 : 1e9;
@@ -2709,7 +2728,7 @@ function expandGlyph(c, x, y, dir) {
 
 /**
  * What the line under the scene says away from the garden: this place's own
- * goal, not the garden's (its wonders and the glow constellations are the
+ * goal, not the garden's (its wonders and the glow stars are the
  * garden's, and glow is the whole town's). In turn: the way on to the next
  * place, until it opens; then this place's last thing; then, once it's
  * grown, another of them for the sky, the bar showing how much of the next
@@ -2741,7 +2760,7 @@ function drawStatus(c) {
     frac = clamp((S.peak - a) / (b - a), 0, 1);
   } else {
     const base = decorAt(DECOR.length), k = Math.floor((S.peak - base) / STAR_STEP), a = base + k * STAR_STEP;
-    label = 'Next: a new constellation'; right = `${fmt(a + STAR_STEP - S.peak)} ✦ to go`;
+    label = 'Next: a new star'; right = `${fmt(a + STAR_STEP - S.peak)} ✦ to go`;
     frac = clamp((S.peak - a) / STAR_STEP, 0, 1);
   }
   c.textBaseline = 'alphabetic';
@@ -3807,7 +3826,7 @@ function openBook() {
     + (S.decor < DECOR.length ? `<li class="no">· · · and ${DECOR.length - S.decor} more to find</li>` : '');
   const next = S.decor < DECOR.length
     ? `Next: <b>${DECOR[S.decor].name}</b>, in ${fmt(decorAt(S.decor + 1) - S.peak)} ✦.`
-    : `Every wonder has come. Each ${fmt(STAR_STEP)} ✦ now adds a constellation to the sky.`;
+    : `Every wonder has come. Each ${fmt(STAR_STEP)} ✦ now lights a new star in the sky${glowStars() ? ` (${fmt(glowStars())} so far)` : ''}. The constellations come from the moons you grow.`;
   const nextItem = S.best < MAX_TIER ? `<p><small>Merge two ${ITEMS[S.best].many} to find out what comes next.</small></p>`
     : `<p><small>${AREA.words.done}</small></p>`;
   openSheet(`
@@ -3829,9 +3848,10 @@ function openBook() {
       <span>Wishes granted</span><span>${fmt(S.stats.wishes)}</span>
       ${S.stats.errands ? `<span>Errands run</span><span>${fmt(S.stats.errands)}</span>` : ''}
       ${S.skyMoons ? `<span>Moons grown</span><span>${fmt(S.skyMoons)}</span>` : ''}
+      ${glowStars() ? `<span>Stars lit with glow</span><span>${fmt(glowStars())}</span>` : ''}
       <span>Glow, all told</span><span>${fmt(S.peak)} ✦</span>
     </div>
-    ${S.skyMoons ? `<h3>In the stars</h3><ul class="wonders">${MOON_SHAPES.slice(0, Math.min(S.skyMoons, MOON_SHAPES.length)).map(m => `<li>✦ ${m.name}</li>`).join('')}</ul>` : ''}
+    ${S.skyMoons ? `<h3>Constellations</h3><ul class="wonders">${MOON_SHAPES.slice(0, Math.min(S.skyMoons, MOON_SHAPES.length)).map(m => `<li>✦ ${m.name}</li>`).join('')}</ul>` : ''}
     <button class="btn done" data-close>Back to the garden</button>`);
 }
 

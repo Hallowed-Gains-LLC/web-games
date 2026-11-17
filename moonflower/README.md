@@ -234,10 +234,9 @@ constellation, its stars coming out one by one. It pays its basket value
 wishes granted, glow). Each moon after adds the next of twelve garden
 shapes (the Luna Moth, the Moonflower, the Owl, the Lantern, the Fox, the
 Firefly Jar, the Rabbit, the Wishing Tree, the Hedgehog, the Sprout, the
-Cottage; `MOON_SHAPES`), listed in the garden book under "In the stars".
-They share the sky's places (`skySlots`, a jittered grid left of the big
-moon, two rows when the sky is tall enough) with the faint glow
-constellations: moons fill from the middle out, glow ones from the edges in.
+Cottage; `MOON_SHAPES`), listed in the garden book under "Constellations".
+They take the sky's places (`skySlots`, a jittered grid left of the big
+moon, two rows when the sky is tall enough) from the middle out.
 A risen moon clears the undo history, since undoing the merge would hand
 back the two Wishing trees and keep the moon. Saves from before 1.2 send any
 moons on the board up at start-up, and get the card if they haven't seen it
@@ -246,7 +245,14 @@ moons on the board up at start-up, and get the card if they haven't seen it
 **Garden wonders** arrive at 40k² + 40k glow for the k-th one (80, 240, 480,
 …, 24,000): fireflies, a pond, a birch with an owl in it, a cottage whose
 window lights up, sleeping animals, and finally the Milky Way. After all 24,
-every 3,000 glow adds a constellation.
+every 3,000 glow lights a **new star**: one warm star with a small glint and
+no lines, scattered over the open sky and clear of the constellations'
+places. A toast says so, and the book counts them. They are deliberately
+never called constellations. That word is only for the named shapes your
+grown moons (and lanterns, kites…) become, which are the ones with stories
+(`glowStars`, `drawGlowStars`; up to 120 places, `GLOW_STARS_MAX`). Until
+2.9.3 they were faint, unnamed "glow constellations", which were easy to
+mix up with the grown ones.
 
 The garden book (📖 at the top) shows everything grown so far, the wonders,
 and a few gentle stats.
@@ -276,7 +282,7 @@ means a lane has opened that you haven't walked down yet.
 - **Each area keeps its own board** (and pouch, wishes, visitors, best item and
   constellations), just as you left it. **Glow is the whole town's**, and so
   are the garden's wonders: the sky ones (clouds, shooting stars, the Milky
-  Way, the glow constellations) show over every area.
+  Way, the stars lit with glow) show over every area.
 - **Each area has its own scene and visitors.** The farm: fields on the far
   hills, a windmill turning slowly, a red barn with a lit loft and a lantern
   by the door, a silo, hay bales and an old oak; visited by a barn owl, cat,
@@ -298,7 +304,7 @@ means a lane has opened that you haven't walked down yet.
   tiny clothes swaying; no new visitors, just gentle ones from everywhere.
   Nothing in the nursery is a baby, and nothing suggests one going up into
   the sky: what rises there is a Sweet dream (keep it that way).
-- **Each area has its own goal** on the line under the scene, with a bar. The garden's is its next wonder (then, once all 24 have come, the next glow constellation). Elsewhere, in turn:
+- **Each area has its own goal** on the line under the scene, with a bar. The garden's is its next wonder (then, once all 24 have come, the next star lit with glow). Elsewhere, in turn:
   - the way to the next place, until it opens ("Next: the way to the park", "6 of 10 found");
   - then the area's last item ("Next: the last light of all", "11 of 12 found");
   - once that's grown, another one for the sky ("Next: another sky lantern"). The bar here shows how much of the next one is already on the board, by its worth in seeds (`areaProgress`).
