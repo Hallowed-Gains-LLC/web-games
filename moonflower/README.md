@@ -219,6 +219,7 @@ change. Scripture is never in the library: each app keeps its own.
 | Wish cards | Three visitors, each wanting one item. A gold border means you have it: tap the card (or drag the item onto it). Pays 3× the item's seed value. Wishes lead you on: about one in four (never more than one at a time) is for the next thing you've never grown, shown as a silhouette with a "?" until you grow it; about a third ask for your best so far; the rest for something a step to three below it (`wishTier`). |
 | Basket | Drag anything here (or select it and tap the basket) to tuck it away for its seed value in glow. |
 | Sort | Tidies the board: everything in order, the biggest first from the top left, so pairs sit side by side and the empty places end up at the bottom by the pouch. Each thing glides to its place, and Undo puts it back (`sortBoard`). |
+| Merge | Merges the two lowest things on the board that make a pair (the closest two of them), as if you'd dragged one onto the other: one merge a tap, into the one nearer the top. Says so when nothing pairs yet (`autoMerge`). The bar is five evenly spaced, the pouch in the middle: Basket, Sort, Seeds, Merge, Undo. |
 | Glow | Never spent. Crossing each threshold brings a new garden wonder to the scene. |
 
 **The chain:** Seed → Sprout → Seedling → Bud → Moonflower → Posy → Glow-lily →

@@ -712,9 +712,12 @@ function layout() {
 
   const by = L.barTop + barH / 2 - 7;
   L.pouch = { x: W / 2, y: by, r: Math.min(barH * .36, 40) };
-  L.basket = { x: W / 2 - Math.min(L.cw * .4, 170), y: by, r: 27 };
-  L.undo = { x: W / 2 + Math.min(L.cw * .4, 170), y: by, r: 27 };
-  L.sort = { x: (L.basket.x + L.basket.r + W / 2 - L.pouch.r * 1.25) / 2, y: by, r: 20 };   // between the basket and the pouch
+  // The bar: five evenly spaced, the pouch in the middle. Basket, Sort | Seeds | Merge, Undo.
+  const slot = Math.min(L.cw * .2, 86);
+  L.basket = { x: W / 2 - slot * 2, y: by, r: 27 };
+  L.sort = { x: W / 2 - slot, y: by, r: 20 };
+  L.merge = { x: W / 2 + slot, y: by, r: 20 };
+  L.undo = { x: W / 2 + slot * 2, y: by, r: 27 };
   const hy = st + L.headerH / 2;
   L.gear = { x: L.cx + L.cw - 18, y: hy, r: 22 };
   L.book = { x: L.cx + L.cw - 62, y: hy, r: 22 };
@@ -2494,6 +2497,26 @@ function sortBoard() {
   sfx.tick(); later(150, () => sfx.tick()); buzz(6);
   save();
 }
+/**
+ * Merge the two lowest things on the board that make a pair (the closest
+ * two of them), as if you'd dragged one onto the other: one merge a tap,
+ * into the one nearer the top. Saves the fiddly little drags of seeds and
+ * sprouts; the bigger choices are still yours.
+ */
+function autoMerge() {
+  for (let t = 1; t < MAX_TIER; t++) {
+    const cells = S.board.map((v, i) => v === t && !busy(i) ? i : -1).filter(i => i >= 0);
+    if (cells.length < 2) continue;
+    let pair = null, d = 1e9;
+    for (let a = 0; a < cells.length; a++) for (let b = a + 1; b < cells.length; b++) {
+      const i = cells[a], j = cells[b], dd = Math.hypot(i % COLS - j % COLS, Math.floor(i / COLS) - Math.floor(j / COLS));
+      if (dd < d) { d = dd; pair = [j, i]; }   // the later one flies into the earlier (nearer the top)
+    }
+    sel = -1; doMerge(pair[0], pair[1], null);
+    return;
+  }
+  toast({ title: 'Nothing to pair yet', sub: 'Tap the seed pouch for more.' });
+}
 function gather(cell, from) {
   const t = S.board[cell];
   if (t === MAX_TIER) return;   // it's on its way into the sky
@@ -3014,6 +3037,13 @@ function drawBar(c, ms) {
   for (const [k, w] of [[0, 9], [1, 6], [2, 3]]) { c.beginPath(); c.moveTo(-9, -6 + k * 6); c.lineTo(-9 + w * 2, -6 + k * 6); c.stroke(); }
   c.restore();
   c.textBaseline = 'top'; c.fillStyle = rgba(COL.text, .5); c.fillText('Sort', So.x, B.y + B.r - 1);
+  // merge: two chevrons meeting at a small spark
+  const Me = L.merge;
+  c.save(); c.translate(Me.x, Me.y); c.strokeStyle = rgba(COL.text, .8); c.lineWidth = 2.4; c.lineCap = 'round'; c.lineJoin = 'round';
+  c.beginPath(); c.moveTo(-11, -6); c.lineTo(-5, 0); c.lineTo(-11, 6); c.moveTo(11, -6); c.lineTo(5, 0); c.lineTo(11, 6); c.stroke();
+  c.fillStyle = rgba(COL.gold, .85); sparkle(c, 0, 0, 3, rgba(COL.gold, .85));
+  c.restore();
+  c.textBaseline = 'top'; c.fillStyle = rgba(COL.text, .5); c.fillText('Merge', Me.x, B.y + B.r - 1);
   c.fillText(AREA.words.pouch, P.x, P.y + P.r + 2);
 }
 
@@ -3384,6 +3414,7 @@ function hitTest(x, y, dropping) {
   if (inC(L.pouch, 1.25)) return { kind: 'pouch' };
   if (inC(L.basket, dropping ? 1.9 : 1.5)) return { kind: 'basket' };
   if (!dropping && inC(L.sort, 1.15)) return { kind: 'sort' };
+  if (!dropping && inC(L.merge, 1.15)) return { kind: 'merge' };
   if (!dropping && inC(L.undo, 1.5)) return { kind: 'undo' };
   if (!dropping && inC(L.book, 1)) return { kind: 'book' };
   if (!dropping && inC(L.map, 1)) return { kind: 'map' };
@@ -3456,6 +3487,7 @@ function tap(h) {
       break;
     case 'undo': sel = -1; doUndo(); break;
     case 'sort': sortBoard(); break;
+    case 'merge': autoMerge(); break;
     case 'book': openBook(); break;
     case 'map': if (sel >= 0 && S.board[sel] && S.opened.length > 1) { pack(sel, null); sel = -1; } else { sel = -1; openMap(); } break;
     case 'gear': openSettings(); break;
