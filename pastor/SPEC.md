@@ -1,13 +1,14 @@
 # What Does This Mean? — content spec (shared by the engine and the content file)
 
-Game: **What Does This Mean?** (a pastor's year at St. Luke's) — a cozy pixel-art week-planner through one church year
+Game: **What Does This Mean?** (a pastor's year at Zion Lutheran) — a cozy pixel-art week-planner through one church year
 (~30 min). Folder: `pastor/`. Engine: `index.html`.
 Content: `content.js`, which sets `window.PASTOR = { ... }` exactly as below. Plain data only:
 no functions, no imports. UTF-8. Curly quotes/apostrophes are fine inside JS strings; prefer double-quoted
 JS strings so apostrophes need no escaping.
 
 ## Setting and tone
-- St. Luke's Lutheran Church, a small congregation (about 60–90 on a normal Sunday) in **Willow Creek**,
+- Zion Evangelical Lutheran Church of the Unaltered Augsburg Confession ("Zion" in speech and text;
+  the full name is a running gag, used sparingly), a small congregation (about 60–90 on a normal Sunday) in **Willow Creek**,
   a small Midwestern town. You are **Pastor** (never named; the player is "you"). The LCMS ordains
   only men, so the pastor is a man: write him as "you", and where a third person is natural, "he".
   His wife is **Sam** and their daughter is **Bea** (8); Bea calls Sam "Mom".

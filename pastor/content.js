@@ -1,4 +1,4 @@
-// A Pastor’s Year at St. Luke’s: all words in the game.
+// What Does This Mean? (a pastor’s year at Zion Lutheran): all words in the game.
 // Plain data only. See SPEC.md for the shape. Scripture is KJV, checked word for word.
 window.PASTOR = {
 
@@ -20,7 +20,7 @@ window.PASTOR = {
     // Monthly Communion calls on the homebound and at Pine Haven.
     communion: [
       { text: "The portable Communion set, the little book, a full afternoon. Six homes, six kitchen tables, the same Supper. “This is my body which is given for you” (Luke 22:19)." },
-      { text: "At Pine Haven you set a corporal on a hospital tray. Four St. Luke’s members gather in wheelchairs. Mrs. Dahl sings every word of the liturgy, loudly." },
+      { text: "At Pine Haven you set a corporal on a hospital tray. Four Zion members gather in wheelchairs. Mrs. Dahl sings every word of the liturgy, loudly." },
       { text: "Mr. Krause can’t remember your name, but when you begin the Lord’s Prayer he says every word with you, and he receives the Sacrament with folded hands." },
       { text: "“For as often as ye eat this bread, and drink this cup, ye do shew the Lord’s death till he come” (1 Corinthians 11:26). You say it to a farmer who can no longer farm." },
       { text: "A shut-in confesses, you absolve her in Christ’s stead, and she receives His body and blood at her own table. “Now I can sleep,” she says." },
@@ -50,7 +50,7 @@ window.PASTOR = {
       { text: "A seminary professor’s voice in your head: “Preach the text, not your week.” You delete the paragraph about the copier." },
       { text: "You study in the third pew today, where the sun comes through the Good Shepherd window. It helps more than it should." },
       { text: "Halfway through your notes on {gospel}, Biscuit walks across the keyboard and adds “jjjjjjjjj”. It is the most honest line on the page.", fx: { sermon: -1, strength: 1 } },
-      { text: "St. Luke’s pulpit was built in 1911. More than a century of sermons, most of them too long, and God used every one." },
+      { text: "Zion’s pulpit was built in 1911. More than a century of sermons, most of them too long, and God used every one." },
       { text: "You write {sunday} at the top of a clean page. The old Latin names still feel like a door opening. You walk through it into {gospel}." },
       { text: "The readings for {sunday} rhyme with each other in a way you didn’t expect, as if somebody planned it a thousand years ago. Somebody did." },
       { text: "You write one sentence you’re sure of: Christ is for you. You build the rest around it, like a house around a hearth.", fx: { sermon: 4 } },
@@ -78,6 +78,7 @@ window.PASTOR = {
     ],
 
     office: [
+      { text: "The district’s new online form allows the church’s name thirty characters. “Zion Evangelical Lutheran Ch” will have to do. The Augsburg Confession stays unaltered, merely abbreviated." },
       { text: "The copier jams on page two of forty bulletins. You open drawer C. You look for drawer D. There is no drawer D. There is a paper clip." },
       { text: "Seventeen voicemails. Nine are about the thermostat. One is a man selling church van insurance. You do not have a church van." },
       { text: "Autocorrect changes “Sabaoth” to “Sabbath” and “Kyrie” to “Kyle” in the bulletin. You fix both. Kyle will be disappointed." },
@@ -96,7 +97,7 @@ window.PASTOR = {
       { text: "You check the bulletin’s hymn numbers against the hymnal. Twice. Last time, the congregation sang a funeral hymn at a wedding." },
       { text: "The coffee urn needs descaling and you’re the only one who knows where the vinegar is. This, too, is ministry." },
       { text: "You phone the shut-ins on the list to say hello. Each call is short. Each one is the best part of someone’s day.", fx: { harmony: 3, strength: -2 } },
-      { text: "A man calls to ask if St. Luke’s does weddings for “mostly spiritual” people. You have a long, kind talk. He might come Sunday." },
+      { text: "A man calls to ask if Zion does weddings for “mostly spiritual” people. You have a long, kind talk. He might come Sunday." },
       { text: "A teenager rearranged the church sign from COME AS YOU ARE to COME AS YOUR ARE. You fix it. It’s still true." },
       { text: "Pete’s budget spreadsheet is color-coded. Green is good. Yellow is “pray.” Red is “pray harder.” There is a lot of yellow.", fx: { building: 2 } },
       { text: "You type up the altar flower calendar. Easter is booked solid. The Sundays after it are wide open, which is how it always goes." }
@@ -127,7 +128,7 @@ window.PASTOR = {
       { text: "Nurse Carol hands you a coffee without asking. “Room 6 has no visitors,” she says. You go to Room 6.", fx: { strength: -2, harmony: 2 } },
       { text: "A young dad in the waiting room isn’t a member of anything. You sit with him. You don’t fix it. You just stay." },
       { text: "Arne is two days out of knee surgery and already asking when he can mow the church lawn. Not this week, Arne." },
-      { text: "A St. Luke’s member at Pine Haven receives the Lord’s Supper for the first time in two years. She weeps at “given and shed for you.” So, a little, do you." },
+      { text: "A Zion member at Pine Haven receives the Lord’s Supper for the first time in two years. She weeps at “given and shed for you.” So, a little, do you." },
       { text: "You read Psalm 121 to a woman who can’t open her eyes today. At “My help cometh from the LORD” (Psalm 121:2), her thumb moves on your hand." },
       { text: "Four rooms at the care center, four stories, one bag of peppermints. The peppermints run out first." },
       { text: "The hospital chapel has a fake plant and a real Bible. You sit there for five minutes between visits and breathe.", fx: { strength: 2 } },
@@ -145,7 +146,7 @@ window.PASTOR = {
       { text: "Deb asks if pastors ever get a day off. You say yes. She raises one eyebrow very high. Deb knows things." },
       { text: "You jot sermon notes on a napkin. A farmer reads over your shoulder. “That one’s good. Use that.” You use that.", fx: { sermon: 2 } },
       { text: "The high schoolers in the corner booth are cramming for chemistry. You remember nothing about chemistry. You buy them fries." },
-      { text: "The mayor (also the hardware store) asks if St. Luke’s can host the blood drive. You say yes before checking with Pete. Oh well." },
+      { text: "The mayor (also the hardware store) asks if Zion can host the blood drive. You say yes before checking with Pete. Oh well." },
       { text: "Deb’s coffee could stand a spoon up. Two cups and you briefly understand Greek.", fx: { strength: 2 } },
       { text: "An old man at the counter hasn’t been to church since 1979. “Roof fell in,” he says. He doesn’t mean the church’s roof. You sit down beside him." },
       { text: "Lemon meringue today. Deb cuts you a slice “for the sermon.” You’re not sure how pie helps a sermon. It does." },
@@ -171,6 +172,7 @@ window.PASTOR = {
     ],
 
     family: [
+      { text: "Bea asks what “Unaltered Augsburg Confession” means. You explain that Zion still confesses what the Lutherans confessed at Augsburg in 1530. “Did they have a boiler?” No. Lucky them." },
       { text: "Bea teaches you a card game with rules she invents as she goes. You lose. Somehow you also owe her a cookie." },
       { text: "Supper with no phones at the table. Sam tells a story about the grocery store that makes you laugh milk out of your nose." },
       { text: "You and Bea build a fort out of couch cushions. It is declared a church. You are allowed to preach for exactly one minute." },
@@ -223,7 +225,7 @@ window.PASTOR = {
           { label: "Sneak her a slice of Deb’s pie", fx: { olsen: -15, strength: 2 },
             reply: "Nurse Carol catches you and pretends not to. “I didn’t see that,” she says, “and neither did her blood sugar.” Mrs. Olsen eats every crumb." },
           { label: "Pray, then hurry back to work", fx: { olsen: -8, sermon: 5 },
-            reply: "She waves you off. “Go write something good. I’ll listen on the radio.” St. Luke’s isn’t on the radio. You don’t correct her." }
+            reply: "She waves you off. “Go write something good. I’ll listen on the radio.” Zion isn’t on the radio. You don’t correct her." }
         ] },
 
       { id: "olsen4", when: { minWeek: 6, maxWeek: 8, at: "hospital", flag: "olsenHospital" }, title: "Two A.M. Is the Worst Hour",
@@ -342,7 +344,7 @@ window.PASTOR = {
         ] },
 
       { id: "gus7a", when: { minWeek: 12, maxWeek: 15, flag: "margeStory", notFlag: "trucePact" }, title: "What Gus Didn’t Know",
-        text: "With Marge’s permission you tell Gus why she keeps it at 64: the 1981 heating bill that nearly closed St. Luke’s, and Leonard up nights over the books. Gus is quiet a long time.",
+        text: "With Marge’s permission you tell Gus why she keeps it at 64: the 1981 heating bill that nearly closed Zion, and Leonard up nights over the books. Gus is quiet a long time.",
         choices: [
           { label: "Let him sit with it", fx: { gus: -15, harmony: 6 },
             reply: "“I was on council in ’81,” Gus says at last. “Voted to shut the balcony to save heat. Leonard never said what it cost him.” He goes off to find Marge." },
@@ -393,7 +395,7 @@ window.PASTOR = {
         ] },
 
       { id: "marge3", when: { minWeek: 5, maxWeek: 8 }, title: "Why Sixty-Four",
-        text: "Over coffee Marge finally tells you. 1981: a heating bill St. Luke’s couldn’t pay. Her Leonard was treasurer and sat up nights over the books until they found a way. “Sixty-four keeps his church open.”",
+        text: "Over coffee Marge finally tells you. 1981: a heating bill Zion couldn’t pay. Her Leonard was treasurer and sat up nights over the books until they found a way. “Sixty-four keeps his church open.”",
         choices: [
           { label: "Promise to keep her secret", fx: { marge: -22, strength: -2 },
             reply: "“Thank you,” she says, and squeezes your hand once, hard. On your way out she turns the thermostat up to 65. Just for you." },
@@ -703,7 +705,7 @@ window.PASTOR = {
           { label: "Pray with him first", fx: { pete: -20, strength: -2 },
             reply: "“Casting all your care upon him; for he careth for you” (1 Peter 5:7). Pete’s shoulders drop an inch. “Can I cast the spreadsheet on him too?” Especially the spreadsheet." },
           { label: "Tell him to get some sleep", fx: { pete: -8, strength: 2, building: -2 },
-            reply: "“St. Luke’s survived 1981, Pete. It’ll survive December.” He laughs a little. He also emails you at 2:14 a.m. with a new tab." }
+            reply: "“Zion survived 1981, Pete. It’ll survive December.” He laughs a little. He also emails you at 2:14 a.m. with a new tab." }
         ] },
 
       { id: "pete2", when: { minWeek: 1, maxWeek: 4, flag: "boilerDead" }, title: "What a Boiler Costs",
@@ -1226,7 +1228,7 @@ window.PASTOR = {
       ] },
 
     { id: "weddingCouple", when: { minWeek: 5, maxWeek: 10, chance: 0.4 }, from: "Tyler & Kayla", kind: "email", title: "We’re Engaged!",
-      text: "Tyler and Kayla, both 24, are engaged and would love a fall wedding at St. Luke’s. Kayla’s grandmother says they must “do the counselling thing” first. Are you free?",
+      text: "Tyler and Kayla, both 24, are engaged and would love a fall wedding at Zion. Kayla’s grandmother says they must “do the counselling thing” first. Are you free?",
       choices: [
         { label: "Six sessions, starting now", fx: { harmony: 5, strength: -6, sermon: -3 },
           reply: "First session, you ask how they handle arguments. They look at each other and say, “We don’t argue.” You schedule five more sessions." },
@@ -1357,7 +1359,7 @@ window.PASTOR = {
       ] },
 
     { id: "foodPantry", when: { minWeek: 1, maxWeek: 16, chance: 0.3 }, from: "Deb", kind: "call", title: "The Empty Shelf",
-      text: "Deb: “The food pantry shelf at the café is bare again. It’s been a hard stretch for some folks. Can St. Luke’s help?”",
+      text: "Deb: “The food pantry shelf at the café is bare again. It’s been a hard stretch for some folks. Can Zion help?”",
       choices: [
         { label: "Announce a food drive", fx: { harmony: 6, strength: -2 },
           reply: "By Sunday the narthex holds a mountain of canned corn, peanut butter and, inexplicably, eleven jars of pickled herring. Deb takes it all." },
@@ -1501,6 +1503,7 @@ window.PASTOR = {
       "“I’ll be thinking about that all week,” says someone you didn’t know was listening."
     ],
     good: [
+      "“Pastor, I finally wrote the church’s whole name on a check. It took both lines and the memo.”",
       "“Lovely sermon, Pastor. A bit long.”",
       "“Good sermon. Is the coffee ready?”",
       { who: "marge", text: "Marge: “Very nice. The hymn after was in the wrong key, but that’s Hannah’s department.”" },

@@ -3,7 +3,7 @@
 *The Small Catechism's question, asked weekly of a boiler, a council and a donkey.*
 
 A cozy pixel-art week planner through one church year as the pastor of
-**St. Luke's Lutheran Church** in Willow Creek, a small Midwestern town.
+**Zion Evangelical Lutheran Church of the Unaltered Augsburg Confession** (everyone just says Zion) in Willow Creek, a small Midwestern town.
 About half an hour from Advent to the Last Sunday of the Church Year.
 
 🎮 **[hallowedgains.com/games/pastor](https://hallowedgains.com/games/pastor/)**
