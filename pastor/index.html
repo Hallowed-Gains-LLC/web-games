@@ -6,6 +6,9 @@
 <meta name="theme-color" content="#1a1d2e">
 <meta name="description" content="What Does This Mean? A cozy, gently funny pixel-art church year as the pastor of Zion Evangelical Lutheran Church of the Unaltered Augsburg Confession, in a small Midwestern town.">
 <title>What Does This Mean?</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   /* ============================================================
      What Does This Mean? (a pastor's year at Zion Lutheran)
@@ -31,6 +34,12 @@
   #stage::after { content: ''; position: absolute; inset: 0; pointer-events: none;
                   background: radial-gradient(ellipse at center, rgba(0,0,0,0) 62%, rgba(5,6,14,.45) 100%); }
   /* the day's name, laid over the town for a moment when a new day starts */
+  /* music and sound-effect toggles: over the top-right corner of the town, above cards and the title too */
+  #soundBtns { position: fixed; top: calc(env(safe-area-inset-top) + 6px); right: calc(env(safe-area-inset-right) + 8px); z-index: 40; display: flex; gap: 6px; }
+  @media (min-aspect-ratio: 11/10) and (min-width: 700px) { #soundBtns { right: 388px; } }
+  #soundBtns button { width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255,255,255,.25); background: rgba(16,18,34,.55);
+                      color: #f6e2b0; font-size: 16px; line-height: 1; padding: 0; backdrop-filter: blur(2px); }
+  #soundBtns button.off { opacity: .45; text-decoration: line-through; }
   #banner { position: absolute; left: 0; right: 0; top: 38%; z-index: 2; text-align: center; pointer-events: none; opacity: 0;
             font-family: Georgia, serif; font-size: 30px; color: #fff4d6; text-shadow: 0 2px 0 rgba(0,0,0,.55), 0 0 18px rgba(0,0,0,.5); }
   #banner small { display: block; font-family: system-ui, sans-serif; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: #f0d79a; margin-top: 2px; }
@@ -160,6 +169,7 @@
     <div id="hint"></div>
   </div>
 </div>
+<div id="soundBtns"><button id="musicBtn" aria-label="Music">♪</button><button id="sfxBtn" aria-label="Sound effects">🔔</button></div>
 <div id="modal"><div id="card" role="dialog" aria-modal="true"></div></div>
 <div id="title">
   <div class="kicker">A pastor's year at Zion Lutheran</div>
@@ -180,7 +190,7 @@
    plain data (window.PASTOR); this file is the calendar, the rules, the
    pixel town and the screens. See README.md.
    ============================================================ */
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 const SAVE_KEY = 'pastor_save_v1';          // every game on the site shares localStorage
 const P = window.PASTOR || { pools: {}, stories: {}, visitLines: {}, events: [], specials: {}, door: {}, endings: {}, closing: '' };
 
@@ -521,7 +531,8 @@ function doAction(a) {
     if (a.key === 'rest') S.stats.rests++;
     if (a.key === 'family') S.stats.family++;
     const changes = apply(fx);
-    showCard({ kicker: KICKER[a.key], title: TITLE[a.key], text: fill(line.text), changes, then: endSlot });
+    const sound = { tap: 'clink', fishFry: 'clink', theologyOnTap: 'clink', bowling: 'strike', study: 'page', exegesis: 'page', fathers: 'page', manuscript: 'page' }[a.key];
+    showCard({ kicker: KICKER[a.key], title: TITLE[a.key], text: fill(line.text), changes, sound, then: endSlot });
   });
 }
 function doVisit(a) {
@@ -594,6 +605,7 @@ function runEvent(ev) {
   S.seen[ev.id] = true; S.stats.events++;
   const kick = { call: '☎ The phone rings', knock: 'A knock at the door', mail: 'In the mailbox', email: 'An email' }[ev.kind] || DAYS[S.day];
   showCard({ kicker: `${kick}${ev.from ? ' · ' + ev.from : ''}`, title: fill(ev.title), text: fill(ev.text), choices: ev.choices,
+    sound: { call: 'call', knock: 'knock', email: 'email' }[ev.kind] || 'card',
     then: c => c && c.away ? goAway() : (save(), render()) });
 }
 /**
@@ -629,6 +641,7 @@ function chips(changes) {
 function showCard(o) {
   if (o.pre) o.pre();
   modal.classList.add('open');
+  Sound.sfx(o.sound || 'card');
   const head = `${o.kicker ? `<div class="kicker">${esc(o.kicker)}</div>` : ''}<h2>${esc(o.title || '')}</h2>`;
   const body = (o.html || '') + (o.text ? `<p class="${o.html ? '' : 'lead'}">${esc(o.text)}</p>` : '');
   if (o.choices && o.choices.length) {
@@ -665,11 +678,13 @@ function special(key, then) {
   const extra = Object.entries(sp.flagBeats || {}).filter(([f]) => S.flags[f]).map(([, b]) => b);
   if (extra.length) beats.splice(Math.max(1, beats.length - 1), 0, ...extra);
   for (let i = 0; i < beats.length; i++) beats[i] = fill(beats[i]);
+  if (key === 'funeral') Sound.toll(3, 3, 147); else Sound.toll(1);
+  Sound.hymn(key === 'christmasEve' ? 'silentNight' : key === 'easterSunrise' || key === 'pentecost' ? 'oldHundredth' : 'chords');
   let i = 0;
   const next = () => {
     if (i < beats.length) { const t = beats[i++]; showCard({ kicker: W().name, title: sp.title, text: t, go: i < beats.length ? 'Continue' : 'Amen', then: next }); return; }
     const changes = apply(sumFx({ harmony: 6, strength: -6 }, sp.fx));
-    scene = null; render();
+    scene = null; Sound.stopChurch(); render();
     if (changes.length) showCard({ kicker: W().name, title: sp.title, text: '', changes, then }); else then();
   };
   next();
@@ -694,6 +709,7 @@ function sunday() {
     S.sundays.push({ week: S.week, att, score, tier });
     apply({ harmony: { great: 5, good: 2, fine: 0, thin: -4 }[tier] });
     scene = { kind: 'sunday', candles: false, att, t0: performance.now() };
+    Sound.toll(3); Sound.hymn('oldHundredth');
     render();
     const said = fill(textOf(draw('sermon:' + tier, (P.sermonLines || {})[tier])) || { great: `Your sermon on ${w.gospel} sang. People were still talking about it at coffee hour.`, good: `Your sermon on ${w.gospel} was solid: Law and Gospel, and home by noon.`, fine: `Your sermon on ${w.gospel} got there in the end, by way of a story about your car.`, thin: `Your sermon on ${w.gospel} was thin. You could feel the study you skipped. The Gospel still did its work: it always does.` }[tier]);
     const door = doorLines(tier);
@@ -729,7 +745,7 @@ function review() {
     go: S.week >= WEEKS.length - 1 ? 'The year in review' : 'Monday, your day off', then: nextWeek });
 }
 function nextWeek() {
-  scene = null;
+  scene = null; Sound.stopChurch();
   if (S.week >= WEEKS.length - 1) return yearEnd();
   S.week++; S.day = 0; S.slot = 0; S.studies = 0; S.eventToday = -1;
   S.m.sermon = 0;
@@ -781,6 +797,231 @@ function yearEnd() {
 }
 
 /* ============================================================
+   Sound: every effect and every note is synthesized with Web Audio,
+   so the game ships no audio files.
+
+   - Effects (Sound.sfx): taps, the card's paper rustle, the phone, a knock,
+     an email ding, footsteps, meter chimes, glasses at the Tap, a strike on
+     league night, a page turn, the church bell.
+   - Town music: a slow, generative tune on a soft pad and a music-box voice,
+     with a chord progression for each season.
+   - Church music: an organ playing public-domain hymn tunes, harmonized in
+     four parts: Old Hundredth (Genevan Psalter, 1551) on Sundays and
+     "Stille Nacht" (Gruber, 1818) on Christmas Eve; slow organ chords for
+     the other services.
+   Music and effects have their own toggles, remembered per browser.
+   ============================================================ */
+const SOUND_KEY = 'pastor_sound_v1';
+const Sound = (() => {
+  let ac = null, out, musicBus, sfxBus;
+  let churchPlaying = false, churchEnd = 0, churchBus = null;   // the organ, while a service is on
+  let prefs = { music: true, sfx: true };
+  try { Object.assign(prefs, JSON.parse(localStorage.getItem(SOUND_KEY) || '{}')); } catch (e) {}
+  const savePrefs = () => { try { localStorage.setItem(SOUND_KEY, JSON.stringify(prefs)); } catch (e) {} };
+  const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+
+  /** The audio graph is made on the first tap (browsers require a gesture). */
+  function ensure() {
+    if (!ac) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ac = new AC();
+      out = ac.createDynamicsCompressor(); out.connect(ac.destination);
+      musicBus = ac.createGain(); musicBus.gain.value = prefs.music ? 1 : 0; musicBus.connect(out);
+      sfxBus = ac.createGain(); sfxBus.gain.value = prefs.sfx ? 1 : 0; sfxBus.connect(out);
+      setInterval(tick, 100);
+    }
+    if (ac.state === 'suspended') ac.resume();
+    return ac;
+  }
+  document.addEventListener('visibilitychange', () => { if (ac) document.hidden ? ac.suspend() : ac.resume(); });
+
+  /* ---------- building blocks ---------- */
+  /** An oscillator with an attack/decay envelope, into `dest`. */
+  function tone(dest, { freq, type = 'sine', t = ac.currentTime, a = .005, d = .3, gain = .2, sustain = 0, hold = 0, glide }) {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (glide) o.frequency.exponentialRampToValueAtTime(glide, t + a + hold + d);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain, t + a);
+    if (hold) g.gain.setValueAtTime(sustain || gain, t + a + hold);
+    g.gain.exponentialRampToValueAtTime(.0001, t + a + hold + d);
+    o.connect(g); g.connect(dest); o.start(t); o.stop(t + a + hold + d + .05);
+  }
+  let noiseBuf = null;
+  /** A burst of filtered noise (rustles, knocks, footsteps, pins). */
+  function noise(dest, { t = ac.currentTime, d = .1, gain = .2, type = 'bandpass', freq = 2000, q = 1 }) {
+    if (!noiseBuf) {
+      noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+      const ch = noiseBuf.getChannelData(0); for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+    }
+    const src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    src.buffer = noiseBuf; f.type = type; f.frequency.value = freq; f.Q.value = q;
+    g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+    src.connect(f); f.connect(g); g.connect(dest); src.start(t, Math.random() * .5); src.stop(t + d + .02);
+  }
+  /** A church bell: inharmonic partials with a long ring. */
+  function bell(t, root = 196, gain = .22) {
+    for (const [ratio, amp, len] of [[.5, .5, 4.5], [1, 1, 3.6], [1.19, .45, 2.8], [1.5, .35, 2.4], [2, .4, 2], [2.51, .2, 1.5], [3.01, .15, 1.1]]) {
+      tone(sfxBus, { freq: root * ratio, t, a: .004, d: len, gain: gain * amp });
+    }
+    noise(sfxBus, { t, d: .05, gain: .05, freq: 3000 });
+  }
+  /** One organ pipe-ish note: a few stops (8', 4', 2 2/3', 2') blended. */
+  function organ(dest, midi, t, dur, gain = .06) {
+    const f = mtof(midi);
+    for (const [mult, amp] of [[1, 1], [2, .55], [3, .18], [4, .22]]) {
+      tone(dest, { freq: f * mult, t, a: .05, hold: Math.max(.05, dur - .12), d: .18, gain: gain * amp });
+    }
+  }
+
+  /* ---------- effects ---------- */
+  const FX = {
+    tap()   { tone(sfxBus, { freq: 520, type: 'triangle', d: .06, gain: .07 }); },
+    card()  { noise(sfxBus, { d: .16, gain: .06, freq: 3200, q: .6 }); noise(sfxBus, { t: ac.currentTime + .06, d: .12, gain: .04, freq: 2200, q: .8 }); },
+    page()  { const t = ac.currentTime; noise(sfxBus, { t, d: .22, gain: .07, freq: 1800, q: .5 }); noise(sfxBus, { t: t + .12, d: .16, gain: .05, freq: 3500, q: .7 }); },
+    up()    { const t = ac.currentTime; tone(sfxBus, { freq: 784, t, d: .5, gain: .05 }); tone(sfxBus, { freq: 1175, t: t + .09, d: .6, gain: .045 }); },
+    down()  { tone(sfxBus, { freq: 330, type: 'triangle', d: .35, gain: .05, glide: 262 }); },
+    step()  { noise(sfxBus, { d: .05, gain: .035, type: 'lowpass', freq: seasonLook().snow ? 2600 : 900, q: .7 }); },
+    call()  {   // an old telephone's double ring, twice
+      const t = ac.currentTime;
+      for (const s0 of [0, .55]) for (let i = 0; i < 8; i++) {
+        tone(sfxBus, { freq: 440, t: t + s0 + i * .045, d: .04, gain: .05, type: 'square' });
+        tone(sfxBus, { freq: 480, t: t + s0 + i * .045 + .022, d: .04, gain: .05, type: 'square' });
+      }
+    },
+    knock() { const t = ac.currentTime; for (const k of [0, .17, .34]) { tone(sfxBus, { freq: 140, t: t + k, d: .09, gain: .25, glide: 90 }); noise(sfxBus, { t: t + k, d: .05, gain: .08, type: 'lowpass', freq: 700 }); } },
+    email() { const t = ac.currentTime; tone(sfxBus, { freq: 988, t, d: .4, gain: .06 }); tone(sfxBus, { freq: 1319, t: t + .12, d: .6, gain: .06 }); },
+    clink() { const t = ac.currentTime; tone(sfxBus, { freq: 2350, t, d: .5, gain: .05 }); tone(sfxBus, { freq: 3120, t: t + .015, d: .45, gain: .04 }); noise(sfxBus, { t: t + .3, d: .5, gain: .02, freq: 600, q: .4 }); },
+    strike() {   // the roll down the lane, then pins
+      const t = ac.currentTime;
+      noise(sfxBus, { t, d: .9, gain: .05, type: 'lowpass', freq: 300, q: .5 });
+      for (let i = 0; i < 10; i++) noise(sfxBus, { t: t + .85 + Math.random() * .25, d: .08, gain: .09, freq: 1200 + Math.random() * 1800, q: 4 });
+    },
+    bell()  { bell(ac.currentTime); },
+  };
+  function sfx(name) { if (!prefs.sfx || !ensure() || !FX[name]) return; try { FX[name](); } catch (e) {} }
+  /** The bell tolled `n` times, `gap` seconds apart. */
+  function toll(n = 3, gap = 2.2, root = 196) { if (!prefs.sfx || !ensure()) return; for (let i = 0; i < n; i++) bell(ac.currentTime + i * gap, root); }
+
+  /* ---------- town music: generative, one progression per season ---------- */
+  // Chords as MIDI note lists (root position, around C3); each lasts two bars.
+  const PROG = {
+    advent:    [[50, 53, 57], [46, 50, 53], [53, 57, 60], [48, 52, 55]],   // Dm Bb F C: waiting
+    christmas: [[48, 52, 55], [45, 48, 52], [53, 57, 60], [43, 47, 50]],   // C Am F G
+    epiphany:  [[43, 47, 50], [50, 54, 57], [52, 55, 59], [48, 52, 55]],   // G D Em C
+    lent:      [[45, 48, 52], [50, 53, 57], [52, 56, 59], [45, 48, 52]],   // Am Dm E Am
+    holyweek:  [[45, 48, 52], [53, 57, 60], [52, 56, 59], [52, 56, 59]],   // Am F E E
+    easter:    [[50, 54, 57], [43, 47, 50], [45, 49, 52], [50, 54, 57]],   // D G A D
+    pentecost: [[53, 57, 60], [46, 50, 53], [48, 52, 55], [53, 57, 60]],   // F Bb C F
+    autumn:    [[43, 47, 50], [52, 55, 59], [48, 52, 55], [50, 54, 57]],   // G Em C D
+  };
+  const BEAT = 60 / 66;   // a slow walk
+  let townOn = false, nextBeat = 0, beatN = 0, lastMel = 72;
+  function progression() { return S && S.week >= 16 ? PROG.autumn : PROG[(S ? W() : WEEKS[0]).season] || PROG.christmas; }
+  function townBeat(t) {
+    const prog = progression(), chord = prog[Math.floor(beatN / 8) % prog.length], inBar = beatN % 8;
+    if (inBar === 0) {   // a soft pad for the chord, and its root in the bass
+      for (const m of chord) tone(musicBus, { freq: mtof(m), type: 'triangle', t, a: 1.2, hold: BEAT * 6, d: 2, gain: .022 });
+      tone(musicBus, { freq: mtof(chord[0] - 12), t, a: .02, d: BEAT * 4, gain: .05 });
+    }
+    // a music-box melody: chord tones and neighbours, mostly stepwise, with rests
+    if (Math.random() < (inBar % 2 ? .35 : .7)) {
+      const pool = [];
+      for (const c of chord) for (const o of [12, 24]) pool.push(c + o);
+      pool.sort((a, b) => Math.abs(a - lastMel) - Math.abs(b - lastMel));
+      const m = pool[Math.floor(Math.random() * Math.min(3, pool.length))];
+      lastMel = m;
+      tone(musicBus, { freq: mtof(m), t, a: .004, d: 1.4, gain: .035 });
+      tone(musicBus, { freq: mtof(m) * 2, t, a: .004, d: .5, gain: .008 });   // the music box's glassy overtone
+    }
+    // birdsong now and then in the warm seasons
+    if (S && !seasonLook().snow && seasonLook().tree !== 'bare' && Math.random() < .07) {
+      const f = 2400 + Math.random() * 1200;
+      for (let i = 0; i < 3; i++) tone(musicBus, { freq: f, t: t + i * .11, d: .08, gain: .012, glide: f * 1.3 });
+    }
+    beatN++;
+  }
+  function tick() {
+    if (!ac || ac.state !== 'running') return;
+    townOn = prefs.music && !churchPlaying;
+    if (!townOn) { nextBeat = 0; return; }
+    if (nextBeat < ac.currentTime) nextBeat = ac.currentTime + .1;
+    while (nextBeat < ac.currentTime + .6) { townBeat(nextBeat); nextBeat += BEAT; }
+  }
+
+  /* ---------- church music: the organ ---------- */
+  // Hymn tunes as [melody MIDI, beats, chord]; chords are voiced below the melody.
+  const CHORD = { C: [48, 52, 55], F: [53, 57, 60], G: [43, 47, 50], G7: [43, 47, 53], D: [50, 54, 57], Em: [52, 55, 59], Am: [45, 48, 52], Dm: [50, 53, 57] };
+  const TUNES = {
+    // Old Hundredth (Genevan Psalter, 1551), in G: "Praise God from whom all blessings flow".
+    oldHundredth: { beat: .72, notes: [
+      [67, 2, 'G'], [67, 1, 'G'], [66, 1, 'D'], [64, 1, 'C'], [62, 1, 'G'], [67, 1, 'Em'], [69, 1, 'D'], [71, 2, 'G'],
+      [71, 2, 'G'], [71, 1, 'Em'], [71, 1, 'G'], [69, 1, 'D'], [67, 1, 'Em'], [72, 1, 'C'], [71, 1, 'G'], [69, 2, 'D'],
+      [67, 2, 'G'], [69, 1, 'D'], [71, 1, 'G'], [69, 1, 'D'], [67, 1, 'Em'], [64, 1, 'C'], [66, 1, 'D'], [67, 2, 'G'],
+      [74, 2, 'G'], [71, 1, 'Em'], [67, 1, 'G'], [69, 1, 'D'], [72, 1, 'C'], [71, 1, 'G'], [69, 1, 'D'], [67, 3, 'G'],
+    ] },
+    // Stille Nacht (Franz Gruber, 1818), in C, counted in eighth notes of 6/8.
+    silentNight: { beat: .26, notes: [
+      [67, 3, 'C'], [69, 1, 'C'], [67, 2, 'C'], [64, 6, 'C'], [67, 3, 'C'], [69, 1, 'C'], [67, 2, 'C'], [64, 6, 'C'],
+      [74, 4, 'G'], [74, 2, 'G'], [71, 6, 'G'], [72, 4, 'C'], [72, 2, 'C'], [67, 6, 'C'],
+      [69, 4, 'F'], [69, 2, 'F'], [72, 3, 'F'], [71, 1, 'F'], [69, 2, 'F'], [67, 3, 'C'], [69, 1, 'C'], [67, 2, 'C'], [64, 6, 'C'],
+      [69, 4, 'F'], [69, 2, 'F'], [72, 3, 'F'], [71, 1, 'F'], [69, 2, 'F'], [67, 3, 'C'], [69, 1, 'C'], [67, 2, 'C'], [64, 6, 'C'],
+      [74, 4, 'G'], [74, 2, 'G'], [77, 3, 'G7'], [74, 1, 'G7'], [71, 2, 'G'], [72, 6, 'C'], [76, 6, 'C'],
+      [72, 3, 'C'], [67, 1, 'C'], [64, 2, 'C'], [67, 3, 'G7'], [65, 1, 'G7'], [62, 2, 'G7'], [60, 12, 'C'],
+    ] },
+    // Slow chords for the other services: I IV V I in C, twice, then a plagal Amen.
+    chords: { beat: 1.4, notes: [
+      [67, 2, 'C'], [69, 2, 'F'], [67, 2, 'G'], [67, 2, 'C'], [64, 2, 'Am'], [65, 2, 'Dm'], [67, 2, 'G7'], [64, 2, 'C'], [65, 2, 'F'], [64, 4, 'C'],
+    ] },
+  };
+  /** Play a hymn on the organ; town music rests until it ends (or `stopChurch`). */
+  function hymn(name) {
+    const tune = TUNES[name]; if (!tune || !prefs.music || !ensure()) return;
+    churchPlaying = true;
+    if (churchBus) churchBus.gain.setTargetAtTime(0, ac.currentTime, .2);   // a hymn already playing gives way
+    churchBus = ac.createGain(); churchBus.connect(musicBus);
+    const bus = churchBus;
+    let t = ac.currentTime + .4, prevChord = null;
+    for (const [m, beats, ch] of tune.notes) {
+      const dur = beats * tune.beat;
+      organ(bus, m, t, dur * .96, .055);                         // the melody
+      if (ch !== prevChord || beats >= 2) {                              // the chord beneath, re-struck on changes and long notes
+        const low = CHORD[ch];
+        for (const c of low) organ(bus, c + (c + 12 < m - 2 ? 12 : 0), t, dur * .96, .03);
+        organ(bus, low[0] - 12, t, dur * .96, .035);                // the pedal
+      }
+      prevChord = ch; t += dur;
+    }
+    churchEnd = t;
+    setTimeout(() => { if (ac && ac.currentTime >= churchEnd - .1) churchPlaying = false; }, (t - ac.currentTime) * 1000 + 200);
+  }
+  /** Back to the town: the organ fades out under it. */
+  function stopChurch() {
+    churchPlaying = false;
+    if (churchBus && ac) churchBus.gain.setTargetAtTime(0, ac.currentTime, .5);
+  }
+
+  /* ---------- the toggles ---------- */
+  function paint() {
+    document.getElementById('musicBtn').classList.toggle('off', !prefs.music);
+    document.getElementById('sfxBtn').classList.toggle('off', !prefs.sfx);
+  }
+  function set(k, v) {
+    prefs[k] = v; savePrefs(); paint();
+    if (ensure()) (k === 'music' ? musicBus : sfxBus).gain.setTargetAtTime(v ? 1 : 0, ac.currentTime, .05);
+  }
+  document.getElementById('musicBtn').onclick = e => { e.stopPropagation(); set('music', !prefs.music); };
+  document.getElementById('sfxBtn').onclick = e => { e.stopPropagation(); set('sfx', !prefs.sfx); if (prefs.sfx) sfx('tap'); };
+  paint();
+  // Any tap wakes the audio (browsers allow sound only after a gesture), and buttons click.
+  document.addEventListener('pointerdown', () => ensure(), { capture: true });
+  document.addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.closest('#soundBtns')) sfx('tap'); }, true);
+
+  return { sfx, toll, hymn, stopChurch };
+})();
+
+/* ============================================================
    The panel
    ============================================================ */
 let selected = null;
@@ -828,6 +1069,10 @@ function renderMeters() {
       el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
     }
   }
+  if (shownMeters) {
+    const deltas = METERS.map(m => meter(m.k) - shownMeters[m.k]).filter(d => d && !Number.isNaN(d));
+    if (deltas.length) Sound.sfx(deltas.reduce((a, b) => a + b, 0) >= 0 ? 'up' : 'down');
+  }
   shownMeters = Object.fromEntries(METERS.map(m => [m.k, meter(m.k)]));
 }
 /** Show the day's name over the town for a moment. */
@@ -863,9 +1108,11 @@ function walkTo(k, done) {
   const pts = [{ ...pastor }, { x: pastor.x, y: STREET_Y }, { x: to.x, y: STREET_Y }, to];
   walk = { pts, i: 0, done: () => { S.at = k; walk = null; done && done(); } };
 }
+let stepAcc = 0;   // distance walked since the last footstep sound
 function stepWalk(dt) {
   if (!walk) return;
   let left = dt * 70;   // pixels a second
+  stepAcc += left; if (stepAcc > 9) { stepAcc = 0; Sound.sfx('step'); }
   while (walk && left > 0) {
     const t = walk.pts[walk.i + 1];
     if (!t) { const d = walk.done; d(); return; }
