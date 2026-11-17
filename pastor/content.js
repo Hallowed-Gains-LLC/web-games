@@ -1995,6 +1995,26 @@ window.PASTOR = {
   // ───────────────────────── 4. Special services ─────────────────────────
   // flagBeats (optional): a beat the engine may append when that flag is set.
   specials: {
+    advent2: { title: "Midweek Advent Vespers", fx: { harmony: 2, strength: -2 },
+      beats: [
+        "Two candles on the wreath now. The Lindemann twins light them with the focus of brain surgeons, and the church sings “Savior of the Nations, Come.”",
+        "“The night is far spent, the day is at hand” (Romans 13:12).",
+        "Soup after: Hank Krause’s potato soup, and Biscuit under the tables, working the room."
+      ] },
+    advent3: { title: "Gaudete Vespers", fx: { harmony: 3, strength: -2 },
+      beats: [
+        "The rose candle is lit. Marge stands close by, in case anyone calls it pink.",
+        "“Rejoice in the Lord alway: and again I say, Rejoice” (Philippians 4:4).",
+        "The choir sings “Comfort, Comfort Ye My People.” Hannah is so pleased she forgets to frown at the tempo.",
+        "Kuchen instead of soup tonight. Nobody objects."
+      ] },
+    lent2: { title: "The Last Midweek of Lent", fx: { harmony: 3, strength: -3 },
+      beats: [
+        "Fewer slow cookers tonight, more bread, and the quiet of a congregation that knows what next week holds.",
+        "Evening Prayer by candlelight. The Passion reading reaches the garden.",
+        "“All we like sheep have gone astray; we have turned every one to his own way; and the LORD hath laid on him the iniquity of us all” (Isaiah 53:6).",
+        "They sing “When I Survey the Wondrous Cross” slowly. Gus sings the bass line from memory, eyes closed."
+      ] },
     lent: { title: "Midweek Lenten Vespers", fx: { harmony: 2, strength: -3 },
       beats: [
         "Soup supper first: eleven slow cookers, too many crackers, and Gus explaining his chili to anyone who stands still.",

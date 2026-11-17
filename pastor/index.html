@@ -222,9 +222,9 @@ const SLOTS = ['morning', 'afternoon'];
  * congregations keep them, usually after a soup supper.
  */
 const SPECIAL_DAYS = [
-  [0, 1, 1, 'advent'], [1, 1, 1, 'advent'], [2, 1, 1, 'advent'],
+  [0, 1, 1, 'advent'], [1, 1, 1, 'advent2'], [2, 1, 1, 'advent3'],
   [4, 3, 1, 'christmasEve'], [8, 1, 1, 'ashWednesday'],
-  [9, 1, 1, 'lent'], [10, 1, 1, 'lent'],
+  [9, 1, 1, 'lent'], [10, 1, 1, 'lent2'],
   [11, 2, 1, 'maundyThursday'], [11, 3, 1, 'goodFriday'],
   [13, 1, 1, 'funeral', 'olsenDied'],
 ];
@@ -657,8 +657,9 @@ function close() { modal.classList.remove('open'); }
    ============================================================ */
 /** A special service: its beats one at a time over the candlelit church. */
 function special(key, then) {
-  const sp = P.specials[key]; if (!sp) return then();
-  scene = { kind: 'service', candles: true, t0: performance.now(), att: { christmasEve: 130, easterSunrise: 125, funeral: 140, lent: 38, advent: 42 }[key] || 45 };
+  // Each midweek has its own service (advent2, lent2 …), falling back to the season's if one is missing.
+  const sp = P.specials[key] || P.specials[key.replace(/\d+$/, '')]; if (!sp) return then();
+  scene = { kind: 'service', candles: true, t0: performance.now(), att: { christmasEve: 130, easterSunrise: 125, funeral: 140 }[key] || (key.startsWith('lent') ? 38 : key.startsWith('advent') ? 42 : 45) };
   const beats = (sp.beats || []).slice();
   // Beats that only happen if something earlier did (Walt back in the choir, Josh confirmed).
   const extra = Object.entries(sp.flagBeats || {}).filter(([f]) => S.flags[f]).map(([, b]) => b);
