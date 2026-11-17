@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a1d2e">
+<meta name="description" content="A cozy pixel-art week planner through one church year as the pastor of a small-town church.">
+<title>A Pastor's Year</title>
+<style>
+  /* ============================================================
+     A Pastor's Year at St. Luke's
+     The town is a small pixel-art canvas, scaled up crisp; everything
+     you read or tap (the day, the meters, the places, the scenes) is
+     plain HTML beside or below it, so it stays readable on a phone.
+     ============================================================ */
+  :root {
+    --ink: #2b2420; --paper: #f6edd9; --paper2: #efe2c4; --line: #d8c7a0;
+    --night: #1a1d2e; --night2: #23273d; --gold: #e0b05a; --muted: #8a7f6a;
+    --strength: #6aa86a; --sermon: #c77d3a; --harmony: #4f8fbf; --building: #9a7b5a; --family: #c86a8a; --care: #b8565c;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--night); color: var(--paper); }
+  body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; overscroll-behavior: none; }
+  button { font: inherit; cursor: pointer; }
+
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column;
+         padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  #stage { flex: 0 0 auto; display: flex; justify-content: center; align-items: center; background: #0f1220; position: relative; }
+  #town { image-rendering: pixelated; image-rendering: crisp-edges; display: block; touch-action: manipulation; }
+  #panel { flex: 1 1 auto; overflow-y: auto; padding: 10px 14px 18px; background: var(--night); }
+  @media (min-aspect-ratio: 11/10) and (min-width: 700px) {
+    #app { flex-direction: row; }
+    #stage { flex: 1 1 auto; }
+    #panel { flex: 0 0 380px; border-left: 1px solid #2c3150; }
+  }
+
+  /* the day */
+  #when { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 2px 0 6px; }
+  #when .day { font-weight: 700; font-size: 17px; }
+  #when .sunday { font-size: 13px; color: #c9bfa6; }
+  #when .sunday b { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: 0; }
+  #slots { display: flex; gap: 4px; margin: 0 0 10px; }
+  #slots i { flex: 1; height: 5px; border-radius: 3px; background: #343a5a; }
+  #slots i.done { background: #7d86b8; } #slots i.now { background: var(--gold); }
+
+  /* the meters */
+  #meters { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px 10px; margin-bottom: 12px; }
+  .meter { font-size: 12px; color: #c9bfa6; }
+  .meter .bar { height: 7px; border-radius: 4px; background: #2e3350; overflow: hidden; margin-top: 3px; }
+  .meter .bar i { display: block; height: 100%; border-radius: 4px; transition: width .5s ease; }
+  .meter.low { color: #f0a080; }
+
+  /* places and actions */
+  h3 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: #9aa0c2; margin: 14px 0 6px; font-weight: 600; }
+  #head { position: sticky; top: -10px; z-index: 2; background: var(--night); padding-top: 10px; margin-top: -10px; padding-bottom: 2px; }
+  #places { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .place { position: relative; background: var(--night2); color: var(--paper); border: 1px solid #343a5a; border-radius: 10px; padding: 9px 4px; font-size: 12.5px; line-height: 1.2; }
+  .place.on { border-color: var(--gold); background: #2f2c35; }
+  .place .dot { position: absolute; top: 5px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 6px var(--gold); }
+  #acts { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .act { text-align: left; background: var(--paper); color: var(--ink); border: 0; border-radius: 10px; padding: 10px 12px; font-size: 15px; }
+  .act small { display: block; color: #7a6c55; font-size: 12px; margin-top: 2px; }
+  .act .new { color: #b0612a; font-weight: 700; }
+  .act:disabled { opacity: .45; cursor: default; }
+  #hint { color: #9aa0c2; font-size: 13px; line-height: 1.45; margin-top: 10px; }
+
+  /* the scene card */
+  #modal { position: fixed; inset: 0; z-index: 20; display: none; align-items: flex-end; justify-content: center; background: rgba(8,10,20,.55); }
+  #modal.open { display: flex; }
+  #card { width: min(520px, 100%); max-height: 86%; overflow-y: auto; background: var(--paper); color: var(--ink);
+          border-radius: 18px 18px 0 0; padding: 18px 20px calc(18px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 30px rgba(0,0,0,.4);
+          animation: up .25s ease-out; }
+  @media (min-height: 700px) and (min-width: 700px) { #modal { align-items: center; } #card { border-radius: 18px; } }
+  @keyframes up { from { transform: translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+  #card .kicker { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #9a7b4a; }
+  #card h2 { font-family: Georgia, 'Times New Roman', serif; font-size: 22px; margin: 4px 0 8px; }
+  #card p { font-family: Georgia, 'Times New Roman', serif; font-size: 17px; line-height: 1.5; margin: 8px 0; }
+  #card .choices { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  #card .choice { text-align: left; background: #fff8e8; border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; font-size: 15px; color: var(--ink); }
+  #card .choice:hover { border-color: #b08a4a; }
+  #card .choice small { display: block; color: #8a7a5e; font-size: 12px; margin-top: 3px; }
+  #card .go { background: #3a3020; color: #f6e2b0; border: 0; border-radius: 12px; padding: 12px; font-size: 16px; width: 100%; margin-top: 14px; }
+  #card .fx { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  #card .fx span { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: #efe2c4; color: #5a4a30; }
+  #card .fx span.down { background: #f2d6cc; color: #8a3a2a; }
+  #card .quote { border-left: 3px solid var(--gold); padding-left: 10px; font-style: italic; }
+  #card .stats { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 14px; margin: 10px 0; }
+  #card .stats b { text-align: right; }
+  #card .verse { text-align: center; font-style: italic; color: #6a5a3a; }
+
+  /* the title */
+  #title { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+           padding: 24px 24px calc(40px + env(safe-area-inset-bottom)); background: linear-gradient(to bottom, rgba(10,12,24,0) 30%, rgba(10,12,24,.92) 62%); }
+  #title.hide { display: none; }
+  #title h1 { font-family: Georgia, serif; font-size: 34px; margin: 0; text-align: center; color: #f6e2b0; }
+  #title .sub { color: #c9bfa6; margin: 6px 0 22px; text-align: center; font-size: 15px; line-height: 1.5; }
+  #title button { width: min(320px, 100%); margin-top: 8px; padding: 13px; border-radius: 12px; border: 0; font-size: 16px; }
+  #title .primary { background: #e0b05a; color: #2b2010; font-weight: 700; }
+  #title .secondary { background: #2e3350; color: #f6e2b0; }
+  #title .fine { color: #6f7596; font-size: 12px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage"><canvas id="town" width="240" height="176" aria-label="The town of Willow Creek"></canvas></div>
+  <div id="panel">
+    <div id="head">
+      <div id="when"></div>
+      <div id="slots"></div>
+      <div id="meters"></div>
+    </div>
+    <h3>Where to?</h3>
+    <div id="places"></div>
+    <div id="acts"></div>
+    <div id="hint"></div>
+  </div>
+</div>
+<div id="modal"><div id="card" role="dialog" aria-modal="true"></div></div>
+<div id="title">
+  <h1>A Pastor's Year</h1>
+  <div class="sub">St. Luke's Lutheran Church, Willow Creek.<br>One church year, from Advent to the Last Sunday.</div>
+  <button class="primary" id="newBtn">Begin the year</button>
+  <button class="secondary" id="contBtn" hidden>Continue</button>
+  <div class="fine" id="ver"></div>
+</div>
+
+<script src="content.js"></script>
+<script>
+'use strict';
+/* ============================================================
+   A Pastor's Year: the engine.
+   The words (scenes, stories, events, services) live in content.js as
+   plain data (window.PASTOR); this file is the calendar, the rules, the
+   pixel town and the screens. See README.md.
+   ============================================================ */
+const VERSION = '1.0.0';
+const SAVE_KEY = 'pastor_save_v1';          // every game on the site shares localStorage
+const P = window.PASTOR || { pools: {}, stories: {}, visitLines: {}, events: [], specials: {}, door: {}, endings: {}, closing: '' };
+
+/* ---------- The church year: 18 weeks, Advent to the Last Sunday ----------
+   Names, Gospels and paraments colours follow the historic one-year
+   lectionary as A Simple Way to Pray keeps it (its data/mid_week_readings.json
+   and data/liturgical_year.json), Latin Sunday names included. Rose is for
+   Gaudete and Laetare, the two "rejoice" Sundays in the penitential seasons;
+   scarlet for Palm Sunday; gold, as LSB suggests, for the Last Sunday. The
+   game skips some Sundays (the Gesimas, Lent II, III and V) to fit one year
+   into eighteen weeks, but never Palm Sunday or Easter. */
+const C = { violet: '#5b3f8f', blue: '#3b5fb0', rose: '#d48aa4', white: '#f3ead2', green: '#3f8a4a', red: '#b8322e', scarlet: '#8e1f2a', gold: '#d8b04a' };
+const WEEKS = [
+  { name: 'Advent I',  latin: 'Ad Te Levavi',  season: 'advent',    gospel: 'Matthew 21:1–9',   color: C.blue },
+  { name: 'Advent II', latin: 'Populus Zion',  season: 'advent',    gospel: 'Luke 21:25–36',    color: C.blue },
+  { name: 'Advent III', latin: 'Gaudete',      season: 'advent',    gospel: 'Matthew 11:2–10',  color: C.rose },
+  { name: 'Advent IV', latin: 'Rorate Coeli',  season: 'advent',    gospel: 'John 1:19–28',     color: C.blue },
+  { name: 'The Sunday after Christmas', latin: '', season: 'christmas', gospel: 'Luke 2:33–40', color: C.white },
+  { name: 'The Epiphany of Our Lord', latin: '', season: 'epiphany', gospel: 'Matthew 2:1–12',  color: C.white },
+  { name: 'Epiphany II', latin: '',            season: 'epiphany',  gospel: 'John 2:1–11',      color: C.green },
+  { name: 'The Transfiguration of Our Lord', latin: '', season: 'epiphany', gospel: 'Matthew 17:1–9', color: C.white },
+  { name: 'Lent I',    latin: 'Invocabit',     season: 'lent',      gospel: 'Matthew 4:1–11',   color: C.violet },
+  { name: 'Lent IV',   latin: 'Laetare',       season: 'lent',      gospel: 'John 6:1–15',      color: C.rose },
+  { name: 'Palm Sunday', latin: 'Palmarum',    season: 'lent',      gospel: 'Matthew 21:1–9',   color: C.scarlet },
+  { name: 'Easter Day', latin: 'The Resurrection of Our Lord', season: 'holyweek', gospel: 'Mark 16:1–8', color: C.white },
+  { name: 'Easter II', latin: 'Quasimodogeniti', season: 'easter',  gospel: 'John 20:19–31',    color: C.white },
+  { name: 'Easter III', latin: 'Misericordias Domini', season: 'easter', gospel: 'John 10:11–16', color: C.white },
+  { name: 'Pentecost', latin: 'Whitsunday',    season: 'pentecost', gospel: 'John 14:23–31',    color: C.red },
+  { name: 'The Holy Trinity', latin: '',       season: 'pentecost', gospel: 'John 3:1–15',      color: C.white },
+  { name: 'Reformation Sunday', latin: '',     season: 'pentecost', gospel: 'John 8:31–36',     color: C.red },
+  { name: 'The Last Sunday of the Church Year', latin: '', season: 'pentecost', gospel: 'Matthew 25:1–13', color: C.gold },
+];
+const DAYS = ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const SLOTS = ['morning', 'afternoon'];
+/**
+ * Weekday services that take an afternoon (and its evening):
+ * [week, day, slot, specials key, flag it needs (optional)].
+ * Wednesdays in Advent and Lent have midweek Vespers, as most LCMS
+ * congregations keep them, usually after a soup supper.
+ */
+const SPECIAL_DAYS = [
+  [0, 1, 1, 'advent'], [1, 1, 1, 'advent'], [2, 1, 1, 'advent'],
+  [4, 3, 1, 'christmasEve'], [8, 1, 1, 'ashWednesday'],
+  [9, 1, 1, 'lent'], [10, 1, 1, 'lent'],
+  [11, 2, 1, 'maundyThursday'], [11, 3, 1, 'goodFriday'],
+  [13, 1, 1, 'funeral', 'olsenDied'],
+];
+/**
+ * Confirmation class meets every Wednesday afternoon (before the midweek
+ * service, in Advent and Lent), except Christmas week, Ash Wednesday and Holy Week.
+ */
+const CLASS_DAY = 1, NO_CLASS_WEEKS = [4, 8, 11];
+/** Communion calls on the homebound come round about once a month. */
+const COMMUNION_EVERY = 4;
+
+/* ---------- People ---------- */
+const CAST = {
+  olsen:  { name: 'Mrs. Olsen', rate: 16, places: ['home', 'hospital'] },
+  gus:    { name: 'Gus',        rate: 7,  places: ['church', 'cafe'] },
+  marge:  { name: 'Marge',      rate: 7,  places: ['church', 'cafe'] },
+  nguyen: { name: 'the Nguyens', rate: 11, places: ['home', 'hospital'] },
+  walt:   { name: 'Walt',       rate: 14, places: ['home', 'cafe'] },
+  josh:   { name: 'Josh',       rate: 9,  places: ['church', 'cafe'] },
+  pete:   { name: 'Pete',       rate: 8,  places: ['office', 'cafe'] },
+  hannah: { name: 'Hannah',     rate: 8,  places: ['church'] },
+};
+const METERS = [   // shown in this order; care is worked out from everyone's needs
+  { k: 'sermon',   label: 'Sermon',   color: 'var(--sermon)' },
+  { k: 'care',     label: 'Care',     color: 'var(--care)' },
+  { k: 'harmony',  label: 'Harmony',  color: 'var(--harmony)' },
+  { k: 'building', label: 'Building', color: 'var(--building)' },
+  { k: 'strength', label: 'Strength', color: 'var(--strength)' },
+  { k: 'family',   label: 'Family',   color: 'var(--family)' },
+];
+const FX_NAMES = { strength: 'Strength', sermon: 'Sermon', harmony: 'Harmony', building: 'Building', family: 'Family' };
+
+/* ---------- Places in the town (canvas coordinates; the town is 240 x 176) ---------- */
+const PLACES = {
+  parsonage: { name: 'Parsonage', rect: [8, 44, 50, 52],   door: [33, 96] },
+  church:    { name: 'Church',    rect: [70, 18, 66, 78],   door: [103, 96] },
+  office:    { name: 'Office',    rect: [136, 56, 28, 40],  door: [150, 96] },
+  hospital:  { name: 'Hospital',  rect: [176, 34, 60, 62],  door: [206, 96] },
+  cafe:      { name: 'Willow Café', rect: [4, 120, 54, 46], door: [31, 118] },
+  olsen:     { name: "Mrs. Olsen's", rect: [66, 124, 40, 42], door: [86, 118], person: 'olsen' },
+  nguyen:    { name: "The Nguyens'", rect: [116, 124, 40, 42], door: [136, 118], person: 'nguyen' },
+  walt:      { name: "Walt's",    rect: [166, 124, 40, 42], door: [186, 118], person: 'walt' },
+};
+const STREET_Y = 107;
+
+/* ============================================================
+   State and saving
+   ============================================================ */
+function freshState() {
+  return {
+    v: 1, week: 0, day: 0, slot: 0, at: 'parsonage', started: true, over: false,
+    m: { strength: 75, sermon: 0, harmony: 60, building: 58, family: 65 },
+    need: { olsen: 45, gus: 30, marge: 30, nguyen: 35, walt: 55, josh: 30, pete: 35, hannah: 30 },
+    flags: {}, seen: {}, lastPool: {}, studies: 0, rep: 50,
+    weekStart: null, doneToday: {},
+    stats: { visits: 0, studies: 0, prayers: 0, rests: 0, family: 0, events: 0 },
+    sundays: [],   // { week, att, score, tier }
+    eventToday: -1,
+  };
+}
+let S = load();
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+    if (d && d.v === 1) return Object.assign(freshState(), d, { m: Object.assign(freshState().m, d.m), stats: Object.assign(freshState().stats, d.stats) });
+  } catch (e) { /* a broken save is a fresh year */ }
+  return null;
+}
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const W = () => WEEKS[S.week];
+/** Everyone the pastor still has (Mrs. Olsen's need stops when she's gone). */
+const living = () => Object.keys(CAST).filter(id => !(id === 'olsen' && S.flags.olsenDied));
+/** Care: how well looked after the people are, from their needs. */
+const care = () => { const ids = living(); return Math.round(100 - ids.reduce((n, id) => n + S.need[id], 0) / ids.length); };
+const meter = k => k === 'care' ? care() : S.m[k];
+/** Fill the placeholders content.js may use. */
+const fill = s => String(s || '').replace(/\{gospel\}/g, W().gospel).replace(/\{sunday\}/g, W().name).replace(/\{weekday\}/g, DAYS[S.day] || 'Sunday');
+
+/** Apply an fx object; returns the list of changes for the little chips under a scene. */
+function apply(fx) {
+  const out = [];
+  for (const [k, v] of Object.entries(fx || {})) {
+    if (!v) continue;
+    if (k in S.m) { const b = S.m[k]; S.m[k] = clamp(b + v, 0, 100); if (S.m[k] !== b) out.push([FX_NAMES[k], S.m[k] - b]); }
+    else if (k in S.need) { const b = S.need[k]; S.need[k] = clamp(b + v, 0, 100); if (S.need[k] !== b) out.push([CAST[k].name, b - S.need[k]]); }   // shown as care given
+  }
+  return out;
+}
+const sumFx = (...fxs) => { const o = {}; for (const f of fxs) for (const [k, v] of Object.entries(f || {})) o[k] = (o[k] || 0) + v; return o; };
+
+/* ============================================================
+   What there is to do
+   ============================================================ */
+/** The story scene `who` has ready at this place now, if any (first unseen whose `when` matches). */
+function storyFor(who, at) {
+  for (const sc of (P.stories[who] || [])) {
+    if (S.seen[sc.id]) continue;
+    if (matches(sc.when, at)) return sc;
+  }
+  return null;
+}
+function matches(w, at) {
+  w = w || {};
+  if (w.minWeek != null && S.week < w.minWeek) return false;
+  if (w.maxWeek != null && S.week > w.maxWeek) return false;
+  if (w.season && w.season !== W().season) return false;
+  if (w.at && at && w.at !== at) return false;
+  if (w.day != null && w.day !== S.day) return false;
+  if (w.flag && !S.flags[w.flag]) return false;
+  if (w.notFlag && S.flags[w.notFlag]) return false;
+  return true;
+}
+/**
+ * Where the people with hospital stays are: Mrs. Olsen after her fall
+ * (Epiphany into early Lent), and the Nguyens from the start of labour until
+ * Grace is born. Everyone else is never in hospital.
+ */
+function inHospital(id) {
+  if (id === 'olsen') return !!S.flags.olsenHospital && !S.flags.olsenDied && (S.week >= 5 && S.week <= 7 || (S.week === 8 && !S.seen.olsen4));
+  if (id === 'nguyen') return !!S.flags.inLabor && !S.flags.graceBorn;
+  return false;
+}
+/** The things you can do at a place: [{ key, label, sub, who?, isNew? }]. */
+function actionsAt(pl) {
+  const A = [];
+  const person = id => {
+    if (!living().includes(id)) return;
+    const at = PLACES[pl].person ? 'home' : pl;
+    // Someone in hospital isn't at home, and someone at home isn't in hospital.
+    if ((at === 'hospital') !== inHospital(id) && (at === 'home' || at === 'hospital')) {
+      if (at === 'home') A.push({ key: 'none', label: `${visitLabel(id, at).replace('Visit ', '')}: nobody's home`, sub: 'try Willow Creek Hospital' });
+      return;
+    }
+    const sc = storyFor(id, at);
+    A.push({ key: 'visit', who: id, at, label: visitLabel(id, at), sub: needWord(id), isNew: !!sc });
+  };
+  if (pl === 'church') {
+    A.push({ key: 'study', label: `Study the readings`, sub: `${W().gospel} · sermon` });
+    A.push({ key: 'pray', label: 'Pray in the sanctuary', sub: 'strength · a little sermon' });
+    A.push({ key: 'property', label: 'Walk the building with Gus', sub: 'building · a list for the trustees' });
+    for (const id of ['gus', 'marge', 'josh', 'hannah']) person(id);
+  } else if (pl === 'office') {
+    A.push({ key: 'office', label: 'Bulletins, budget and the phone', sub: 'building · books' });
+    person('pete');
+  } else if (pl === 'hospital') {
+    for (const id of ['olsen', 'nguyen']) person(id);
+    A.push({ key: 'rounds', label: 'Make rounds', sub: 'members in hospital · harmony' });
+    if (communionDue()) A.push({ key: 'communion', label: 'Communion calls', sub: 'the homebound and Pine Haven, once a month', isNew: true });
+  } else if (pl === 'cafe') {
+    A.push({ key: 'cafe', label: 'Coffee and pie at the counter', sub: 'harmony · town news' });
+    for (const id of ['walt', 'pete', 'gus', 'marge', 'josh']) {
+      if (storyFor(id, 'cafe')) person(id);   // at the café, only when they're there for a reason
+    }
+  } else if (pl === 'parsonage') {
+    A.push({ key: 'rest', label: 'Rest', sub: 'strength' });
+    A.push({ key: 'family', label: 'Time with Sam and Bea', sub: 'family · strength' });
+  } else if (PLACES[pl].person) person(PLACES[pl].person);
+  return A;
+}
+function visitLabel(id, at) {
+  const n = CAST[id].name, N = n[0].toUpperCase() + n.slice(1);
+  if (at === 'hospital') return `Visit ${n} in hospital`;
+  if (at === 'home') return `Visit ${n}`;
+  if (at === 'cafe') return `Coffee with ${n}`;
+  if (id === 'josh') return 'Catechism with Josh';
+  if (id === 'hannah') return 'Choir business with Hannah';
+  return `Talk with ${N}`;
+}
+function needWord(id) {
+  const v = S.need[id];
+  return v >= 75 ? 'hasn\'t seen you in a long while' : v >= 50 ? 'would be glad of a visit' : v >= 25 ? 'doing all right' : 'just saw you';
+}
+/** True when the monthly Communion calls are due (first in Advent, then every few weeks). */
+function communionDue() { return S.week - (S.lastCommunion ?? -COMMUNION_EVERY) >= COMMUNION_EVERY; }
+/** Places with something waiting (a story scene, or someone in real need): the gold dot. */
+function waiting(pl) {
+  return actionsAt(pl).some(a => a.isNew || (a.who && S.need[a.who] >= 70));
+}
+
+/* ============================================================
+   Doing things
+   ============================================================ */
+const BASE = {   // what each kind of action does before its words add their own
+  study:    () => ({ sermon: [30, 24, 18, 12, 8][Math.min(S.studies, 4)], strength: -8 }),
+  pray:     () => ({ strength: 8, sermon: 6, harmony: 2 }),
+  property: () => ({ building: 11, strength: -9 }),
+  office:   () => ({ building: 9, strength: -7, harmony: 2 }),
+  rounds:   () => ({ harmony: 3, sermon: 4, strength: -10 }),
+  communion: () => ({ harmony: 5, sermon: 3, strength: -10, ...(living().includes('olsen') ? { olsen: -12 } : {}) }),
+  cafe:     () => ({ harmony: 6, sermon: 3, strength: -4 }),
+  rest:     () => ({ strength: 24, family: 2 }),
+  family:   () => ({ family: 22, strength: 9 }),
+  visit:    id => ({ [id]: -35, strength: -10, sermon: 4, harmony: 1 }),
+};
+const POOL_OF = { communion: 'communion', study: 'study', pray: 'pray', property: 'property', office: 'office', rounds: 'rounds', cafe: 'cafe', rest: 'rest', family: 'family' };
+const KICKER = { communion: 'Pine Haven and the homebound', study: 'The church office', pray: 'The sanctuary', property: 'The building', office: 'The church office', rounds: 'Willow Creek Hospital', cafe: 'The Willow Café', rest: 'The parsonage', family: 'The parsonage' };
+const TITLE = { communion: 'Communion calls', study: 'Sermon study', pray: 'Prayer', property: 'Rounds of the building', office: 'Office hours', rounds: 'Hospital rounds', cafe: 'Coffee and pie', rest: 'Rest', family: 'Sam and Bea' };
+
+/** A line from a pool, never the same one twice in a row. */
+function poolLine(key) {
+  const pool = P.pools[key] || [];
+  if (!pool.length) return { text: '' };
+  let i = Math.floor(Math.random() * pool.length);
+  if (pool.length > 1 && i === S.lastPool[key]) i = (i + 1) % pool.length;
+  S.lastPool[key] = i;
+  return pool[i];
+}
+
+function doAction(a) {
+  if (busy()) return;
+  const where = a.who && PLACES[a.who] ? a.who : selected;   // a home visit walks to that house
+  closeMenu();
+  walkTo(where, () => {
+    if (a.key === 'visit') return doVisit(a);
+    const line = poolLine(POOL_OF[a.key]);
+    const fx = sumFx(BASE[a.key](), line.fx);
+    if (a.key === 'study') { S.studies++; S.stats.studies++; }
+    if (a.key === 'communion') { S.lastCommunion = S.week; S.stats.communion = (S.stats.communion || 0) + 1; }
+    if (a.key === 'pray') S.stats.prayers++;
+    if (a.key === 'rest') S.stats.rests++;
+    if (a.key === 'family') S.stats.family++;
+    const changes = apply(fx);
+    showCard({ kicker: KICKER[a.key], title: TITLE[a.key], text: fill(line.text), changes, then: endSlot });
+  });
+}
+function doVisit(a) {
+  const id = a.who, sc = storyFor(id, a.at);
+  S.stats.visits++;
+  const base = BASE.visit(id);
+  if (sc) {
+    S.seen[sc.id] = true;
+    showCard({ kicker: PLACES[a.at === 'home' ? id : a.at]?.name || '', title: fill(sc.title), text: fill(sc.text), choices: sc.choices, base, then: endSlot });
+  } else {
+    const lines = P.visitLines[id] || [];
+    const line = lines.length ? pick(lines) : { text: `${CAST[id].name[0].toUpperCase() + CAST[id].name.slice(1)} is glad to see you.` };
+    const changes = apply(sumFx(base, line.fx));
+    showCard({ kicker: PLACES[a.at === 'home' ? id : a.at]?.name || '', title: visitLabel(id, a.at), text: fill(line.text || line), changes, then: endSlot });
+  }
+}
+
+/** After every slot: the next slot, the next day, or Sunday. */
+function endSlot() {
+  save();
+  S.slot++;
+  if (S.slot > 1) { S.slot = 0; S.day++; S.eventToday = -1; }
+  if (S.day > 4) return sunday();
+  startSlot();
+}
+/** The start of a slot: a weekday service, the day's event, or running on empty. */
+function startSlot() {
+  render();
+  const sp = SPECIAL_DAYS.find(([w, d, s, , flag]) => w === S.week && d === S.day && s === S.slot && (!flag || S.flags[flag]));
+  if (S.day === CLASS_DAY && S.slot === 1 && S.classWeek !== S.week && !NO_CLASS_WEEKS.includes(S.week)) {
+    S.classWeek = S.week;
+    return confirmationClass(() => sp ? special(sp[3], endSlot) : endSlot());
+  }
+  if (sp) return special(sp[3], endSlot);
+  if (S.slot === 0 && S.eventToday !== S.day) { S.eventToday = S.day; const ev = dayEvent(); if (ev) return runEvent(ev); }
+  if (S.m.strength < 12) {
+    return showCard({ kicker: 'The parsonage', title: 'Running on empty', text: 'You sit down to tie your shoes and wake up forty minutes later. Sam brings you tea and takes the phone off the hook. Some days, rest is the work.', changes: apply({ strength: 26, family: 6 }), then: endSlot, pre: () => walkTo('parsonage') });
+  }
+  save(); render();
+}
+/**
+ * Wednesday confirmation class: Josh's next scene if he has one waiting,
+ * otherwise an ordinary class from the catechism pool.
+ */
+function confirmationClass(then) {
+  walkTo('church', () => {
+    const base = { josh: -20, sermon: 3, strength: -6 }, sc = storyFor('josh', 'church');
+    S.stats.classes = (S.stats.classes || 0) + 1;
+    if (sc) {
+      S.seen[sc.id] = true;
+      return showCard({ kicker: 'Wednesday · confirmation class', title: fill(sc.title), text: fill(sc.text), choices: sc.choices, base, then });
+    }
+    const line = poolLine('catechism');
+    showCard({ kicker: 'Wednesday · confirmation class', title: 'The Small Catechism', text: fill(line.text), changes: apply(sumFx(base, line.fx)), then });
+  });
+}
+/** At most one event a day: fixed story beats first, then (about half the days) a random one. */
+function dayEvent() {
+  const ok = (P.events || []).filter(e => !(e.when?.once !== false && S.seen[e.id]) && matches(e.when));
+  const fixed = ok.filter(e => (e.when?.chance ?? 1) >= 1);
+  if (fixed.length) return fixed[0];
+  if (Math.random() > .5) return null;
+  const rnd = ok.filter(e => Math.random() < (e.when?.chance ?? 1));
+  return rnd.length ? pick(rnd) : null;
+}
+function runEvent(ev) {
+  S.seen[ev.id] = true; S.stats.events++;
+  const kick = { call: '☎ The phone rings', knock: 'A knock at the door', mail: 'In the mailbox', email: 'An email' }[ev.kind] || DAYS[S.day];
+  showCard({ kicker: `${kick}${ev.from ? ' · ' + ev.from : ''}`, title: fill(ev.title), text: fill(ev.text), choices: ev.choices, then: () => { save(); render(); } });
+}
+
+/* ============================================================
+   The scene card
+   ============================================================ */
+const card = document.getElementById('card'), modal = document.getElementById('modal');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function chips(changes) {
+  if (!changes || !changes.length) return '';
+  return `<div class="fx">${changes.map(([n, d]) => `<span class="${d < 0 ? 'down' : ''}">${n} ${d > 0 ? '+' : ''}${d}</span>`).join('')}</div>`;
+}
+/**
+ * Show a scene: text and either choices (each applies `base` + its own fx,
+ * then shows its reply) or a Continue button. `then` runs when it's done.
+ */
+function showCard(o) {
+  if (o.pre) o.pre();
+  modal.classList.add('open');
+  const head = `${o.kicker ? `<div class="kicker">${esc(o.kicker)}</div>` : ''}<h2>${esc(o.title || '')}</h2>`;
+  const body = (o.html || '') + (o.text ? `<p>${esc(o.text)}</p>` : '');
+  if (o.choices && o.choices.length) {
+    card.innerHTML = head + body + `<div class="choices">${o.choices.map((c, i) => `<button class="choice" data-i="${i}">${esc(c.label)}</button>`).join('')}</div>`;
+    card.querySelectorAll('.choice').forEach(b => b.onclick = () => {
+      const c = o.choices[+b.dataset.i];
+      if (c.set) S.flags[c.set] = true;
+      const changes = apply(sumFx(o.base, c.fx));
+      card.innerHTML = head + (c.reply ? `<p>${esc(fill(c.reply))}</p>` : body) + chips(changes) + `<button class="go">Continue</button>`;
+      card.querySelector('.go').onclick = () => { close(); o.then && o.then(); };
+      card.querySelector('.go').focus();
+      render();
+    });
+  } else {
+    card.innerHTML = head + body + chips(o.changes) + `<button class="go">${esc(o.go || 'Continue')}</button>`;
+    card.querySelector('.go').onclick = () => { close(); o.then && o.then(); };
+  }
+  card.scrollTop = 0;
+  const first = card.querySelector('button'); if (first) first.focus({ preventScroll: true });
+  render();
+}
+function close() { modal.classList.remove('open'); }
+
+/* ============================================================
+   Services: weekday specials and Sunday
+   ============================================================ */
+/** A special service: its beats one at a time over the candlelit church. */
+function special(key, then) {
+  const sp = P.specials[key]; if (!sp) return then();
+  scene = { kind: 'service', candles: true, t0: performance.now(), att: { christmasEve: 130, easterSunrise: 125, funeral: 140, lent: 38, advent: 42 }[key] || 45 };
+  const beats = (sp.beats || []).slice();
+  // Beats that only happen if something earlier did (Walt back in the choir, Josh confirmed).
+  const extra = Object.entries(sp.flagBeats || {}).filter(([f]) => S.flags[f]).map(([, b]) => b);
+  if (extra.length) beats.splice(Math.max(1, beats.length - 1), 0, ...extra);
+  for (let i = 0; i < beats.length; i++) beats[i] = fill(beats[i]);
+  let i = 0;
+  const next = () => {
+    if (i < beats.length) { const t = beats[i++]; showCard({ kicker: W().name, title: sp.title, text: t, go: i < beats.length ? 'Continue' : 'Amen', then: next }); return; }
+    const changes = apply(sumFx({ harmony: 6, strength: -6 }, sp.fx));
+    scene = null; render();
+    if (changes.length) showCard({ kicker: W().name, title: sp.title, text: '', changes, then }); else then();
+  };
+  next();
+}
+let scene = null;   // the church interior when it's showing: { kind, candles, att, t0 }
+
+/** Sunday: the service, the sermon, the door, and the week in review. */
+function sunday() {
+  const w = W();
+  const pre = [];
+  if (S.week === 11) pre.push('easterSunrise');
+  if (S.week === 12 && S.flags.baptismPlanned) pre.push('baptism');
+  if (S.week === 14) pre.push('pentecost');
+  const go = () => {
+    if (pre.length) return special(pre.shift(), go);
+    const score = clamp(S.m.sermon - (S.m.strength < 25 ? 12 : 0), 0, 100);
+    const tier = score >= 80 ? 'great' : score >= 55 ? 'good' : score >= 30 ? 'fine' : 'thin';
+    S.rep = Math.round(S.rep * .7 + score * .3);
+    const mult = { 4: 1.9, 11: 1.95 }[S.week] || { advent: 1.05, christmas: 1.2, epiphany: 1, lent: .95, holyweek: 1.9, easter: 1.05, pentecost: .9 }[w.season];
+    const att = Math.round(72 * (.5 + care() * .0025 + S.m.harmony * .0025 + S.rep * .002) * mult * (.94 + Math.random() * .12));
+    S.sundays.push({ week: S.week, att, score, tier });
+    apply({ harmony: { great: 5, good: 2, fine: 0, thin: -4 }[tier] });
+    scene = { kind: 'sunday', candles: false, att, t0: performance.now() };
+    render();
+    const said = { great: `Your sermon on ${w.gospel} sang. People were still talking about it at coffee hour.`, good: `Your sermon on ${w.gospel} was solid: Law and Gospel, and home by noon.`, fine: `Your sermon on ${w.gospel} got there in the end, by way of a story about your car.`, thin: `Your sermon on ${w.gospel} was thin. You could feel the study you skipped. The Gospel still did its work: it always does.` }[tier];
+    const door = doorLines(tier);
+    // Bible class, then the Divine Service with the Sacrament: an LCMS Sunday morning.
+    const morning = 'Bible class at 9:15, the Divine Service at 10:30, and the Lord\'s Supper at the rail.';
+    // The Last Sunday remembers the saints who died in the faith this year.
+    const saints = S.week === WEEKS.length - 1 && S.flags.olsenDied
+      ? 'Before the prayers you read the names of the saints who died in the faith this year. “Ingrid Olsen.” Gus tolls the bell once. Then silence.' : '';
+    setTimeout(() => showCard({ kicker: `Sunday · ${w.name}`, title: `${att} in the pews`,
+      html: `<p>${esc(morning)}</p><p>${esc(said)}</p>${saints ? `<p>${esc(saints)}</p>` : ''}${door.map(d => `<p class="quote">${esc(d)}</p>`).join('')}`,
+      go: 'The week in review', then: review }), 1400);
+  };
+  go();
+}
+/** Two things said at the door (and one from someone you've looked after, sometimes). */
+function doorLines(tier) {
+  const pool = (P.door[tier] || []).slice(), out = [];
+  const general = pool.filter(l => typeof l === 'string' || !l.who);
+  const personal = pool.filter(l => l.who && living().includes(l.who) && S.need[l.who] < 40);
+  for (let k = 0; k < 2 && general.length; k++) out.push(general.splice(Math.floor(Math.random() * general.length), 1)[0]);
+  if (personal.length && Math.random() < .6) out.push(pick(personal));
+  return out.map(l => fill(typeof l === 'string' ? l : l.text));
+}
+function review() {
+  const start = S.weekStart || {};
+  const rows = METERS.filter(m => m.k !== 'sermon').map(m => {
+    const now = meter(m.k), was = start[m.k] ?? now, d = now - was;
+    return `<span>${m.label}</span><b>${now}${d ? ` <small style="color:${d > 0 ? '#3a7a3a' : '#a04a3a'}">(${d > 0 ? '+' : ''}${d})</small>` : ''}</b>`;
+  }).join('');
+  const lonely = living().filter(id => S.need[id] >= 70).map(id => CAST[id].name);
+  const note = lonely.length ? `${lonely.join(' and ')} could do with a visit this week.` : 'Nobody has gone too long without a visit.';
+  showCard({ kicker: W().name, title: 'The week in review', html: `<div class="stats">${rows}</div><p>${esc(note)}</p>`,
+    go: S.week >= WEEKS.length - 1 ? 'The year in review' : 'Monday, your day off', then: nextWeek });
+}
+function nextWeek() {
+  scene = null;
+  if (S.week >= WEEKS.length - 1) return yearEnd();
+  S.week++; S.day = 0; S.slot = 0; S.studies = 0; S.eventToday = -1;
+  S.m.sermon = 0;
+  // Monday is the day off (strength back), but the rest of the week wears on
+  // things: the building ages, the family misses you, and a congregation left
+  // to itself drifts a little apart. Each needs tending again this week.
+  apply({ strength: 18, building: -5, family: -16, harmony: -15 });
+  for (const id of living()) S.need[id] = clamp(S.need[id] + CAST[id].rate, 0, 100);
+  S.weekStart = Object.fromEntries(METERS.map(m => [m.k, meter(m.k)]));
+  S.at = 'parsonage'; pastor = { ...placeXY('parsonage') };
+  save(); startSlot();
+}
+
+/* ============================================================
+   The year in review
+   ============================================================ */
+function yearEnd() {
+  S.over = true; save();
+  const sun = S.sundays, avg = k => Math.round(sun.reduce((n, s) => n + s[k], 0) / Math.max(1, sun.length));
+  const attAvg = avg('att'), scoreAvg = avg('score'), best = sun.reduce((a, s) => s.att > a.att ? s : a, { att: 0 });
+  const c = care(), h = S.m.harmony, b = S.m.building, st = S.m.strength, f = S.m.family;
+  let key = 'shepherd';
+  if (st < 30 || f < 30) key = 'tired';
+  else if (Math.min(scoreAvg, c, h, b) >= 50) key = 'shepherd';
+  else { const top = [['preacher', scoreAvg], ['pastor', c], ['builder', b]].sort((x, y) => y[1] - x[1])[0]; key = top[0]; }
+  const end = P.endings[key] || { title: 'The year is done', text: '' };
+  const story = [
+    S.flags.baptismPlanned && 'Baby Grace Nguyen was baptized.',
+    S.flags.joshReady && 'Josh was confirmed at Pentecost.',
+    S.stats.communion && `You brought the Lord's Supper to the homebound ${S.stats.communion} time${S.stats.communion > 1 ? 's' : ''}.`,
+    S.flags.waltSings && 'Walt is back in the choir.',
+    S.flags.newBoiler && 'Old Faithful was retired; the new boiler purrs.',
+    S.flags.trucePact && 'Gus and Marge made peace over the thermostat.',
+    S.flags.olsenDied && 'You laid Mrs. Olsen to rest: “them also which sleep in Jesus will God bring with him” (1 Thessalonians 4:14).',
+  ].filter(Boolean);
+  showCard({ kicker: 'The year in review', title: end.title,
+    html: `<p>${esc(fill(end.text))}</p><div class="stats">
+      <span>Sundays</span><b>${sun.length}</b>
+      <span>Average in the pews</span><b>${attAvg}</b>
+      <span>Fullest Sunday</span><b>${best.att} (${WEEKS[best.week || 0].name})</b>
+      <span>Visits made</span><b>${S.stats.visits}</b>
+      <span>Hours of sermon study</span><b>${S.stats.studies * 3}</b>
+      <span>Average sermon</span><b>${scoreAvg}</b>
+    </div>${story.map(s => `<p>✦ ${esc(s)}</p>`).join('')}<p class="verse">${esc(P.closing || '')}</p>`,
+    go: 'Begin another year', then: () => { localStorage.removeItem(SAVE_KEY); begin(); } });
+}
+
+/* ============================================================
+   The panel
+   ============================================================ */
+let selected = null;
+function render() {
+  if (!S) return;
+  const w = W(), day = S.day <= 4 ? DAYS[S.day] : 'Sunday';
+  document.getElementById('when').innerHTML = `<span class="day">${day} ${S.day <= 4 ? SLOTS[S.slot] : ''}</span><span class="sunday"><b style="background:${w.color}"></b>${esc(w.name)}${w.latin ? ` · <i>${esc(w.latin)}</i>` : ''}</span>`;
+  document.getElementById('slots').innerHTML = Array.from({ length: 10 }, (_, i) => { const cur = S.day * 2 + S.slot; return `<i class="${i < cur ? 'done' : i === cur ? 'now' : ''}"></i>`; }).join('');
+  document.getElementById('meters').innerHTML = METERS.map(m => { const v = meter(m.k); return `<div class="meter${v < 25 && m.k !== 'sermon' ? ' low' : ''}">${m.label}<div class="bar"><i style="width:${v}%;background:${m.color}"></i></div></div>`; }).join('');
+  document.getElementById('places').innerHTML = Object.entries(PLACES).map(([k, p]) => `<button class="place${k === selected ? ' on' : ''}" data-p="${k}">${esc(p.name)}${waiting(k) ? '<i class="dot"></i>' : ''}</button>`).join('');
+  document.querySelectorAll('.place').forEach(b => b.onclick = () => choose(b.dataset.p));
+  const acts = document.getElementById('acts');
+  if (selected) {
+    const A = actionsAt(selected);
+    acts.innerHTML = A.length ? A.map((a, i) => `<button class="act" data-i="${i}">${a.isNew ? '<span class="new">✦ </span>' : ''}${esc(a.label)}<small>${esc(a.sub || '')}</small></button>`).join('')
+      : `<div id="hint">Nobody's in here who needs you just now.</div>`;
+    acts.querySelectorAll('.act').forEach(b => { const a = A[+b.dataset.i]; if (a.key === 'none') b.disabled = true; else b.onclick = () => doAction(a); });
+  } else acts.innerHTML = '';
+  document.getElementById('hint').textContent = selected ? '' : hintLine();
+}
+function hintLine() {
+  if (S.week === 0 && S.day === 0 && S.slot === 0) return 'Tap a place in town (or a button) to choose how to spend your morning. Study for Sunday, visit your people, keep the building going, and don\'t forget to rest. A gold dot means someone or something is waiting.';
+  if (S.m.sermon < 30 && S.day >= 3) return 'Sunday is coming, and the sermon is thin. The church office is open.';
+  if (S.m.strength < 30) return 'You\'re running low. The parsonage has a couch with your name on it.';
+  return '';
+}
+/** True while the pastor is walking, a service is on, or a card is up: taps wait. */
+function busy() { return !!walk || !!scene || modal.classList.contains('open'); }
+function choose(pl) {
+  if (busy()) return;
+  selected = pl === selected ? null : pl; render(); if (selected) document.getElementById('acts').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+function closeMenu() { selected = null; }
+
+/* ============================================================
+   The pixel town
+   ============================================================ */
+const cv = document.getElementById('town'), cx = cv.getContext('2d');
+const TW = 240, TH = 176;
+let pastor = { x: 33, y: 96 }, walk = null;   // walk: { pts, i, t0, done }
+const placeXY = k => ({ x: PLACES[k].door[0], y: PLACES[k].door[1] });
+/** Walk the pastor from where they are to a place's door, by way of the street. */
+function walkTo(k, done) {
+  const to = placeXY(k);
+  if (Math.hypot(to.x - pastor.x, to.y - pastor.y) < 2) { S.at = k; done && done(); return; }
+  const pts = [{ ...pastor }, { x: pastor.x, y: STREET_Y }, { x: to.x, y: STREET_Y }, to];
+  walk = { pts, i: 0, done: () => { S.at = k; walk = null; done && done(); } };
+}
+function stepWalk(dt) {
+  if (!walk) return;
+  let left = dt * 70;   // pixels a second
+  while (walk && left > 0) {
+    const t = walk.pts[walk.i + 1];
+    if (!t) { const d = walk.done; d(); return; }
+    const dx = t.x - pastor.x, dy = t.y - pastor.y, d = Math.hypot(dx, dy);
+    if (d <= left) { pastor.x = t.x; pastor.y = t.y; walk.i++; left -= d; }
+    else { pastor.x += dx / d * left; pastor.y += dy / d * left; left = 0; }
+  }
+}
+cv.addEventListener('pointerup', e => {
+  if (modal.classList.contains('open') || walk || scene) return;
+  const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * TW, y = (e.clientY - r.top) / r.height * TH;
+  for (const [k, p] of Object.entries(PLACES)) { const [a, b, w, h] = p.rect; if (x >= a && x <= a + w && y >= b && y <= b + h) { choose(k); return; } }
+});
+
+/* --- tiny pixel font (5x7), for signs --- */
+const FONT = {A:"01110100011000111111100011000110001",B:"11110100011000111110100011000111110",C:"01110100011000010000100001000101110",D:"11110100011000110001100011000111110",E:"11111100001000011110100001000011111",F:"11111100001000011110100001000010000",G:"01110100011000010111100011000101111",H:"10001100011000111111100011000110001",I:"11111001000010000100001000010011111",K:"10001100101010011000101001001010001",L:"10000100001000010000100001000011111",M:"10001110111010110101100011000110001",N:"10001110011010110011100011000110001",O:"01110100011000110001100011000101110",P:"11110100011000111110100001000010000",R:"11110100011000111110101001001010001",S:"01111100001000001110000010000111110",T:"11111001000010000100001000010000100",U:"10001100011000110001100011000101110",V:"10001100011000110001100010101000100",W:"10001100011000110101101011101110001",Y:"10001100010101000100001000010000100",' ':"00000000000000000000000000000000000","'":"00100001000000000000000000000000000",'.':"00000000000000000000000000110001100"};
+function text(s, x, y, col) {
+  s = s.toUpperCase(); const w = s.length * 6 - 1; x = Math.round(x - w / 2);
+  cx.fillStyle = col;
+  for (const ch of s) { const g = FONT[ch] || FONT[' ']; for (let i = 0; i < 35; i++) if (g[i] === '1') cx.fillRect(x + i % 5, y + Math.floor(i / 5), 1, 1); x += 6; }
+}
+/* --- a 3x5 font for the small signs on the buildings (only the letters they use) --- */
+const MINI = {A:'010101111101101',C:'011100100100011',E:'111100110100111',F:'111100110100100',G:'011100101101011',H:'101101111101101',I:'111010010010111',L:'100100100100111',M:'101111111101101',N:'110101101101101',O:'010101101101010',P:'110101110100100',R:'110101110101101',S:'011100010001110',T:'111010010010010',U:'101101101101111',Y:'101101010010010',' ':'000000000000000',
+  0:'111101101101111',1:'010110010010111',2:'110001010100111',3:'110001010001110',4:'101101111001001',5:'111100110001110',6:'011100110101010',7:'111001010010010',8:'010101010101010',9:'010101011001110'};
+function textSmall(s, x, y, col) {
+  s = String(s).toUpperCase(); x = Math.round(x - (s.length * 4 - 1) / 2);
+  cx.fillStyle = col;
+  for (const ch of s) { const g = MINI[ch] || MINI[' ']; for (let i = 0; i < 15; i++) if (g[i] === '1') cx.fillRect(x + i % 3, y + Math.floor(i / 3), 1, 1); x += 4; }
+}
+const R = (x, y, w, h, c) => { cx.fillStyle = c; cx.fillRect(x, y, w, h); };
+
+/** The look of the season: sky, ground, trees, weather. */
+function seasonLook() {
+  const s = W().season, wk = S.week;
+  if (s === 'advent' || s === 'christmas' || (s === 'epiphany' && wk <= 6)) return { sky: ['#1e2a4a', '#4d5f8f'], ground: '#e8eef4', grass: '#cfd9e6', tree: 'snow', snow: true };
+  if (s === 'epiphany' || (s === 'lent' && wk <= 9)) return { sky: ['#5a6f95', '#9fb0c8'], ground: '#9a9f86', grass: '#8a9476', tree: 'bare', snow: false };
+  if (s === 'lent') return { sky: ['#6f86b0', '#b8c7dc'], ground: '#8fa06a', grass: '#7f9a5a', tree: 'bud', snow: false };
+  if (s === 'holyweek' || s === 'easter') return { sky: ['#7fb0e0', '#cfe3f2'], ground: '#7fb05a', grass: '#6aa04a', tree: 'blossom', snow: false };
+  return { sky: ['#6aa8e0', '#cfe6f6'], ground: '#6aa84a', grass: '#5a983a', tree: 'green', snow: false };
+}
+function drawTown(t) {
+  const L = seasonLook(), aft = S.slot === 1;
+  // sky (warmer in the afternoon)
+  const g = cx.createLinearGradient(0, 0, 0, 70); g.addColorStop(0, L.sky[0]); g.addColorStop(1, aft ? '#e8b888' : L.sky[1]);
+  cx.fillStyle = g; cx.fillRect(0, 0, TW, 96);
+  // far hills
+  cx.fillStyle = L.snow ? '#c9d3e2' : '#6f8a62';
+  cx.beginPath(); cx.moveTo(0, 80); for (let x = 0; x <= TW; x += 8) cx.lineTo(x, 70 + 6 * Math.sin(x * .04) + 4 * Math.sin(x * .11)); cx.lineTo(TW, 96); cx.lineTo(0, 96); cx.fill();
+  // ground
+  R(0, 92, TW, TH - 92, L.ground);
+  // the street and sidewalks
+  R(0, 98, TW, 3, '#b9b2a2'); R(0, 101, TW, 14, '#4c4f58'); R(0, 115, TW, 3, '#b9b2a2');
+  for (let x = 4; x < TW; x += 16) R(x, 107, 8, 1, '#c9c3a8');
+  // paths to doors
+  for (const p of Object.values(PLACES)) { const [dx, dy] = p.door; if (dy < 100) R(dx - 2, dy, 5, 98 - dy + 1, '#b9b2a2'); else R(dx - 2, 118, 5, dy - 118 + 6, '#b9b2a2'); }
+  drawParsonage(L); drawChurch(L, t); drawOffice(L); drawHospital(L, t);
+  drawCafe(L); drawHouse(PLACES.olsen, '#b8786a', '#6a3a34', L, 'OLSEN'); drawHouse(PLACES.nguyen, '#7a9ab8', '#3a4a6a', L, 'NGUYEN'); drawHouse(PLACES.walt, '#a8a07a', '#5a5234', L, 'PETERSON');
+  drawTree(64, 96, L); drawTree(170, 96, L); drawTree(224, 166, L); drawTree(112, 166, L, .8); drawTree(162, 166, L, .7);
+  // the church cat on the steps (most days)
+  if ((S.week + S.day) % 3 !== 1) { R(110, 93, 4, 2, '#e0a04a'); R(113, 91, 2, 2, '#e0a04a'); R(113, 90, 1, 1, '#e0a04a'); R(110, 92, 1, 1, '#c88a3a'); }
+  // weather
+  if (L.snow) { cx.fillStyle = 'rgba(255,255,255,.85)'; for (let i = 0; i < 40; i++) { const x = (i * 53 + t * 9) % TW, y = (i * 37 + t * 14) % TH; cx.fillRect(x, y, 1, 1); } }
+  // gold markers over places with something waiting
+  if (!scene) for (const [k, p] of Object.entries(PLACES)) if (waiting(k)) { const [a, b, w] = p.rect, bob = Math.sin(t * 3 + a) * 1.5; R(a + w / 2 - 1, b - 9 + bob, 3, 5, '#f0c050'); R(a + w / 2 - 1, b - 3 + bob, 3, 2, '#f0c050'); }
+  // a highlight on the chosen place
+  if (selected && PLACES[selected]) { const [a, b, w, h] = PLACES[selected].rect; cx.strokeStyle = `rgba(240,192,80,${.6 + .4 * Math.sin(t * 5)})`; cx.lineWidth = 1; cx.strokeRect(a + .5, b + .5, w - 1, h - 1); }
+  drawPastor(t);
+}
+function roofSnow(x, y, w, L) { if (L.snow) R(x, y, w, 2, '#f4f8fc'); }
+function drawParsonage(L) {
+  const [x, y, w, h] = PLACES.parsonage.rect;
+  R(x + 2, y + 16, w - 4, h - 16, '#c9b48a');
+  cx.fillStyle = '#7a4a3a'; cx.beginPath(); cx.moveTo(x - 2, y + 18); cx.lineTo(x + w / 2, y); cx.lineTo(x + w + 2, y + 18); cx.fill();
+  if (L.snow) { cx.fillStyle = '#f4f8fc'; cx.beginPath(); cx.moveTo(x + 6, y + 13); cx.lineTo(x + w / 2, y + 2); cx.lineTo(x + w - 6, y + 13); cx.lineTo(x + w - 9, y + 13); cx.lineTo(x + w / 2, y + 5); cx.lineTo(x + 9, y + 13); cx.fill(); }
+  R(x + 36, y + 2, 5, 10, '#6a3a2a');   // chimney
+  R(x + 22, y + 34, 8, 14, '#5a3424'); R(x + 28, y + 41, 1, 1, '#e0c070');   // door
+  for (const wx of [x + 7, x + 36]) { R(wx, y + 24, 8, 8, S.slot ? '#f6d28a' : '#9fc0d8'); R(wx + 3, y + 24, 1, 8, '#6a5a44'); R(wx, y + 27, 8, 1, '#6a5a44'); }
+  textSmall('HOME', x + w / 2, y + 19, '#5a3a2a');
+}
+function drawChurch(L, t) {
+  const [x, y, w, h] = PLACES.church.rect;
+  // steeple and cross
+  R(x + 26, y + 6, 14, 30, '#e8e2d2'); cx.fillStyle = '#5a5a6a'; cx.beginPath(); cx.moveTo(x + 24, y + 8); cx.lineTo(x + 33, y - 12); cx.lineTo(x + 42, y + 8); cx.fill();
+  R(x + 32, y - 20, 2, 9, '#d8b860'); R(x + 29, y - 17, 8, 2, '#d8b860');
+  R(x + 30, y + 14, 6, 7, '#3a3a4a');   // belfry
+  // nave
+  R(x + 4, y + 34, w - 8, h - 34, '#efe8d6');
+  cx.fillStyle = '#5a5a6a'; cx.beginPath(); cx.moveTo(x, y + 38); cx.lineTo(x + w / 2, y + 22); cx.lineTo(x + w, y + 38); cx.fill();
+  roofSnow(x + 10, y + 34, w - 20, L);
+  // stained glass and doors
+  const glass = ['#d84a4a', '#4a7ad8', '#e8c04a', '#4ab87a'];
+  for (const gx of [x + 10, x + 48]) { R(gx, y + 46, 8, 14, '#3a3a4a'); for (let i = 0; i < 4; i++) R(gx + 1 + (i % 2) * 3, y + 47 + Math.floor(i / 2) * 6, 3, 6, glass[(i + Math.floor(t)) % 4] + 'cc'); }
+  R(x + 27, y + 56, 12, 22, '#6a3a24'); R(x + 32, y + 56, 1, 22, '#4a2414'); cx.fillStyle = '#6a3a24'; cx.beginPath(); cx.arc(x + 33, y + 56, 6, Math.PI, 0); cx.fill();
+  // seasonal touches on the doors: a wreath in Advent and Christmas, lilies at Easter
+  const s = W().season;
+  if (s === 'advent' || s === 'christmas') { cx.strokeStyle = '#2a7a3a'; cx.lineWidth = 2; cx.beginPath(); cx.arc(x + 33, y + 52, 3, 0, 7); cx.stroke(); R(x + 33, y + 55, 2, 2, '#c83a3a'); }
+  if (s === 'holyweek' || s === 'easter') for (const lx of [x + 22, x + 42]) { R(lx, y + 72, 1, 6, '#3a7a3a'); R(lx - 1, y + 70, 3, 2, '#fbf8ee'); }
+  // the hymn board sign
+  R(x + 47, y + 66, 13, 11, '#4a3020'); textSmall(String(S.week + 1), x + 53, y + 69, '#f0e0b0');
+  text("ST LUKE'S", x + w / 2 - 1, y + 39, '#3a3a4a');
+}
+function drawOffice(L) {
+  const [x, y, w, h] = PLACES.office.rect;
+  R(x, y + 8, w, h - 8, '#e3dcc8'); R(x - 1, y + 6, w + 2, 3, '#5a5a6a'); roofSnow(x, y + 4, w, L);
+  R(x + 10, y + 24, 8, 16, '#5a3a24'); R(x + 4, y + 13, 7, 7, S.slot ? '#f6d28a' : '#9fc0d8'); R(x + 17, y + 13, 7, 7, S.slot ? '#f6d28a' : '#9fc0d8');
+  textSmall('OFFICE', x + w / 2, y + 2, '#3a3a4a');
+}
+function drawHospital(L, t) {
+  const [x, y, w, h] = PLACES.hospital.rect;
+  R(x, y + 6, w, h - 6, '#dde6ea'); R(x - 1, y + 4, w + 2, 3, '#7a8a94'); roofSnow(x, y + 2, w, L);
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) R(x + 5 + c * 11, y + 12 + r * 12, 7, 7, (r + c + Math.floor(t / 4)) % 5 ? '#9fc0d8' : '#f6d28a');
+  R(x + w / 2 - 7, y + 46, 14, 16, '#7aa0b8'); R(x + w / 2, y + 46, 1, 16, '#5a7a94');
+  R(x + w / 2 - 4, y - 6, 8, 10, '#3a7ab8'); text('H', x + w / 2, y - 5, '#ffffff');
+  textSmall('HOSPITAL', x + w / 2, y + 7, '#4a5a64');
+}
+function drawCafe(L) {
+  const [x, y, w, h] = PLACES.cafe.rect;
+  R(x, y + 10, w, h - 10, '#e6c9a0'); R(x - 1, y + 6, w + 2, 5, '#8a4a3a'); roofSnow(x, y + 4, w, L);
+  for (let i = 0; i < 9; i++) R(x + i * 6, y + 11, 3, 4, i % 2 ? '#f4efe4' : '#c84a4a');   // the striped awning
+  R(x + 5, y + 18, 18, 12, S.slot ? '#f6d28a' : '#bfd6e6'); R(x + 34, y + 20, 10, 18, '#6a3a24');
+  textSmall('CAFE', x + w / 2, y + 1, '#5a2a1a');
+}
+function drawHouse(p, wall, roof, L, label) {
+  const [x, y, w, h] = p.rect;
+  R(x + 3, y + 14, w - 6, h - 14, wall);
+  cx.fillStyle = roof; cx.beginPath(); cx.moveTo(x, y + 16); cx.lineTo(x + w / 2, y + 2); cx.lineTo(x + w, y + 16); cx.fill();
+  if (L.snow) { cx.fillStyle = '#f4f8fc'; cx.beginPath(); cx.moveTo(x + 5, y + 12); cx.lineTo(x + w / 2, y + 4); cx.lineTo(x + w - 5, y + 12); cx.fill(); }
+  R(x + w / 2 - 3, y + 28, 7, 14, '#4a3020'); R(x + 7, y + 20, 7, 7, S.slot ? '#f6d28a' : '#9fc0d8'); R(x + w - 14, y + 20, 7, 7, S.slot ? '#f6d28a' : '#9fc0d8');
+  if (p.person === 'olsen' && S.flags.olsenDied) R(x + w / 2 - 3, y + 30, 7, 2, '#2a2a2a');   // a black ribbon on the door
+  textSmall(label, x + w / 2, y + 15, '#2a2420');   // the name over the windows
+}
+function drawTree(x, y, L, s = 1) {
+  R(x - 1, y - 10 * s, 3, 10 * s, '#5a3a24');
+  const r = 8 * s;
+  if (L.tree === 'bare') { cx.strokeStyle = '#5a3a24'; cx.lineWidth = 1; cx.beginPath(); cx.moveTo(x, y - 8 * s); cx.lineTo(x - 5 * s, y - 16 * s); cx.moveTo(x, y - 9 * s); cx.lineTo(x + 5 * s, y - 17 * s); cx.stroke(); return; }
+  const col = { snow: '#3a5a4a', bud: '#7a9a5a', blossom: '#f2c6d6', green: '#3a7a3a' }[L.tree];
+  cx.fillStyle = col; cx.beginPath(); cx.arc(x, y - 14 * s, r, 0, 7); cx.fill();
+  if (L.tree === 'snow') { cx.fillStyle = '#f4f8fc'; cx.beginPath(); cx.arc(x, y - 17 * s, r * .7, Math.PI, 0); cx.fill(); }
+  if (L.tree === 'blossom') { cx.fillStyle = '#ffffff'; for (let i = 0; i < 6; i++) cx.fillRect(x - 5 + (i * 7) % 11, y - 19 + (i * 5) % 10, 1, 1); }
+}
+function drawPastor(t) {
+  const x = Math.round(pastor.x), y = Math.round(pastor.y), moving = !!walk, step = moving ? Math.floor(t * 8) % 2 : 0;
+  R(x - 3, y - 2, 6, 2, 'rgba(0,0,0,.2)');
+  R(x - 2, y - 9, 5, 7, '#24242c');                 // black shirt and jacket
+  R(x, y - 9, 1, 1, '#ffffff');                     // the white tab of the collar
+  R(x - 2, y - 13, 5, 4, '#e8b890');                // face
+  R(x - 2, y - 14, 5, 2, '#5a3a24');                // hair
+  R(x - 2 + step, y - 2, 2, 2, '#2a2a34'); R(x + 1 - step, y - 2, 2, 2, '#2a2a34');   // feet
+}
+
+/** Inside the church: Sunday and the special services. */
+function drawChurchInside(t) {
+  const sc = scene, w = W(), dark = sc.candles;
+  R(0, 0, TW, TH, dark ? '#1a1620' : '#e9e0cc');
+  // the chancel: windows, cross, altar with paraments
+  for (const gx of [40, 184]) { R(gx, 14, 16, 34, '#3a3a4a'); const glass = ['#d84a4a', '#4a7ad8', '#e8c04a', '#4ab87a']; for (let i = 0; i < 6; i++) R(gx + 2 + (i % 2) * 6, 16 + Math.floor(i / 2) * 10, 6, 10, glass[i % 4] + (dark ? '66' : 'dd')); }
+  R(116, 10, 8, 30, dark ? '#c8a050' : '#b08a3a'); R(108, 18, 24, 6, dark ? '#c8a050' : '#b08a3a');
+  R(92, 48, 56, 16, '#d8cfb8'); R(92, 50, 56, 12, w.color); R(112, 50, 16, 12, '#f0e6c8');
+  // candles
+  for (const [x0, y0] of [[96, 44], [140, 44]].concat(dark ? [[20, 70], [218, 70], [60, 120], [180, 120]] : [])) {
+    R(x0, y0, 2, 5, '#f4efe0'); const f = Math.sin(t * 9 + x0) * .5;
+    cx.fillStyle = '#ffd27a'; cx.fillRect(x0 + f, y0 - 3, 2, 3);
+    if (dark) { const gr = cx.createRadialGradient(x0 + 1, y0 - 2, 0, x0 + 1, y0 - 2, 22); gr.addColorStop(0, 'rgba(255,200,110,.35)'); gr.addColorStop(1, 'rgba(255,200,110,0)'); cx.fillStyle = gr; cx.fillRect(x0 - 22, y0 - 24, 46, 46); }
+  }
+  // pulpit and organ
+  R(30, 60, 18, 16, '#7a5234'); R(26, 58, 26, 3, '#5a3a24'); R(196, 56, 30, 22, '#6a4a34'); for (let i = 0; i < 6; i++) R(199 + i * 4, 44, 2, 12, '#c8b070');
+  // the pastor in the pulpit
+  R(37, 51, 5, 7, '#24242c'); R(39, 51, 1, 1, '#ffffff'); R(37, 47, 5, 4, '#e8b890'); R(37, 46, 5, 2, '#5a3a24');
+  // pews filling with people
+  const seats = [], shown = Math.min(sc.att, 132) * clamp((performance.now() - sc.t0) / 1200, 0, 1);
+  for (let r = 0; r < 6; r++) for (const side of [0, 1]) for (let s = 0; s < 11; s++) seats.push([side ? 132 + s * 8 : 20 + s * 8, 99 + r * 14]);
+  const order = seats.map((s, i) => [s, (i * 37) % seats.length]).sort((a, b) => a[1] - b[1]).map(a => a[0]);
+  const tones = ['#e8b890', '#c8906a', '#a06a4a', '#f0c8a0', '#7a4a34'], shirts = ['#4a6a9a', '#9a4a4a', '#4a8a5a', '#8a7a4a', '#6a4a8a', '#3a3a4a', '#c88a3a'];
+  for (let i = 0; i < Math.floor(shown); i++) { const [sx, sy] = order[i % order.length]; R(sx, sy - 4, 4, 4, shirts[i % shirts.length]); R(sx + 1, sy - 7, 3, 3, tones[i % tones.length]); }
+  for (let r = 0; r < 6; r++) for (const px of [16, 128]) { R(px, 97 + r * 14, 92, 4, '#8a5a34'); R(px, 101 + r * 14, 92, 1, '#5a3a24'); }   // pew backs, in front of the people
+  if (sc.att > 132) text('STANDING ROOM ONLY', TW / 2, 168, dark ? '#f0d090' : '#5a4a30');
+}
+
+let lastT = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(.05, (now - lastT) / 1000); lastT = now;
+  stepWalk(dt);
+  cx.imageSmoothingEnabled = false;
+  if (scene) drawChurchInside(now / 1000); else drawTown(now / 1000);
+}
+
+/* ---------- fitting the canvas: whole-number scaling, crisp pixels ---------- */
+function fit() {
+  const st = document.getElementById('stage'), wide = matchMedia('(min-aspect-ratio: 11/10) and (min-width: 700px)').matches;
+  const availW = wide ? innerWidth - 380 : innerWidth, availH = wide ? innerHeight : innerHeight * .46;
+  const k = Math.max(1, Math.floor(Math.min(availW / TW, availH / TH) * 2) / 2);   // halves are fine too
+  cv.style.width = TW * k + 'px'; cv.style.height = TH * k + 'px';
+  st.style.height = wide ? '' : TH * k + 'px';
+}
+addEventListener('resize', fit);
+
+/* ============================================================
+   Start
+   ============================================================ */
+function begin() {
+  S = freshState();
+  S.weekStart = Object.fromEntries(METERS.map(m => [m.k, meter(m.k)]));
+  pastor = { ...placeXY('parsonage') }; scene = null; selected = null;
+  document.getElementById('title').classList.add('hide');
+  save();
+  showCard({ kicker: 'Advent 1 · Tuesday morning', title: 'Welcome to St. Luke\'s', text: 'Your first year as pastor of St. Luke\'s begins with Advent, with your wife Sam and your daughter Bea in the parsonage next door. Monday is your day off; Tuesday to Saturday are yours to spend, two parts a day, and Sunday is Sunday. Study, visit, teach the catechism on Wednesdays, love your people, and rest: the church is Christ\'s, not yours to carry alone.', go: 'Let\'s begin', then: startSlot });
+}
+const hadSave = !!(S && !S.over);   // a year in progress to continue (and not lose by accident)
+document.getElementById('newBtn').onclick = () => { if (hadSave && !confirm('Start a new year? Your current one will be lost.')) return; begin(); };
+document.getElementById('contBtn').onclick = () => { document.getElementById('title').classList.add('hide'); pastor = { ...placeXY(S.at || 'parsonage') }; startSlot(); };
+document.getElementById('ver').textContent = `Version ${VERSION} · Hallowed Gains`;
+if (hadSave) { const b = document.getElementById('contBtn'); b.hidden = false; b.textContent = `Continue (${WEEKS[S.week].name}, ${DAYS[S.day] || 'Sunday'})`; }
+else S = freshState();
+fit(); render(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>
