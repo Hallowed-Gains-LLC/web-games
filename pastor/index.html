@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1a1d2e">
-<meta name="description" content="A cozy pixel-art week planner through one church year as the pastor of a small-town church.">
-<title>A Pastor's Year</title>
+<meta name="description" content="What Does This Mean? A cozy, gently funny pixel-art church year as the pastor of Zion Evangelical Lutheran Church of the Unaltered Augsburg Confession, in a small Midwestern town.">
+<title>What Does This Mean?</title>
 <style>
   /* ============================================================
-     A Pastor's Year at St. Luke's
+     What Does This Mean? (a pastor's year at Zion Lutheran)
      The town is a small pixel-art canvas, scaled up crisp; everything
      you read or tap (the day, the meters, the places, the scenes) is
      plain HTML beside or below it, so it stays readable on a phone.
@@ -27,6 +27,15 @@
          padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
   #stage { flex: 0 0 auto; display: flex; justify-content: center; align-items: center; background: #0f1220; position: relative; }
   #town { image-rendering: pixelated; image-rendering: crisp-edges; display: block; touch-action: manipulation; }
+  /* a soft vignette over the town, so the pixel art sits in a frame */
+  #stage::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+                  background: radial-gradient(ellipse at center, rgba(0,0,0,0) 62%, rgba(5,6,14,.45) 100%); }
+  /* the day's name, laid over the town for a moment when a new day starts */
+  #banner { position: absolute; left: 0; right: 0; top: 38%; z-index: 2; text-align: center; pointer-events: none; opacity: 0;
+            font-family: Georgia, serif; font-size: 30px; color: #fff4d6; text-shadow: 0 2px 0 rgba(0,0,0,.55), 0 0 18px rgba(0,0,0,.5); }
+  #banner small { display: block; font-family: system-ui, sans-serif; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: #f0d79a; margin-top: 2px; }
+  #banner.show { animation: banner 1.8s ease-out both; }
+  @keyframes banner { 0% { opacity: 0; transform: translateY(8px); } 18%, 70% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-6px); } }
   #panel { flex: 1 1 auto; overflow-y: auto; padding: 10px 14px 18px; background: var(--night); }
   @media (min-aspect-ratio: 11/10) and (min-width: 700px) {
     #app { flex-direction: row; }
@@ -45,6 +54,23 @@
 
   /* the meters */
   #meters { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px 10px; margin-bottom: 12px; }
+  .meter { position: relative; }
+  .meter .bar { box-shadow: inset 0 1px 0 rgba(0,0,0,.35); }
+  .meter .bar i { background-image: linear-gradient(to bottom, rgba(255,255,255,.28), rgba(255,255,255,0) 60%); }
+  .meter.flash .bar { animation: flash .7s ease-out; }
+  @keyframes flash { 0% { box-shadow: 0 0 0 2px rgba(240,200,110,.8); } 100% { box-shadow: 0 0 0 0 rgba(240,200,110,0); } }
+  /* "+8" floating up from a meter that just changed */
+  .meter .float { position: absolute; right: 0; top: -2px; font-size: 12px; font-weight: 700; color: #9fe09f; pointer-events: none; animation: floatup 1.3s ease-out forwards; }
+  .meter .float.down { color: #ff9a80; }
+  @keyframes floatup { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-16px); } }
+
+  /* the church's letterboard sign: one gently funny message a week */
+  #sign { margin: 2px 0 4px; padding: 7px 10px 6px; border-radius: 6px; background: #17171b; border: 2px solid #5a4630;
+          box-shadow: inset 0 0 0 1px #000, 0 2px 0 #0b0b10; text-align: center;
+          background-image: repeating-linear-gradient(to bottom, transparent 0 15px, rgba(255,255,255,.05) 15px 16px); }
+  #sign div { font-family: 'Courier New', ui-monospace, monospace; font-weight: 700; font-size: 12.5px; line-height: 16px;
+              letter-spacing: .12em; color: #f4f1e8; text-transform: uppercase; }
+  #sign .who { font-family: system-ui, sans-serif; font-weight: 600; font-size: 9.5px; letter-spacing: .22em; color: #b99b6a; margin-bottom: 2px; }
   .meter { font-size: 12px; color: #c9bfa6; }
   .meter .bar { height: 7px; border-radius: 4px; background: #2e3350; overflow: hidden; margin-top: 3px; }
   .meter .bar i { display: block; height: 100%; border-radius: 4px; transition: width .5s ease; }
@@ -54,11 +80,19 @@
   h3 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: #9aa0c2; margin: 14px 0 6px; font-weight: 600; }
   #head { position: sticky; top: -10px; z-index: 2; background: var(--night); padding-top: 10px; margin-top: -10px; padding-bottom: 2px; }
   #places { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-  .place { position: relative; background: var(--night2); color: var(--paper); border: 1px solid #343a5a; border-radius: 10px; padding: 9px 4px; font-size: 12.5px; line-height: 1.2; }
+  .place { position: relative; background: linear-gradient(to bottom, #282d47, var(--night2)); color: var(--paper); border: 1px solid #343a5a; border-radius: 10px; padding: 7px 4px 8px; font-size: 12px; line-height: 1.2;
+           box-shadow: 0 2px 0 #12152a; transition: transform .12s ease, border-color .2s; }
+  .place:active { transform: translateY(1px); box-shadow: 0 1px 0 #12152a; }
+  .place .ic { display: block; font-size: 17px; line-height: 1; margin-bottom: 3px; }
   .place.on { border-color: var(--gold); background: #2f2c35; }
   .place .dot { position: absolute; top: 5px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 6px var(--gold); }
   #acts { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
-  .act { text-align: left; background: var(--paper); color: var(--ink); border: 0; border-radius: 10px; padding: 10px 12px; font-size: 15px; }
+  .act { text-align: left; background: linear-gradient(to bottom, #fbf4e3, var(--paper)); color: var(--ink); border: 0; border-radius: 10px; padding: 10px 12px; font-size: 15px;
+         box-shadow: 0 2px 0 #b8a47c; transition: transform .12s ease; animation: pop .22s ease-out both; }
+  .act:active { transform: translateY(1px); box-shadow: 0 1px 0 #b8a47c; }
+  .act:nth-child(2) { animation-delay: .03s; } .act:nth-child(3) { animation-delay: .06s; } .act:nth-child(4) { animation-delay: .09s; }
+  .act:nth-child(5) { animation-delay: .12s; } .act:nth-child(6) { animation-delay: .15s; } .act:nth-child(7) { animation-delay: .18s; }
+  @keyframes pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   .act small { display: block; color: #7a6c55; font-size: 12px; margin-top: 2px; }
   .act .new { color: #b0612a; font-weight: 700; }
   .act:disabled { opacity: .45; cursor: default; }
@@ -67,7 +101,9 @@
   /* the scene card */
   #modal { position: fixed; inset: 0; z-index: 20; display: none; align-items: flex-end; justify-content: center; background: rgba(8,10,20,.55); }
   #modal.open { display: flex; }
-  #card { width: min(520px, 100%); max-height: 86%; overflow-y: auto; background: var(--paper); color: var(--ink);
+  #card { width: min(520px, 100%); max-height: 86%; overflow-y: auto; color: var(--ink);
+          background: radial-gradient(ellipse at top left, #fffaf0, rgba(255,250,240,0) 60%), radial-gradient(ellipse at bottom right, #eadbb8, rgba(234,219,184,0) 55%), var(--paper);
+          border-top: 3px solid #c9a35a;
           border-radius: 18px 18px 0 0; padding: 18px 20px calc(18px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 30px rgba(0,0,0,.4);
           animation: up .25s ease-out; }
   @media (min-height: 700px) and (min-width: 700px) { #modal { align-items: center; } #card { border-radius: 18px; } }
@@ -75,9 +111,13 @@
   #card .kicker { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #9a7b4a; }
   #card h2 { font-family: Georgia, 'Times New Roman', serif; font-size: 22px; margin: 4px 0 8px; }
   #card p { font-family: Georgia, 'Times New Roman', serif; font-size: 17px; line-height: 1.5; margin: 8px 0; }
+  #card p.lead::first-letter { float: left; font-size: 46px; line-height: .9; padding: 4px 6px 0 0; color: #8a5a24; font-weight: 700; }
+  #card .rule { height: 1px; margin: 10px 0 4px; background: linear-gradient(to right, transparent, #c9a35a, transparent); }
   #card .choices { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
   #card .choice { text-align: left; background: #fff8e8; border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; font-size: 15px; color: var(--ink); }
-  #card .choice:hover { border-color: #b08a4a; }
+  #card .choice { box-shadow: 0 2px 0 #e2d1aa; transition: transform .12s ease, border-color .2s; }
+  #card .choice:hover { border-color: #b08a4a; transform: translateY(-1px); }
+  #card .choice:active { transform: translateY(1px); box-shadow: none; }
   #card .choice small { display: block; color: #8a7a5e; font-size: 12px; margin-top: 3px; }
   #card .go { background: #3a3020; color: #f6e2b0; border: 0; border-radius: 12px; padding: 12px; font-size: 16px; width: 100%; margin-top: 14px; }
   #card .fx { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
@@ -90,10 +130,14 @@
 
   /* the title */
   #title { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
-           padding: 24px 24px calc(40px + env(safe-area-inset-bottom)); background: linear-gradient(to bottom, rgba(10,12,24,0) 30%, rgba(10,12,24,.92) 62%); }
+           padding: 24px 24px calc(40px + env(safe-area-inset-bottom)); background: linear-gradient(to bottom, rgba(10,12,24,0) 26%, rgba(10,12,24,.9) 48%, rgba(10,12,24,.98) 62%); }
   #title.hide { display: none; }
-  #title h1 { font-family: Georgia, serif; font-size: 34px; margin: 0; text-align: center; color: #f6e2b0; }
-  #title .sub { color: #c9bfa6; margin: 6px 0 22px; text-align: center; font-size: 15px; line-height: 1.5; }
+  #title .kicker { font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #c9a86a; margin-bottom: 8px; }
+  #title h1 { font-family: Georgia, 'Times New Roman', serif; font-size: clamp(36px, 11vw, 54px); line-height: 1.02; margin: 0; text-align: center;
+              color: #f8e4b0; text-shadow: 0 2px 0 #7a5a24, 0 0 24px rgba(240, 190, 90, .35); letter-spacing: .01em; animation: rise .9s ease-out both; }
+  #title .sub { color: #d6ccb2; margin: 12px 0 6px; text-align: center; font-size: 15px; line-height: 1.5; max-width: 340px; animation: rise .9s .15s ease-out both; }
+  #title .amen { font-family: Georgia, serif; font-style: italic; color: #a99f86; font-size: 14px; margin-bottom: 20px; animation: rise .9s .3s ease-out both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
   #title button { width: min(320px, 100%); margin-top: 8px; padding: 13px; border-radius: 12px; border: 0; font-size: 16px; }
   #title .primary { background: #e0b05a; color: #2b2010; font-weight: 700; }
   #title .secondary { background: #2e3350; color: #f6e2b0; }
@@ -102,13 +146,14 @@
 </head>
 <body>
 <div id="app">
-  <div id="stage"><canvas id="town" width="240" height="176" aria-label="The town of Willow Creek"></canvas></div>
+  <div id="stage"><canvas id="town" width="240" height="176" aria-label="The town of Willow Creek"></canvas><div id="banner"></div></div>
   <div id="panel">
     <div id="head">
       <div id="when"></div>
       <div id="slots"></div>
       <div id="meters"></div>
     </div>
+    <div id="sign" aria-label="The church sign"></div>
     <h3>Where to?</h3>
     <div id="places"></div>
     <div id="acts"></div>
@@ -117,8 +162,10 @@
 </div>
 <div id="modal"><div id="card" role="dialog" aria-modal="true"></div></div>
 <div id="title">
-  <h1>A Pastor's Year</h1>
-  <div class="sub">St. Luke's Lutheran Church, Willow Creek.<br>One church year, from Advent to the Last Sunday.</div>
+  <div class="kicker">A pastor's year at Zion Lutheran</div>
+  <h1>What Does<br>This Mean?</h1>
+  <div class="sub">One church year in Willow Creek: sermons, shut-ins, a thermostat war, and a boiler named Old Faithful.</div>
+  <div class="amen">This is most certainly true.</div>
   <button class="primary" id="newBtn">Begin the year</button>
   <button class="secondary" id="contBtn" hidden>Continue</button>
   <div class="fine" id="ver"></div>
@@ -128,12 +175,12 @@
 <script>
 'use strict';
 /* ============================================================
-   A Pastor's Year: the engine.
+   What Does This Mean?: the engine.
    The words (scenes, stories, events, services) live in content.js as
    plain data (window.PASTOR); this file is the calendar, the rules, the
    pixel town and the screens. See README.md.
    ============================================================ */
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const SAVE_KEY = 'pastor_save_v1';          // every game on the site shares localStorage
 const P = window.PASTOR || { pools: {}, stories: {}, visitLines: {}, events: [], specials: {}, door: {}, endings: {}, closing: '' };
 
@@ -188,6 +235,35 @@ const SPECIAL_DAYS = [
 const CLASS_DAY = 1, NO_CLASS_WEEKS = [4, 8, 11];
 /** Communion calls on the homebound come round about once a month. */
 const COMMUNION_EVERY = 4;
+
+/**
+ * The church's letterboard sign, one message a week (two lines each, the way
+ * a real letterboard runs out of letters). Holy Week gets its own schedule
+ * until Sunday. Keep them affectionate: the jokes are about people.
+ */
+const SIGNS = [
+  ['Advent is not Christmas', 'please hold the carols'],
+  ['Vespers Wed 7 · soup at 6', 'the soup is also Advent'],
+  ['Gaudete! The pink candle', 'is rose · ask Marge'],
+  ['Boiler fund: see thermometer', 'in narthex · not that one'],
+  ['Christmas Eve 4 · 7 · 11', '12 days of Christmas · pace yourself'],
+  ['Wise men still seek him', 'and still ask for directions'],
+  ['Water into wine · John 2', 'coffee into coffee hour'],
+  ['Last Alleluia Sunday', 'see you at Easter, Alleluia'],
+  ['Ash Wednesday 7 pm', 'dust you are · coffee after'],
+  ['Laetare! Rejoice!', 'Lent is half over · hang in there'],
+  ['Palm Sunday', 'donkey parking only'],
+  ['He is risen!', 'He is risen indeed! Alleluia!'],
+  ['Easter is 50 days long', 'keep watering the lilies'],
+  ['Good Shepherd Sunday', 'all sheep welcome, even back-pew sheep'],
+  ['Wear red Sunday', 'confirmation 10:30 · cameras quietly'],
+  ['Holy Trinity Sunday', 'Athanasian Creed · stretch first'],
+  ['Reformation Sunday', '95 theses · 1 grill · brats after'],
+  ['The end is near', 'Advent starts next week'],
+];
+const HOLY_WEEK_SIGN = ['Maundy Thurs 7 · Good Fri 7', 'Easter sunrise 6:30 · breakfast after'];
+/** The sign's two lines for the current day. */
+function signFor() { return S.week === 11 && S.day <= 4 ? HOLY_WEEK_SIGN : SIGNS[S.week]; }
 
 /* ---------- People ---------- */
 const CAST = {
@@ -431,6 +507,10 @@ function endSlot() {
 }
 /** The start of a slot: a weekday service, the day's event, or running on empty. */
 function startSlot() {
+  if (S.slot === 0 && S.bannerDay !== S.week * 10 + S.day) {
+    S.bannerDay = S.week * 10 + S.day;
+    banner(DAYS[S.day], W().name + (S.day === 0 ? ' · a new week' : ''));
+  }
   render();
   const sp = SPECIAL_DAYS.find(([w, d, s, , flag]) => w === S.week && d === S.day && s === S.slot && (!flag || S.flags[flag]));
   if (S.day === CLASS_DAY && S.slot === 1 && S.classWeek !== S.week && !NO_CLASS_WEEKS.includes(S.week)) {
@@ -492,7 +572,7 @@ function showCard(o) {
   if (o.pre) o.pre();
   modal.classList.add('open');
   const head = `${o.kicker ? `<div class="kicker">${esc(o.kicker)}</div>` : ''}<h2>${esc(o.title || '')}</h2>`;
-  const body = (o.html || '') + (o.text ? `<p>${esc(o.text)}</p>` : '');
+  const body = (o.html || '') + (o.text ? `<p class="${o.html ? '' : 'lead'}">${esc(o.text)}</p>` : '');
   if (o.choices && o.choices.length) {
     card.innerHTML = head + body + `<div class="choices">${o.choices.map((c, i) => `<button class="choice" data-i="${i}">${esc(c.label)}</button>`).join('')}</div>`;
     card.querySelectorAll('.choice').forEach(b => b.onclick = () => {
@@ -540,6 +620,7 @@ let scene = null;   // the church interior when it's showing: { kind, candles, a
 /** Sunday: the service, the sermon, the door, and the week in review. */
 function sunday() {
   const w = W();
+  banner('Sunday', w.latin ? `${w.name} · ${w.latin}` : w.name);
   const pre = [];
   if (S.week === 11) pre.push('easterSunrise');
   if (S.week === 12 && S.flags.baptismPlanned) pre.push('baptism');
@@ -646,8 +727,10 @@ function render() {
   const w = W(), day = S.day <= 4 ? DAYS[S.day] : 'Sunday';
   document.getElementById('when').innerHTML = `<span class="day">${day} ${S.day <= 4 ? SLOTS[S.slot] : ''}</span><span class="sunday"><b style="background:${w.color}"></b>${esc(w.name)}${w.latin ? ` · <i>${esc(w.latin)}</i>` : ''}</span>`;
   document.getElementById('slots').innerHTML = Array.from({ length: 10 }, (_, i) => { const cur = S.day * 2 + S.slot; return `<i class="${i < cur ? 'done' : i === cur ? 'now' : ''}"></i>`; }).join('');
-  document.getElementById('meters').innerHTML = METERS.map(m => { const v = meter(m.k); return `<div class="meter${v < 25 && m.k !== 'sermon' ? ' low' : ''}">${m.label}<div class="bar"><i style="width:${v}%;background:${m.color}"></i></div></div>`; }).join('');
-  document.getElementById('places').innerHTML = Object.entries(PLACES).map(([k, p]) => `<button class="place${k === selected ? ' on' : ''}" data-p="${k}">${esc(p.name)}${waiting(k) ? '<i class="dot"></i>' : ''}</button>`).join('');
+  renderMeters();
+  const [l1, l2] = signFor();
+  document.getElementById('sign').innerHTML = `<div class="who">Zion Ev. Lutheran Church · U.A.C.</div><div>${esc(l1)}</div><div>${esc(l2)}</div>`;
+  document.getElementById('places').innerHTML = Object.entries(PLACES).map(([k, p]) => `<button class="place${k === selected ? ' on' : ''}" data-p="${k}"><span class="ic" aria-hidden="true">${PLACE_ICON[k]}</span>${esc(p.name)}${waiting(k) ? '<i class="dot"></i>' : ''}</button>`).join('');
   document.querySelectorAll('.place').forEach(b => b.onclick = () => choose(b.dataset.p));
   const acts = document.getElementById('acts');
   if (selected) {
@@ -657,6 +740,39 @@ function render() {
     acts.querySelectorAll('.act').forEach(b => { const a = A[+b.dataset.i]; if (a.key === 'none') b.disabled = true; else b.onclick = () => doAction(a); });
   } else acts.innerHTML = '';
   document.getElementById('hint').textContent = selected ? '' : hintLine();
+}
+/** A small picture for each place button. */
+const PLACE_ICON = { parsonage: '🏡', church: '⛪', office: '📋', hospital: '🏥', cafe: '☕', olsen: '🏠', nguyen: '🏠', walt: '🏠' };
+/**
+ * The meters are built once and then updated in place, so a change can
+ * animate: the bar slides, flashes, and a "+8" floats up beside it.
+ */
+let shownMeters = null;
+function renderMeters() {
+  const box = document.getElementById('meters');
+  if (!box.children.length) {
+    box.innerHTML = METERS.map(m => `<div class="meter" data-k="${m.k}">${m.label}<div class="bar"><i style="background-color:${m.color}"></i></div></div>`).join('');
+  }
+  for (const m of METERS) {
+    const v = meter(m.k), el = box.querySelector(`[data-k="${m.k}"]`);
+    el.querySelector('i').style.width = v + '%';
+    el.classList.toggle('low', v < 25 && m.k !== 'sermon');
+    const was = shownMeters && shownMeters[m.k];
+    if (was != null && v !== was && !(m.k === 'sermon' && v === 0)) {   // a new week's blank sermon isn't news
+      const f = document.createElement('span');
+      f.className = 'float' + (v < was ? ' down' : '');
+      f.textContent = (v > was ? '+' : '−') + Math.abs(v - was);
+      el.appendChild(f); setTimeout(() => f.remove(), 1300);
+      el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+    }
+  }
+  shownMeters = Object.fromEntries(METERS.map(m => [m.k, meter(m.k)]));
+}
+/** Show the day's name over the town for a moment. */
+function banner(title, sub) {
+  const b = document.getElementById('banner');
+  b.innerHTML = `${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}`;
+  b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
 }
 function hintLine() {
   if (S.week === 0 && S.day === 0 && S.slot === 0) return 'Tap a place in town (or a button) to choose how to spend your morning. Study for Sunday, visit your people, keep the building going, and don\'t forget to rest. A gold dot means someone or something is waiting.';
@@ -703,7 +819,7 @@ cv.addEventListener('pointerup', e => {
 });
 
 /* --- tiny pixel font (5x7), for signs --- */
-const FONT = {A:"01110100011000111111100011000110001",B:"11110100011000111110100011000111110",C:"01110100011000010000100001000101110",D:"11110100011000110001100011000111110",E:"11111100001000011110100001000011111",F:"11111100001000011110100001000010000",G:"01110100011000010111100011000101111",H:"10001100011000111111100011000110001",I:"11111001000010000100001000010011111",K:"10001100101010011000101001001010001",L:"10000100001000010000100001000011111",M:"10001110111010110101100011000110001",N:"10001110011010110011100011000110001",O:"01110100011000110001100011000101110",P:"11110100011000111110100001000010000",R:"11110100011000111110101001001010001",S:"01111100001000001110000010000111110",T:"11111001000010000100001000010000100",U:"10001100011000110001100011000101110",V:"10001100011000110001100010101000100",W:"10001100011000110101101011101110001",Y:"10001100010101000100001000010000100",' ':"00000000000000000000000000000000000","'":"00100001000000000000000000000000000",'.':"00000000000000000000000000110001100"};
+const FONT = {A:"01110100011000111111100011000110001",B:"11110100011000111110100011000111110",C:"01110100011000010000100001000101110",D:"11110100011000110001100011000111110",E:"11111100001000011110100001000011111",F:"11111100001000011110100001000010000",G:"01110100011000010111100011000101111",H:"10001100011000111111100011000110001",I:"11111001000010000100001000010011111",K:"10001100101010011000101001001010001",L:"10000100001000010000100001000011111",M:"10001110111010110101100011000110001",N:"10001110011010110011100011000110001",O:"01110100011000110001100011000101110",P:"11110100011000111110100001000010000",R:"11110100011000111110101001001010001",S:"01111100001000001110000010000111110",T:"11111001000010000100001000010000100",U:"10001100011000110001100011000101110",Z:"11111000010001000100010001000011111",V:"10001100011000110001100010101000100",W:"10001100011000110101101011101110001",Y:"10001100010101000100001000010000100",' ':"00000000000000000000000000000000000","'":"00100001000000000000000000000000000",'.':"00000000000000000000000000110001100"};
 function text(s, x, y, col) {
   s = s.toUpperCase(); const w = s.length * 6 - 1; x = Math.round(x - w / 2);
   cx.fillStyle = col;
@@ -722,7 +838,9 @@ const R = (x, y, w, h, c) => { cx.fillStyle = c; cx.fillRect(x, y, w, h); };
 /** The look of the season: sky, ground, trees, weather. */
 function seasonLook() {
   const s = W().season, wk = S.week;
-  if (s === 'advent' || s === 'christmas' || (s === 'epiphany' && wk <= 6)) return { sky: ['#1e2a4a', '#4d5f8f'], ground: '#e8eef4', grass: '#cfd9e6', tree: 'snow', snow: true };
+  // Reformation and the Last Sunday fall in late autumn.
+  if (wk >= 16) return { sky: ['#6f8fb8', '#d8c8b0'], ground: '#8a9a5a', grass: '#7a8a4a', tree: 'autumn', snow: false, leaves: true };
+  if (s === 'advent' || s === 'christmas' || (s === 'epiphany' && wk <= 6)) return { sky: ['#3d5684', '#a9bcd8'], ground: '#e8eef4', grass: '#cfd9e6', tree: 'snow', snow: true };
   if (s === 'epiphany' || (s === 'lent' && wk <= 9)) return { sky: ['#5a6f95', '#9fb0c8'], ground: '#9a9f86', grass: '#8a9476', tree: 'bare', snow: false };
   if (s === 'lent') return { sky: ['#6f86b0', '#b8c7dc'], ground: '#8fa06a', grass: '#7f9a5a', tree: 'bud', snow: false };
   if (s === 'holyweek' || s === 'easter') return { sky: ['#7fb0e0', '#cfe3f2'], ground: '#7fb05a', grass: '#6aa04a', tree: 'blossom', snow: false };
@@ -730,9 +848,11 @@ function seasonLook() {
 }
 function drawTown(t) {
   const L = seasonLook(), aft = S.slot === 1;
-  // sky (warmer in the afternoon)
+  // sky (warmer in the afternoon), the sun, and drifting clouds
   const g = cx.createLinearGradient(0, 0, 0, 70); g.addColorStop(0, L.sky[0]); g.addColorStop(1, aft ? '#e8b888' : L.sky[1]);
   cx.fillStyle = g; cx.fillRect(0, 0, TW, 96);
+  drawSun(aft, L);
+  drawClouds(t, L, aft);
   // far hills
   cx.fillStyle = L.snow ? '#c9d3e2' : '#6f8a62';
   cx.beginPath(); cx.moveTo(0, 80); for (let x = 0; x <= TW; x += 8) cx.lineTo(x, 70 + 6 * Math.sin(x * .04) + 4 * Math.sin(x * .11)); cx.lineTo(TW, 96); cx.lineTo(0, 96); cx.fill();
@@ -745,16 +865,112 @@ function drawTown(t) {
   for (const p of Object.values(PLACES)) { const [dx, dy] = p.door; if (dy < 100) R(dx - 2, dy, 5, 98 - dy + 1, '#b9b2a2'); else R(dx - 2, 118, 5, dy - 118 + 6, '#b9b2a2'); }
   drawParsonage(L); drawChurch(L, t); drawOffice(L); drawHospital(L, t);
   drawCafe(L); drawHouse(PLACES.olsen, '#b8786a', '#6a3a34', L, 'OLSEN'); drawHouse(PLACES.nguyen, '#7a9ab8', '#3a4a6a', L, 'NGUYEN'); drawHouse(PLACES.walt, '#a8a07a', '#5a5234', L, 'PETERSON');
-  drawTree(64, 96, L); drawTree(170, 96, L); drawTree(224, 166, L); drawTree(112, 166, L, .8); drawTree(162, 166, L, .7);
+  drawGroundDetails(L, t);
+  drawTree(64, 96, L); drawTree(224, 166, L); drawTree(112, 166, L, .8); drawTree(162, 166, L, .7);   // (the letterboard stands where a tree was, by the office)
+  drawChimneySmoke(t, L);
+  drawTownsfolk(t, L);
   // the church cat on the steps (most days)
   if ((S.week + S.day) % 3 !== 1) { R(110, 93, 4, 2, '#e0a04a'); R(113, 91, 2, 2, '#e0a04a'); R(113, 90, 1, 1, '#e0a04a'); R(110, 92, 1, 1, '#c88a3a'); }
-  // weather
-  if (L.snow) { cx.fillStyle = 'rgba(255,255,255,.85)'; for (let i = 0; i < 40; i++) { const x = (i * 53 + t * 9) % TW, y = (i * 37 + t * 14) % TH; cx.fillRect(x, y, 1, 1); } }
+  drawWeather(t, L);
   // gold markers over places with something waiting
-  if (!scene) for (const [k, p] of Object.entries(PLACES)) if (waiting(k)) { const [a, b, w] = p.rect, bob = Math.sin(t * 3 + a) * 1.5; R(a + w / 2 - 1, b - 9 + bob, 3, 5, '#f0c050'); R(a + w / 2 - 1, b - 3 + bob, 3, 2, '#f0c050'); }
+  // (only for new story scenes: the buttons' gold dots also cover people who need a visit)
+  if (!scene) for (const [k, p] of Object.entries(PLACES)) if (actionsAt(k).some(a => a.isNew)) { const [a, b, w] = p.rect, bob = Math.sin(t * 3 + a) * 1.5; R(a + w / 2 - 1, b - 9 + bob, 3, 5, '#f0c050'); R(a + w / 2 - 1, b - 3 + bob, 3, 2, '#f0c050'); }
   // a highlight on the chosen place
   if (selected && PLACES[selected]) { const [a, b, w, h] = PLACES[selected].rect; cx.strokeStyle = `rgba(240,192,80,${.6 + .4 * Math.sin(t * 5)})`; cx.lineWidth = 1; cx.strokeRect(a + .5, b + .5, w - 1, h - 1); }
   drawPastor(t);
+}
+/* --- the ambient town: everything here moves off the clock `t` (seconds) --- */
+/** A pixel sun: high and pale in the morning, low and warm in the afternoon. */
+function drawSun(aft, L) {
+  const x = aft ? 196 : 28, y = aft ? 40 : 14, r = 6;
+  const glow = cx.createRadialGradient(x, y, 0, x, y, 26);
+  glow.addColorStop(0, aft ? 'rgba(255,200,120,.55)' : 'rgba(255,250,220,.45)'); glow.addColorStop(1, 'rgba(255,240,200,0)');
+  cx.fillStyle = glow; cx.fillRect(x - 26, y - 26, 52, 52);
+  cx.fillStyle = aft ? '#ffd28a' : L.snow ? '#fff6dc' : '#fff1b8';
+  for (let dy = -r; dy <= r; dy++) { const half = Math.round(Math.sqrt(r * r - dy * dy)); cx.fillRect(x - half, y + dy, half * 2, 1); }
+}
+/** Four chunky clouds drifting east, wrapping around. */
+function drawClouds(t, L, aft) {
+  const col = aft ? 'rgba(255,226,200,.85)' : L.snow ? 'rgba(230,236,248,.8)' : 'rgba(255,255,255,.85)';
+  for (const [seed, y, w, speed] of [[0, 10, 26, 1.6], [90, 22, 18, 1.1], [160, 6, 22, 2.0], [230, 30, 14, .8]]) {
+    const x = ((seed + t * speed) % (TW + 60)) - 40;
+    R(x, y + 3, w, 4, col); R(x + 4, y, w - 10, 3, col); R(x + w * .45, y - 2, w * .3, 2, col);
+  }
+}
+/** Small things on the ground: snowbanks or grass tufts, a fence, mailboxes, shadows under buildings. */
+function drawGroundDetails(L, t) {
+  // shadows where the buildings meet the ground
+  for (const [x, w, y] of [[10, 46, 96], [74, 58, 96], [136, 28, 96], [176, 60, 96], [4, 54, 166], [69, 34, 166], [119, 34, 166], [169, 34, 166]]) R(x, y - 1, w, 2, 'rgba(20,20,30,.18)');
+  if (L.snow) {   // snowbanks along the plowed street
+    for (let x = 0; x < TW; x += 6) { R(x, 96 + (x % 12 ? 0 : 1), 5, 2, '#ffffff'); R(x + 2, 118, 5, 2 + (x % 18 ? 0 : 1), '#ffffff'); }
+  } else {        // grass tufts, still
+    cx.fillStyle = L.grass;
+    for (let i = 0; i < 26; i++) { const x = (i * 37) % TW, y = i % 2 ? 94 : 168 + (i % 3); if (Math.abs(x - 103) > 6) { cx.fillRect(x, y, 1, 2); cx.fillRect(x + 2, y - 1, 1, 3); } }
+  }
+  // a picket fence by the parsonage
+  for (let x = 2; x < 18; x += 3) R(x, 90, 1, 6, '#f0ece0');
+  R(2, 92, 16, 1, '#f0ece0');
+  // mailboxes at the three houses
+  for (const p of [PLACES.olsen, PLACES.nguyen, PLACES.walt]) { const x = p.rect[0] + 2; R(x, 158, 1, 8, '#5a4a3a'); R(x - 1, 155, 4, 3, '#3a5a8a'); }
+  // the church's letterboard on the lawn (its words are in the panel)
+  R(164, 84, 1, 12, '#4a3020'); R(173, 84, 1, 12, '#4a3020'); R(162, 78, 14, 8, '#2a2420');
+  R(163, 80, 12, 1, '#e8e2d2'); R(163, 83, 9, 1, '#e8e2d2');
+  // the bell in the belfry, gold
+  const ch = PLACES.church.rect; R(ch[0] + 31, ch[1] + 16, 4, 3, '#d8b860'); R(ch[0] + 32, ch[1] + 19, 2, 1, '#d8b860');
+}
+/** Smoke curling from the chimneys on cold days (thin wisps the rest of the year). */
+function drawChimneySmoke(t, L) {
+  const cold = L.snow || L.tree === 'bare' || L.tree === 'autumn';
+  const n = cold ? 6 : 2;
+  for (const [cx0, cy0] of [[PLACES.parsonage.rect[0] + 38, PLACES.parsonage.rect[1] + 1], [PLACES.olsen.rect[0] + 30, PLACES.olsen.rect[1] + 4], [PLACES.walt.rect[0] + 10, PLACES.walt.rect[1] + 4]]) {
+    for (let i = 0; i < n; i++) {
+      const k = ((t * .35 + i / n) % 1), x = cx0 + Math.sin(k * 6 + cx0) * 2 + k * 5, y = cy0 - k * 16, a = (1 - k) * (cold ? .55 : .25), r = 1 + k * 2.5;
+      cx.fillStyle = `rgba(235,235,240,${a})`; cx.fillRect(Math.round(x - r), Math.round(y - r), Math.round(r * 2), Math.round(r * 2));
+    }
+  }
+  // the houses' chimneys themselves
+  R(PLACES.olsen.rect[0] + 28, PLACES.olsen.rect[1] + 4, 4, 6, '#6a3a2a'); R(PLACES.walt.rect[0] + 8, PLACES.walt.rect[1] + 4, 4, 6, '#5a4a3a');
+}
+/** Townsfolk on the sidewalks, and now and then a car. Everyone wraps around. */
+function drawTownsfolk(t, L) {
+  const coats = L.snow ? ['#a83a3a', '#3a5a9a', '#5a7a3a', '#8a6a3a'] : ['#c87a4a', '#4a8ab8', '#8aa84a', '#b85a8a'];
+  for (const [i, y, speed, dir] of [[0, 99, 9, 1], [1, 117, 7, -1], [2, 99, 6, -1], [3, 117, 11, 1]]) {
+    const span = TW + 20, p = ((t * speed + i * 67) % span), x = dir > 0 ? p - 10 : TW + 10 - p, step = Math.floor(t * 6 + i) % 2;
+    R(x - 1, y - 9, 3, 3, ['#e8b890', '#c8906a', '#a06a4a', '#f0c8a0'][i]);   // head
+    if (L.snow) R(x - 1, y - 10, 3, 1, coats[(i + 2) % 4]);                    // a hat in winter
+    R(x - 1, y - 6, 3, 4, coats[i]);                                           // coat
+    R(x - 1 + step, y - 2, 1, 2, '#2a2a34'); R(x + 1 - step, y - 2, 1, 2, '#2a2a34');
+  }
+  // a car every so often, eastbound on the near lane
+  const cycle = 14, k = (t % cycle) / cycle;
+  if (k < .45) {
+    const x = -20 + (k / .45) * (TW + 40), col = ['#c84a3a', '#3a6aa8', '#e0c050'][Math.floor(t / cycle) % 3];
+    R(x, 106, 16, 5, col); R(x + 3, 103, 9, 3, col); R(x + 4, 104, 3, 2, '#bfe0f0'); R(x + 8, 104, 3, 2, '#bfe0f0');
+    R(x + 2, 111, 3, 2, '#1a1a20'); R(x + 11, 111, 3, 2, '#1a1a20'); R(x + 15, 107, 1, 1, '#fff2a0');
+  }
+}
+/** Snow, petals, leaves or birds, by season. */
+function drawWeather(t, L) {
+  if (L.snow) {
+    for (let i = 0; i < 46; i++) {
+      const big = i % 5 === 0, x = (i * 53 + t * (big ? 12 : 8) + Math.sin(t + i) * 3) % TW, y = (i * 37 + t * (big ? 18 : 12)) % TH;
+      cx.fillStyle = big ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.7)'; cx.fillRect(x, y, big ? 2 : 1, big ? 2 : 1);
+    }
+  }
+  if (L.tree === 'blossom' || L.leaves) {
+    const cols = L.leaves ? ['#d8782a', '#c8502a', '#e0a83a'] : ['#f8d0dc', '#ffffff'];
+    for (let i = 0; i < 14; i++) {
+      const x = (i * 71 + t * 10 + Math.sin(t * 1.5 + i) * 6) % TW, y = (i * 29 + t * 9) % TH;
+      cx.fillStyle = cols[i % cols.length]; cx.fillRect(x, y, 2, 1);
+    }
+  }
+  if (!L.snow && L.tree !== 'bare') {   // a few birds crossing
+    for (let i = 0; i < 3; i++) {
+      const x = ((t * 14 + i * 22) % (TW + 80)) - 40, y = 26 + i * 5 + Math.sin(t * 2 + i) * 2, flap = Math.floor(t * 5 + i) % 2;
+      cx.fillStyle = '#3a3a48'; cx.fillRect(x, y, 1, 1); cx.fillRect(x - 1, y - flap, 1, 1); cx.fillRect(x + 1, y - flap, 1, 1);
+      cx.fillRect(x - 2, y - 1 + flap, 1, 1); cx.fillRect(x + 2, y - 1 + flap, 1, 1);
+    }
+  }
 }
 function roofSnow(x, y, w, L) { if (L.snow) R(x, y, w, 2, '#f4f8fc'); }
 function drawParsonage(L) {
@@ -787,7 +1003,7 @@ function drawChurch(L, t) {
   if (s === 'holyweek' || s === 'easter') for (const lx of [x + 22, x + 42]) { R(lx, y + 72, 1, 6, '#3a7a3a'); R(lx - 1, y + 70, 3, 2, '#fbf8ee'); }
   // the hymn board sign
   R(x + 47, y + 66, 13, 11, '#4a3020'); textSmall(String(S.week + 1), x + 53, y + 69, '#f0e0b0');
-  text("ST LUKE'S", x + w / 2 - 1, y + 39, '#3a3a4a');
+  text('ZION', x + w / 2, y + 39, '#3a3a4a');
 }
 function drawOffice(L) {
   const [x, y, w, h] = PLACES.office.rect;
@@ -823,21 +1039,39 @@ function drawTree(x, y, L, s = 1) {
   R(x - 1, y - 10 * s, 3, 10 * s, '#5a3a24');
   const r = 8 * s;
   if (L.tree === 'bare') { cx.strokeStyle = '#5a3a24'; cx.lineWidth = 1; cx.beginPath(); cx.moveTo(x, y - 8 * s); cx.lineTo(x - 5 * s, y - 16 * s); cx.moveTo(x, y - 9 * s); cx.lineTo(x + 5 * s, y - 17 * s); cx.stroke(); return; }
-  const col = { snow: '#3a5a4a', bud: '#7a9a5a', blossom: '#f2c6d6', green: '#3a7a3a' }[L.tree];
+  const col = { snow: '#3a5a4a', bud: '#7a9a5a', blossom: '#f2c6d6', green: '#3a7a3a', autumn: '#d0782e' }[L.tree];
   cx.fillStyle = col; cx.beginPath(); cx.arc(x, y - 14 * s, r, 0, 7); cx.fill();
+  // a lighter crown and a darker underside, for a little volume
+  cx.fillStyle = 'rgba(255,255,255,.14)'; cx.beginPath(); cx.arc(x - 2 * s, y - 17 * s, r * .55, 0, 7); cx.fill();
+  cx.fillStyle = 'rgba(0,0,0,.12)'; cx.fillRect(x - r * .8, y - 9 * s, r * 1.6, 2);
+  if (L.tree === 'autumn') { cx.fillStyle = '#e8b040'; for (let i = 0; i < 5; i++) cx.fillRect(x - 5 + (i * 7) % 11, y - 19 + (i * 5) % 10, 2, 1); }
   if (L.tree === 'snow') { cx.fillStyle = '#f4f8fc'; cx.beginPath(); cx.arc(x, y - 17 * s, r * .7, Math.PI, 0); cx.fill(); }
   if (L.tree === 'blossom') { cx.fillStyle = '#ffffff'; for (let i = 0; i < 6; i++) cx.fillRect(x - 5 + (i * 7) % 11, y - 19 + (i * 5) % 10, 1, 1); }
 }
+/** Which way the pastor faces: 1 east, -1 west (kept between walks). */
+let facing = 1;
+/**
+ * The pastor, 7 px wide: dark hair, a black clerical shirt with the white
+ * collar tab, black trousers, and a maroon hymnal under one arm. He bobs
+ * as he walks.
+ */
 function drawPastor(t) {
-  const x = Math.round(pastor.x), y = Math.round(pastor.y), moving = !!walk, step = moving ? Math.floor(t * 8) % 2 : 0;
-  R(x - 3, y - 2, 6, 2, 'rgba(0,0,0,.2)');
-  R(x - 2, y - 9, 5, 7, '#24242c');                 // black shirt and jacket
-  R(x, y - 9, 1, 1, '#ffffff');                     // the white tab of the collar
-  R(x - 2, y - 13, 5, 4, '#e8b890');                // face
-  R(x - 2, y - 14, 5, 2, '#5a3a24');                // hair
-  R(x - 2 + step, y - 2, 2, 2, '#2a2a34'); R(x + 1 - step, y - 2, 2, 2, '#2a2a34');   // feet
+  if (walk) { const n = walk.pts[walk.i + 1]; if (n && Math.abs(n.x - pastor.x) > .5) facing = Math.sign(n.x - pastor.x); }
+  const moving = !!walk, step = moving ? Math.floor(t * 8) % 2 : 0, bob = moving && step ? 1 : 0;
+  const x = Math.round(pastor.x), y = Math.round(pastor.y) - bob, f = facing;
+  R(x - 3, y - 1 + bob, 7, 2, 'rgba(0,0,0,.22)');                                  // shadow
+  R(x - 2 + step, y - 3, 2, 3, '#1c1c24'); R(x + 1 - step, y - 3, 2, 3, '#1c1c24');  // legs
+  R(x - 2, y - 10, 5, 7, '#24242c');                                                // clerical shirt
+  R(x - 1, y - 10, 3, 1, '#16161c'); R(x, y - 10, 1, 1, '#ffffff');                 // the collar and its tab
+  R(x - 3 + (f > 0 ? 0 : 6), y - 9 + step, 1, 4, '#24242c');                        // the swinging arm
+  R(x + (f > 0 ? 2 : -3), y - 8, 2, 3, '#7a2a34'); R(x + (f > 0 ? 3 : -3), y - 8, 1, 3, '#d8b860');   // hymnal, gilt edge
+  R(x - 2, y - 14, 5, 4, '#e8b890');                                                // face
+  R(x + (f > 0 ? 1 : -1), y - 13, 1, 1, '#2a2020');                                 // an eye, looking ahead
+  R(x - 2, y - 15, 5, 2, '#4a3020'); R(x + (f > 0 ? -2 : 2), y - 13, 1, 2, '#4a3020');   // hair
 }
 
+/** A hymn number for the board (deterministic per week, so it doesn't flicker). */
+function hymnNumber(i) { return 330 + ((S.week * 97 + i * 211 + 13) % 640); }
 /** Inside the church: Sunday and the special services. */
 function drawChurchInside(t) {
   const sc = scene, w = W(), dark = sc.candles;
@@ -852,8 +1086,18 @@ function drawChurchInside(t) {
     cx.fillStyle = '#ffd27a'; cx.fillRect(x0 + f, y0 - 3, 2, 3);
     if (dark) { const gr = cx.createRadialGradient(x0 + 1, y0 - 2, 0, x0 + 1, y0 - 2, 22); gr.addColorStop(0, 'rgba(255,200,110,.35)'); gr.addColorStop(1, 'rgba(255,200,110,0)'); cx.fillStyle = gr; cx.fillRect(x0 - 22, y0 - 24, 46, 46); }
   }
-  // pulpit and organ
-  R(30, 60, 18, 16, '#7a5234'); R(26, 58, 26, 3, '#5a3a24'); R(196, 56, 30, 22, '#6a4a34'); for (let i = 0; i < 6; i++) R(199 + i * 4, 44, 2, 12, '#c8b070');
+  // the aisle's red runner, and light falling through the windows by day
+  R(110, 64, 20, TH - 64, dark ? '#4a2024' : '#9a4a44'); R(112, 64, 1, TH - 64, dark ? '#5a2a2e' : '#b05a54');
+  if (!dark) for (const gx of [40, 184]) {
+    cx.fillStyle = 'rgba(255,240,190,.16)'; cx.beginPath();
+    cx.moveTo(gx, 48); cx.lineTo(gx + 16, 48); cx.lineTo(gx + 16 + (gx < 100 ? 40 : -40), TH); cx.lineTo(gx + (gx < 100 ? 30 : -30), TH); cx.fill();
+  }
+  // the hymn board, with this week's three hymns
+  R(64, 18, 20, 24, '#5a3a24'); R(65, 19, 18, 22, '#3a2416');
+  for (let i = 0; i < 3; i++) textSmall(String(hymnNumber(i)), 74, 21 + i * 7, '#f0e0b0');
+  // pulpit (with its parament fall) and organ
+  R(30, 60, 18, 16, '#7a5234'); R(26, 58, 26, 3, '#5a3a24'); R(35, 62, 8, 9, w.color); R(38, 64, 2, 5, '#f0e6c8');
+  R(196, 56, 30, 22, '#6a4a34'); for (let i = 0; i < 6; i++) { R(199 + i * 4, 44 - (i % 3) * 3, 2, 12 + (i % 3) * 3, '#c8b070'); R(199 + i * 4, 44 - (i % 3) * 3, 1, 12 + (i % 3) * 3, '#e8d090'); }
   // the pastor in the pulpit
   R(37, 51, 5, 7, '#24242c'); R(39, 51, 1, 1, '#ffffff'); R(37, 47, 5, 4, '#e8b890'); R(37, 46, 5, 2, '#5a3a24');
   // pews filling with people
@@ -894,7 +1138,7 @@ function begin() {
   pastor = { ...placeXY('parsonage') }; scene = null; selected = null;
   document.getElementById('title').classList.add('hide');
   save();
-  showCard({ kicker: 'Advent 1 · Tuesday morning', title: 'Welcome to St. Luke\'s', text: 'Your first year as pastor of St. Luke\'s begins with Advent, with your wife Sam and your daughter Bea in the parsonage next door. Monday is your day off; Tuesday to Saturday are yours to spend, two parts a day, and Sunday is Sunday. Study, visit, teach the catechism on Wednesdays, love your people, and rest: the church is Christ\'s, not yours to carry alone.', go: 'Let\'s begin', then: startSlot });
+  showCard({ kicker: 'Advent I · Tuesday morning', title: 'Welcome to Zion', text: 'Your first year as pastor of Zion Evangelical Lutheran Church of the Unaltered Augsburg Confession (everyone just says Zion) begins with Advent, with your wife Sam and your daughter Bea in the parsonage next door. Monday is your day off; Tuesday to Saturday are yours to spend, two parts a day, and Sunday is Sunday. Study, visit, teach the catechism on Wednesdays, love your people, and rest: the church is Christ\'s, not yours to carry alone.', go: 'Let\'s begin', then: startSlot });
 }
 const hadSave = !!(S && !S.over);   // a year in progress to continue (and not lose by accident)
 document.getElementById('newBtn').onclick = () => { if (hadSave && !confirm('Start a new year? Your current one will be lost.')) return; begin(); };

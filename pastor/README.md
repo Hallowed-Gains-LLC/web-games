@@ -1,7 +1,9 @@
-# A Pastor's Year ⛪
+# What Does This Mean? ⛪
+
+*The Small Catechism's question, asked weekly of a boiler, a council and a donkey.*
 
 A cozy pixel-art week planner through one church year as the pastor of
-**St. Luke's Lutheran Church** in Willow Creek, a small Midwestern town.
+**Zion Evangelical Lutheran Church of the Unaltered Augsburg Confession** (everyone just says Zion) in Willow Creek, a small Midwestern town.
 About half an hour from Advent to the Last Sunday of the Church Year.
 
 🎮 **[hallowedgains.com/games/pastor](https://hallowedgains.com/games/pastor/)**
@@ -22,6 +24,7 @@ About half an hour from Advent to the Last Sunday of the Church Year.
   people, how the congregation is getting along, how your sermon went
   (did you study?), and the season. Then come the comments at the door
   and a week in review.
+- **The town.** Willow Creek changes with the church year: snow in Advent, bare trees in Lent, blossoms at Easter, autumn leaves for Reformation. Chimneys smoke, townsfolk walk the sidewalks, and the church's letterboard has a new message every week.
 - **The year.** Eight people have stories that run through the year: a
   homebound 91-year-old, a boiler named Old Faithful, a thermostat war, a
   new family with a baby on the way, a widower who left the choir, a
