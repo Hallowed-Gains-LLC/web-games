@@ -396,6 +396,8 @@ function actionsAt(pl) {
   };
   if (pl === 'church') {
     A.push({ key: 'pray', label: 'Pray in the sanctuary', sub: 'strength · a little sermon' });
+    // The quilters meet in the fellowship hall on Wednesday mornings.
+    if (S.day === 1 && S.slot === 0) A.push({ key: 'quilters', label: 'Coffee with the quilters', sub: 'Wednesday morning · harmony · Marge' });
     if (S.day >= 2 && S.m.sermon >= 30) A.push({ key: 'rehearse', label: 'Preach it to the empty church', sub: 'polish the sermon · Thursday on' });
     A.push({ key: 'property', label: 'Walk the building with Gus', sub: 'building · a list for the trustees' });
     for (const id of ['gus', 'marge', 'josh', 'hannah']) person(id);
@@ -419,6 +421,8 @@ function actionsAt(pl) {
   } else if (pl === 'tap') {
     A.push({ key: 'tap', label: 'A beer with the guys', sub: 'strength · harmony · town news' });
     // Tuesday night is league night on the Tap's two lanes; Zion's team is the Unaltered Pins.
+    // Fridays in Lent, the Tap's fish fry: bring Sam and Bea (not Good Friday, which has its service).
+    if (W().season === 'lent' && S.day === 3 && S.fishWeek !== S.week) A.push({ key: 'fishFry', label: 'Friday fish fry, with Sam and Bea', sub: 'Lent · family · harmony', isNew: true });
     if (S.day === 0 && S.slot === 1 && S.bowlWeek !== S.week) A.push({ key: 'bowling', label: 'League night: the Unaltered Pins', sub: 'Tuesday night · strength · harmony · Gus and Pete', isNew: true });
     if (S.day === 2 && S.slot === 1 && S.tapWeek !== S.week) A.push({ key: 'theologyOnTap', label: 'Host Theology on Tap', sub: 'Thursday night · harmony · sermon', isNew: true });
   } else if (pl === 'parsonage') {
@@ -459,6 +463,8 @@ const BASE = {   // what each kind of action does before its words add their own
   manuscript: () => ({ sermon: S.studies ? Math.round(30 * PREP(S.studies - 1)) : 10, strength: -9 }),   // writing pays once you've studied
   rehearse:   () => ({ sermon: 8, strength: -4, hannah: -6 }),
   tap:        () => ({ strength: 9, harmony: 4, family: -2 }),
+  fishFry:    () => ({ family: 12, harmony: 6, strength: 4 }),
+  quilters:   () => ({ harmony: 6, strength: 2, marge: -10 }),
   bowling:    () => ({ strength: 7, harmony: 6, family: -3, gus: -8, pete: -8 }),   // your teammates count it as a visit
   theologyOnTap: () => ({ harmony: 9, sermon: 6, strength: -7 }),
   pray:     () => ({ strength: 8, sermon: 6, harmony: 2 }),
@@ -471,9 +477,9 @@ const BASE = {   // what each kind of action does before its words add their own
   family:   () => ({ family: 22, strength: 9 }),
   visit:    id => ({ [id]: -35, strength: -10, sermon: 4, harmony: 1 }),
 };
-const POOL_OF = { bowling: 'bowling', exegesis: 'exegesis', fathers: 'fathers', manuscript: 'manuscript', rehearse: 'rehearse', tap: 'tap', theologyOnTap: 'theologyOnTap', communion: 'communion', study: 'study', pray: 'pray', property: 'property', office: 'office', rounds: 'rounds', cafe: 'cafe', rest: 'rest', family: 'family' };
-const KICKER = { bowling: 'The lanes behind Krause\'s Tap', exegesis: 'The church office', fathers: 'The church office', manuscript: 'The church office', rehearse: 'The empty church', tap: 'Krause\'s Tap', theologyOnTap: 'The back room at Krause\'s Tap', communion: 'Pine Haven and the homebound', study: 'The church office', pray: 'The sanctuary', property: 'The building', office: 'The church office', rounds: 'Willow Creek Hospital', cafe: 'The Willow Café', rest: 'The parsonage', family: 'The parsonage' };
-const TITLE = { bowling: 'League night', exegesis: 'The Greek', fathers: 'Luther and the fathers', manuscript: 'The manuscript', rehearse: 'Preaching to the pews', tap: 'One beer', theologyOnTap: 'Theology on Tap', communion: 'Communion calls', study: 'Sermon study', pray: 'Prayer', property: 'Rounds of the building', office: 'Office hours', rounds: 'Hospital rounds', cafe: 'Coffee and pie', rest: 'Rest', family: 'Sam and Bea' };
+const POOL_OF = { fishFry: 'fishFry', quilters: 'quilters', bowling: 'bowling', exegesis: 'exegesis', fathers: 'fathers', manuscript: 'manuscript', rehearse: 'rehearse', tap: 'tap', theologyOnTap: 'theologyOnTap', communion: 'communion', study: 'study', pray: 'pray', property: 'property', office: 'office', rounds: 'rounds', cafe: 'cafe', rest: 'rest', family: 'family' };
+const KICKER = { fishFry: 'Friday night at Krause\'s Tap', quilters: 'The fellowship hall', bowling: 'The lanes behind Krause\'s Tap', exegesis: 'The church office', fathers: 'The church office', manuscript: 'The church office', rehearse: 'The empty church', tap: 'Krause\'s Tap', theologyOnTap: 'The back room at Krause\'s Tap', communion: 'Pine Haven and the homebound', study: 'The church office', pray: 'The sanctuary', property: 'The building', office: 'The church office', rounds: 'Willow Creek Hospital', cafe: 'The Willow Café', rest: 'The parsonage', family: 'The parsonage' };
+const TITLE = { fishFry: 'Fish fry', quilters: 'The quilters', bowling: 'League night', exegesis: 'The Greek', fathers: 'Luther and the fathers', manuscript: 'The manuscript', rehearse: 'Preaching to the pews', tap: 'One beer', theologyOnTap: 'Theology on Tap', communion: 'Communion calls', study: 'Sermon study', pray: 'Prayer', property: 'Rounds of the building', office: 'Office hours', rounds: 'Hospital rounds', cafe: 'Coffee and pie', rest: 'Rest', family: 'Sam and Bea' };
 
 /**
  * Draw a line from a list without repeats: each list has a "bag" of the
@@ -508,6 +514,7 @@ function doAction(a) {
     const fx = sumFx(BASE[a.key](), line.fx);
     if (['study', 'exegesis', 'fathers', 'manuscript'].includes(a.key)) { S.studies++; S.stats.studies++; }
     if (a.key === 'theologyOnTap') { S.tapWeek = S.week; S.stats.theologyOnTap = (S.stats.theologyOnTap || 0) + 1; }
+    if (a.key === 'fishFry') S.fishWeek = S.week;
     if (a.key === 'bowling') { S.bowlWeek = S.week; S.stats.bowling = (S.stats.bowling || 0) + 1; }
     if (a.key === 'communion') { S.lastCommunion = S.week; S.stats.communion = (S.stats.communion || 0) + 1; }
     if (a.key === 'pray') S.stats.prayers++;
