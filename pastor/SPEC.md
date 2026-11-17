@@ -92,7 +92,22 @@ window.PASTOR = {
     family:  [ ... ],   // time with Sam and Bea (15+)
     catechism:[ ... ],  // Wednesday confirmation class when Josh has no story waiting
     communion:[ ... ],  // monthly Communion calls on the homebound and at Pine Haven
+    // Sermon prep (all in the church office; they share the week's diminishing insight):
+    exegesis: [ ... ],  // working through the Greek (or Hebrew)
+    fathers:  [ ... ],  // Luther's postils, Chemnitz, Gerhard, Walther: described, never invented quotes
+    manuscript:[ ... ], // writing the sermon (pays best after some study)
+    rehearse: [ ... ],  // preaching to the empty church, Thursday on
+    // Krause's Tap, the town tavern:
+    tap:      [ ... ],  // one beer with the guys (fx may include person ids, e.g. { walt: -10 })
+    bowling:  [ ... ],  // Tuesday league night on the two lanes behind the Tap (the Unaltered Pins)
+    theologyOnTap:[ ... ], // hosting Theology on Tap, Thursday afternoon/evening
   },
+  //    Any pool entry may carry `when` (minWeek, maxWeek, season, flag, notFlag) to be seasonal.
+  //    The engine draws lines from a "bag": none repeats until every line that fits has been shown.
+
+  // Sunday variety:
+  sermonLines: { great:[...], good:[...], fine:[...], thin:[...] },   // the verdict line; may use {gospel}, {sunday}
+  sundayMornings: [ "…" or { text, when } ],                           // Bible class, the service, the Sacrament
   // 2. Each cast member's story: an ordered list of scenes. The engine shows the FIRST scene whose
   //    `when` matches and that hasn't been seen, when you visit that person. If none match, it shows a
   //    `pools.<id>` style generic visit line from `visitLines[id]`.
@@ -119,10 +134,12 @@ window.PASTOR = {
   //    - hannah: Christmas cantata stress; Easter brass; she asks Pastor to sing a solo (comic).
   //    `when` keys (all optional): minWeek, maxWeek, season, at ("home"|"hospital"|"church"|"cafe"|"office"),
   //    flag, notFlag.
-  visitLines: { olsen:[...], gus:[...], marge:[...], nguyen:[...], walt:[...], josh:[...], pete:[...], hannah:[...] },  // 5+ each
+  visitLines: { olsen:[...], gus:[...], marge:[...], nguyen:[...], walt:[...], josh:[...], pete:[...], hannah:[...] },  // 10+ each; entries { text, fx?, when? }
 
   // 3. Events: phone calls, knocks, emails that arrive at the start of a day. `when`: minWeek, maxWeek,
   //    season, day (0=Tue … 4=Sat), chance (0–1, default 1 for fixed ones), flag/notFlag, once (default true).
+  //    A choice may have `away: true` (a conference, a retreat): the rest of that day is spent away,
+  //    unless the afternoon holds a service or class, in which case only the morning goes.
   //    The engine picks at most one random event per day. Fixed beats use chance:1 with a narrow week.
   events: [
     { id:"boiler", when:{ minWeek:1, maxWeek:1, day:0, chance:1 }, from:"Gus", kind:"call",
